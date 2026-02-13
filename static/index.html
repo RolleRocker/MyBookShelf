@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyBookShelf</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="grain-overlay"></div>
+
+    <header class="site-header">
+        <div class="header-inner">
+            <div class="brand">
+                <div class="brand-icon">
+                    <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                        <rect x="4" y="2" width="6" height="28" rx="1" fill="var(--gold)" opacity="0.9"/>
+                        <rect x="12" y="4" width="6" height="26" rx="1" fill="var(--gold-dim)" opacity="0.7"/>
+                        <rect x="20" y="1" width="6" height="29" rx="1" fill="var(--gold)" opacity="0.8"/>
+                    </svg>
+                </div>
+                <h1 class="brand-name">MyBookShelf</h1>
+            </div>
+            <div class="catalog-search">
+                <div class="search-terminal">
+                    <label for="isbn-input" class="search-label">ISBN</label>
+                    <input
+                        type="text"
+                        id="isbn-input"
+                        placeholder="Enter a 10 or 13 digit ISBN..."
+                        maxlength="13"
+                        autocomplete="off"
+                        spellcheck="false"
+                    >
+                    <button id="add-btn" type="button">
+                        <span>Add to Shelf</span>
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </button>
+                </div>
+                <p id="isbn-error" class="search-error" hidden></p>
+            </div>
+        </div>
+    </header>
+
+    <nav class="filter-bar">
+        <div class="filter-inner">
+            <button class="filter-tab active" data-status="all">
+                <span class="tab-dot dot-all"></span>
+                All Books
+                <span class="tab-count" id="count-all">0</span>
+            </button>
+            <button class="filter-tab" data-status="WANT_TO_READ">
+                <span class="tab-dot dot-want"></span>
+                Want to Read
+                <span class="tab-count" id="count-want">0</span>
+            </button>
+            <button class="filter-tab" data-status="READING">
+                <span class="tab-dot dot-reading"></span>
+                Reading
+                <span class="tab-count" id="count-reading">0</span>
+            </button>
+            <button class="filter-tab" data-status="FINISHED">
+                <span class="tab-dot dot-finished"></span>
+                Finished
+                <span class="tab-count" id="count-finished">0</span>
+            </button>
+        </div>
+    </nav>
+
+    <main class="shelf-container">
+        <div id="book-grid" class="book-grid"></div>
+
+        <div id="empty-state" class="empty-state" hidden>
+            <div class="empty-illustration">
+                <svg width="120" height="120" viewBox="0 0 120 120" fill="none">
+                    <rect x="20" y="15" width="18" height="90" rx="3" fill="var(--gold)" opacity="0.15" transform="rotate(-5 29 60)"/>
+                    <rect x="40" y="10" width="18" height="95" rx="3" fill="var(--gold)" opacity="0.2"/>
+                    <rect x="62" y="18" width="18" height="87" rx="3" fill="var(--gold)" opacity="0.12" transform="rotate(3 71 60)"/>
+                    <rect x="82" y="12" width="18" height="93" rx="3" fill="var(--gold)" opacity="0.18" transform="rotate(-2 91 60)"/>
+                </svg>
+            </div>
+            <h2 class="empty-title">Your shelf is empty</h2>
+            <p class="empty-text">Add your first book by entering an ISBN above.<br>We'll fetch the cover and details automatically.</p>
+        </div>
+    </main>
+
+    <!-- Edit Modal -->
+    <div id="edit-modal" class="modal-overlay" hidden>
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Edit Book</h2>
+                <button class="modal-close" id="modal-close" type="button" aria-label="Close">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <path d="M4 4l12 12M16 4L4 16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+            </div>
+            <form id="edit-form" class="modal-form">
+                <input type="hidden" id="edit-id">
+                <div class="form-group">
+                    <label for="edit-title">Title</label>
+                    <input type="text" id="edit-title" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label for="edit-author">Author</label>
+                    <input type="text" id="edit-author" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label for="edit-genre">Genre</label>
+                    <input type="text" id="edit-genre" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label>Rating</label>
+                    <div class="star-picker" id="edit-rating">
+                        <button type="button" class="star" data-value="1" aria-label="1 star">&#9733;</button>
+                        <button type="button" class="star" data-value="2" aria-label="2 stars">&#9733;</button>
+                        <button type="button" class="star" data-value="3" aria-label="3 stars">&#9733;</button>
+                        <button type="button" class="star" data-value="4" aria-label="4 stars">&#9733;</button>
+                        <button type="button" class="star" data-value="5" aria-label="5 stars">&#9733;</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="edit-status">Reading Status</label>
+                    <select id="edit-status">
+                        <option value="WANT_TO_READ">Want to Read</option>
+                        <option value="READING">Reading</option>
+                        <option value="FINISHED">Finished</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" id="modal-cancel">Cancel</button>
+                    <button type="submit" class="btn-save">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="/app.js"></script>
+</body>
+</html>

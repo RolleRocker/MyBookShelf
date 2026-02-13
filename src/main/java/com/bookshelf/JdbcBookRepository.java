@@ -55,6 +55,24 @@ public class JdbcBookRepository implements BookRepository {
     }
 
     @Override
+    public List<Book> findByReadStatus(ReadStatus readStatus) {
+        String sql = "SELECT * FROM books WHERE read_status = ?";
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, readStatus.name());
+            try (ResultSet rs = stmt.executeQuery()) {
+                List<Book> books = new ArrayList<>();
+                while (rs.next()) {
+                    books.add(mapRow(rs));
+                }
+                return books;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to find books by read status", e);
+        }
+    }
+
+    @Override
     public Optional<Book> findById(UUID id) {
         String sql = "SELECT * FROM books WHERE id = ?";
         try (Connection conn = dataSource.getConnection();
@@ -167,6 +185,8 @@ public class JdbcBookRepository implements BookRepository {
     public void updateFromOpenLibrary(UUID bookId, BookMetadata metadata, String coverPath) {
         String sql = """
                 UPDATE books SET
+                    title = COALESCE(title, ?),
+                    author = COALESCE(author, ?),
                     publisher = COALESCE(publisher, ?),
                     publish_date = COALESCE(publish_date, ?),
                     page_count = COALESCE(page_count, ?),
@@ -179,21 +199,25 @@ public class JdbcBookRepository implements BookRepository {
         try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             if (metadata != null) {
-                stmt.setString(1, metadata.getPublisher());
-                stmt.setString(2, metadata.getPublishDate());
-                setNullableInt(stmt, 3, metadata.getPageCount());
-                stmt.setString(4, metadata.getSubjects() != null ? gson.toJson(metadata.getSubjects()) : null);
-                stmt.setString(5, metadata.getCoverUrl());
+                stmt.setString(1, metadata.getTitle());
+                stmt.setString(2, metadata.getAuthor());
+                stmt.setString(3, metadata.getPublisher());
+                stmt.setString(4, metadata.getPublishDate());
+                setNullableInt(stmt, 5, metadata.getPageCount());
+                stmt.setString(6, metadata.getSubjects() != null ? gson.toJson(metadata.getSubjects()) : null);
+                stmt.setString(7, metadata.getCoverUrl());
             } else {
                 stmt.setString(1, null);
                 stmt.setString(2, null);
-                stmt.setNull(3, Types.INTEGER);
+                stmt.setString(3, null);
                 stmt.setString(4, null);
-                stmt.setString(5, null);
+                stmt.setNull(5, Types.INTEGER);
+                stmt.setString(6, null);
+                stmt.setString(7, null);
             }
-            stmt.setString(6, coverPath);
-            stmt.setTimestamp(7, Timestamp.from(Instant.now()));
-            stmt.setObject(8, bookId);
+            stmt.setString(8, coverPath);
+            stmt.setTimestamp(9, Timestamp.from(Instant.now()));
+            stmt.setObject(10, bookId);
             stmt.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException("Failed to update book from Open Library", e);

@@ -10,6 +10,9 @@ public class App {
         Path coversDir = Path.of("covers");
         Files.createDirectories(coversDir);
 
+        Path staticDir = Path.of("static");
+        Files.createDirectories(staticDir);
+
         DatabaseConfig dbConfig = new DatabaseConfig();
         dbConfig.runMigrations();
 
@@ -17,6 +20,9 @@ public class App {
         OpenLibraryService openLibraryService = new OpenLibraryService(repository, coversDir);
         BookController controller = new BookController(repository, openLibraryService);
         Router router = createRouter(controller);
+
+        StaticFileHandler staticHandler = new StaticFileHandler(staticDir);
+        router.setFallbackHandler(staticHandler::handle);
 
         String portEnv = System.getenv("APP_PORT");
         int port = portEnv != null ? Integer.parseInt(portEnv) : 8080;

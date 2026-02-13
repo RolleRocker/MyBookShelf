@@ -71,6 +71,22 @@ public class OpenLibraryService {
         JsonObject bookData = root.getAsJsonObject(key);
         BookMetadata metadata = new BookMetadata();
 
+        // Title
+        if (bookData.has("title") && !bookData.get("title").isJsonNull()) {
+            metadata.setTitle(bookData.get("title").getAsString());
+        }
+
+        // Authors — first entry in authors array
+        if (bookData.has("authors") && bookData.get("authors").isJsonArray()) {
+            JsonArray authors = bookData.getAsJsonArray("authors");
+            if (!authors.isEmpty()) {
+                JsonElement first = authors.get(0);
+                if (first.isJsonObject() && first.getAsJsonObject().has("name")) {
+                    metadata.setAuthor(first.getAsJsonObject().get("name").getAsString());
+                }
+            }
+        }
+
         // Publisher — first entry in publishers array
         if (bookData.has("publishers") && bookData.get("publishers").isJsonArray()) {
             JsonArray publishers = bookData.getAsJsonArray("publishers");

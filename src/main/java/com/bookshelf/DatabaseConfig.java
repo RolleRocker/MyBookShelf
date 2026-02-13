@@ -53,6 +53,7 @@ public class DatabaseConfig {
                 );
                 CREATE INDEX IF NOT EXISTS idx_books_isbn ON books(isbn);
                 CREATE INDEX IF NOT EXISTS idx_books_genre ON books(LOWER(genre));
+                CREATE INDEX IF NOT EXISTS idx_books_read_status ON books(read_status);
                 """;
 
         try (Connection conn = dataSource.getConnection();

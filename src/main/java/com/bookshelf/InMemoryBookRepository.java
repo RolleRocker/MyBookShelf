@@ -25,6 +25,13 @@ public class InMemoryBookRepository implements BookRepository {
     }
 
     @Override
+    public List<Book> findByReadStatus(ReadStatus readStatus) {
+        return store.values().stream()
+                .filter(b -> b.getReadStatus() == readStatus)
+                .toList();
+    }
+
+    @Override
     public Optional<Book> findById(UUID id) {
         return Optional.ofNullable(store.get(id));
     }
@@ -62,6 +69,12 @@ public class InMemoryBookRepository implements BookRepository {
         if (book == null) return;
 
         if (metadata != null) {
+            if (book.getTitle() == null && metadata.getTitle() != null) {
+                book.setTitle(metadata.getTitle());
+            }
+            if (book.getAuthor() == null && metadata.getAuthor() != null) {
+                book.setAuthor(metadata.getAuthor());
+            }
             if (book.getPublisher() == null && metadata.getPublisher() != null) {
                 book.setPublisher(metadata.getPublisher());
             }

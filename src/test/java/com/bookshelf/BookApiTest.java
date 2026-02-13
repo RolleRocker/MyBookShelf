@@ -391,6 +391,88 @@ public class BookApiTest {
         assertEquals(2, books.size());
     }
 
+    // --- V4 Tests ---
+
+    // --- T43: readStatus filtering ---
+    @Test
+    void testT43_readStatusFilter() throws Exception {
+        post("/books", createBookJson("Book 1", "Author 1", "READING"));
+        post("/books", createBookJson("Book 2", "Author 2", "FINISHED"));
+        post("/books", createBookJson("Book 3", "Author 3", "READING"));
+        post("/books", createBookJson("Book 4", "Author 4", "WANT_TO_READ"));
+
+        HttpResponse<String> resp = get("/books?readStatus=READING");
+        assertEquals(200, resp.statusCode());
+        JsonArray books = JsonParser.parseString(resp.body()).getAsJsonArray();
+        assertEquals(2, books.size());
+
+        resp = get("/books?readStatus=FINISHED");
+        assertEquals(200, resp.statusCode());
+        books = JsonParser.parseString(resp.body()).getAsJsonArray();
+        assertEquals(1, books.size());
+
+        resp = get("/books?readStatus=WANT_TO_READ");
+        assertEquals(200, resp.statusCode());
+        books = JsonParser.parseString(resp.body()).getAsJsonArray();
+        assertEquals(1, books.size());
+    }
+
+    // --- T44: readStatus filter with no matches ---
+    @Test
+    void testT44_readStatusFilterNoMatches() throws Exception {
+        post("/books", createBookJson("Book 1", "Author 1", "READING"));
+
+        HttpResponse<String> resp = get("/books?readStatus=FINISHED");
+        assertEquals(200, resp.statusCode());
+        JsonArray books = JsonParser.parseString(resp.body()).getAsJsonArray();
+        assertEquals(0, books.size());
+    }
+
+    // --- T45: Invalid readStatus returns 400 ---
+    @Test
+    void testT45_invalidReadStatusFilter() throws Exception {
+        HttpResponse<String> resp = get("/books?readStatus=INVALID");
+        assertEquals(400, resp.statusCode());
+    }
+
+    // --- T46: Combined genre + readStatus filter ---
+    @Test
+    void testT46_combinedGenreAndReadStatus() throws Exception {
+        post("/books", createBookJson("Dune", "Frank Herbert", "READING", "sci-fi", null, null));
+        post("/books", createBookJson("Foundation", "Asimov", "FINISHED", "sci-fi", null, null));
+        post("/books", createBookJson("1984", "Orwell", "READING", "dystopia", null, null));
+
+        HttpResponse<String> resp = get("/books?genre=sci-fi&readStatus=READING");
+        assertEquals(200, resp.statusCode());
+        JsonArray books = JsonParser.parseString(resp.body()).getAsJsonArray();
+        assertEquals(1, books.size());
+        assertEquals("Dune", books.get(0).getAsJsonObject().get("title").getAsString());
+    }
+
+    // --- T47: ISBN-only POST (no title/author) returns 201 ---
+    @Test
+    void testT47_isbnOnlyPost() throws Exception {
+        String body = "{\"isbn\":\"9780441013593\",\"readStatus\":\"WANT_TO_READ\"}";
+        HttpResponse<String> resp = post("/books", body);
+        assertEquals(201, resp.statusCode());
+
+        JsonObject book = JsonParser.parseString(resp.body()).getAsJsonObject();
+        assertNotNull(book.get("id").getAsString());
+        assertTrue(book.get("title").isJsonNull());
+        assertTrue(book.get("author").isJsonNull());
+        assertEquals("9780441013593", book.get("isbn").getAsString());
+        assertEquals("WANT_TO_READ", book.get("readStatus").getAsString());
+    }
+
+    // --- T48: title/author still required when no ISBN ---
+    @Test
+    void testT48_titleAuthorRequiredWithoutIsbn() throws Exception {
+        String body = "{\"readStatus\":\"READING\"}";
+        HttpResponse<String> resp = post("/books", body);
+        assertEquals(400, resp.statusCode());
+        assertTrue(resp.body().toLowerCase().contains("title"));
+    }
+
     // --- T6: Genre filtering (case-insensitive) ---
     @Test
     void testT06_genreFilter() throws Exception {

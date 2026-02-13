@@ -34,12 +34,34 @@ public class BookController {
     public HttpResponse handleGetBooks(HttpRequest request) {
         try {
             String genre = request.getQueryParams().get("genre");
+            String readStatusParam = request.getQueryParams().get("readStatus");
+
+            ReadStatus readStatus = null;
+            if (readStatusParam != null && !readStatusParam.isEmpty()) {
+                try {
+                    readStatus = ReadStatus.valueOf(readStatusParam);
+                } catch (IllegalArgumentException e) {
+                    return HttpResponse.badRequest("Invalid readStatus value");
+                }
+            }
+
             List<Book> books;
             if (genre != null && !genre.isEmpty()) {
                 books = repository.findByGenre(genre);
+            } else if (readStatus != null) {
+                books = repository.findByReadStatus(readStatus);
             } else {
                 books = repository.findAll();
             }
+
+            // Apply readStatus filter if both genre and readStatus were provided
+            if (genre != null && !genre.isEmpty() && readStatus != null) {
+                ReadStatus finalReadStatus = readStatus;
+                books = books.stream()
+                        .filter(b -> b.getReadStatus() == finalReadStatus)
+                        .toList();
+            }
+
             return HttpResponse.ok(gson.toJson(books));
         } catch (RuntimeException e) {
             return HttpResponse.internalServerError("Internal server error");
@@ -88,12 +110,15 @@ public class BookController {
 
         // Validate required fields
         String title = getStringField(json, "title");
-        if (title == null || title.isEmpty()) {
+        String author = getStringField(json, "author");
+        String isbn = getStringField(json, "isbn");
+        boolean hasIsbn = isbn != null && !isbn.isEmpty();
+
+        if (!hasIsbn && (title == null || title.isEmpty())) {
             return HttpResponse.badRequest("title is required");
         }
 
-        String author = getStringField(json, "author");
-        if (author == null || author.isEmpty()) {
+        if (!hasIsbn && (author == null || author.isEmpty())) {
             return HttpResponse.badRequest("author is required");
         }
 
@@ -117,11 +142,8 @@ public class BookController {
         }
 
         // Validate ISBN if provided
-        if (json.has("isbn") && !json.get("isbn").isJsonNull()) {
-            String isbn = json.get("isbn").getAsString();
-            if (!isValidIsbn(isbn)) {
-                return HttpResponse.badRequest("Invalid ISBN format");
-            }
+        if (hasIsbn && !isValidIsbn(isbn)) {
+            return HttpResponse.badRequest("Invalid ISBN format");
         }
 
         try {
@@ -132,7 +154,7 @@ public class BookController {
             book.setAuthor(author);
             book.setReadStatus(readStatus);
             book.setGenre(getStringField(json, "genre"));
-            book.setIsbn(getStringField(json, "isbn"));
+            book.setIsbn(hasIsbn ? isbn : null);
             book.setPublisher(getStringField(json, "publisher"));
             book.setPublishDate(getStringField(json, "publishDate"));
 

@@ -11,6 +11,11 @@ public class Router {
     private record Route(String method, String pattern, String[] segments, Function<HttpRequest, HttpResponse> handler) {}
 
     private final List<Route> routes = new ArrayList<>();
+    private Function<HttpRequest, HttpResponse> fallbackHandler;
+
+    public void setFallbackHandler(Function<HttpRequest, HttpResponse> handler) {
+        this.fallbackHandler = handler;
+    }
 
     public void addRoute(String method, String pattern, Function<HttpRequest, HttpResponse> handler) {
         String[] segments = splitPath(pattern);
@@ -48,6 +53,10 @@ public class Router {
 
         if (pathMatchedButMethodDifferent) {
             return HttpResponse.methodNotAllowed();
+        }
+
+        if (fallbackHandler != null && "GET".equals(request.getMethod())) {
+            return fallbackHandler.apply(request);
         }
 
         return HttpResponse.notFound("Not found");
