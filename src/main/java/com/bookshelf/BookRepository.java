@@ -13,6 +13,6 @@ public interface BookRepository {
     Book save(Book book);
     Optional<Book> update(UUID id, Book updates);
     boolean delete(UUID id);
-    void updateFromOpenLibrary(UUID bookId, BookMetadata metadata, String coverPath);
+    void updateFromOpenLibrary(UUID bookId, BookMetadata metadata, byte[] coverData);
     void clear();
 }

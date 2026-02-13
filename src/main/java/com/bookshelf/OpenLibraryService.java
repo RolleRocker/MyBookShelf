@@ -6,14 +6,10 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -24,13 +20,11 @@ import java.util.concurrent.TimeUnit;
 public class OpenLibraryService {
 
     private final BookRepository repository;
-    private final Path coversDir;
     private final ExecutorService executor;
     private final HttpClient httpClient;
 
-    public OpenLibraryService(BookRepository repository, Path coversDir) {
+    public OpenLibraryService(BookRepository repository) {
         this.repository = repository;
-        this.coversDir = coversDir;
         this.executor = Executors.newSingleThreadExecutor();
         this.httpClient = HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_1_1)
@@ -42,8 +36,8 @@ public class OpenLibraryService {
         executor.submit(() -> {
             try {
                 BookMetadata metadata = fetchMetadata(isbn);
-                String coverPath = downloadCover(bookId, isbn);
-                repository.updateFromOpenLibrary(bookId, metadata, coverPath);
+                byte[] coverData = downloadCover(isbn);
+                repository.updateFromOpenLibrary(bookId, metadata, coverData);
             } catch (Exception e) {
                 System.err.println("Enrichment failed for ISBN " + isbn + ": " + e.getMessage());
             }
@@ -135,40 +129,26 @@ public class OpenLibraryService {
         return metadata;
     }
 
-    String downloadCover(UUID bookId, String isbn) throws IOException, InterruptedException {
+    byte[] downloadCover(String isbn) throws IOException, InterruptedException {
         String url = "https://covers.openlibrary.org/b/isbn/" + isbn + "-L.jpg";
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .GET()
                 .build();
 
-        HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+        HttpResponse<byte[]> response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
         if (response.statusCode() != 200) {
             return null;
         }
 
-        Path coverFile = coversDir.resolve(bookId + ".jpg");
-        try (InputStream body = response.body()) {
-            Files.copy(body, coverFile, StandardCopyOption.REPLACE_EXISTING);
-        }
+        byte[] data = response.body();
 
         // Check for 1x1 pixel placeholder (< 1KB)
-        long fileSize = Files.size(coverFile);
-        if (fileSize < 1024) {
-            Files.deleteIfExists(coverFile);
+        if (data.length < 1024) {
             return null;
         }
 
-        return coverFile.toAbsolutePath().toString();
-    }
-
-    public void deleteCover(UUID bookId) {
-        try {
-            Path coverFile = coversDir.resolve(bookId + ".jpg");
-            Files.deleteIfExists(coverFile);
-        } catch (IOException e) {
-            System.err.println("Failed to delete cover for " + bookId + ": " + e.getMessage());
-        }
+        return data;
     }
 
     public void shutdown() {

@@ -111,7 +111,7 @@ public class JdbcBookRepository implements BookRepository {
     public Book save(Book book) {
         String sql = """
                 INSERT INTO books (id, title, author, genre, rating, isbn, publisher, publish_date,
-                    page_count, subjects, read_status, cover_path, cover_url, created_at, updated_at)
+                    page_count, subjects, read_status, cover_data, cover_url, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """;
         try (Connection conn = dataSource.getConnection();
@@ -127,7 +127,7 @@ public class JdbcBookRepository implements BookRepository {
             setNullableInt(stmt, 9, book.getPageCount());
             stmt.setString(10, book.getSubjects() != null ? gson.toJson(book.getSubjects()) : null);
             stmt.setString(11, book.getReadStatus().name());
-            stmt.setString(12, book.getCoverPath());
+            stmt.setBytes(12, book.getCoverData());
             stmt.setString(13, book.getCoverUrl());
             stmt.setTimestamp(14, Timestamp.from(book.getCreatedAt()));
             stmt.setTimestamp(15, Timestamp.from(book.getUpdatedAt()));
@@ -143,7 +143,7 @@ public class JdbcBookRepository implements BookRepository {
         String sql = """
                 UPDATE books SET title = ?, author = ?, genre = ?, rating = ?, isbn = ?,
                     publisher = ?, publish_date = ?, page_count = ?, subjects = ?,
-                    read_status = ?, cover_path = ?, cover_url = ?, updated_at = ?
+                    read_status = ?, cover_data = ?, cover_url = ?, updated_at = ?
                 WHERE id = ?
                 """;
         try (Connection conn = dataSource.getConnection();
@@ -158,7 +158,7 @@ public class JdbcBookRepository implements BookRepository {
             setNullableInt(stmt, 8, book.getPageCount());
             stmt.setString(9, book.getSubjects() != null ? gson.toJson(book.getSubjects()) : null);
             stmt.setString(10, book.getReadStatus().name());
-            stmt.setString(11, book.getCoverPath());
+            stmt.setBytes(11, book.getCoverData());
             stmt.setString(12, book.getCoverUrl());
             stmt.setTimestamp(13, Timestamp.from(book.getUpdatedAt()));
             stmt.setObject(14, id);
@@ -182,7 +182,7 @@ public class JdbcBookRepository implements BookRepository {
     }
 
     @Override
-    public void updateFromOpenLibrary(UUID bookId, BookMetadata metadata, String coverPath) {
+    public void updateFromOpenLibrary(UUID bookId, BookMetadata metadata, byte[] coverData) {
         String sql = """
                 UPDATE books SET
                     title = COALESCE(title, ?),
@@ -192,7 +192,7 @@ public class JdbcBookRepository implements BookRepository {
                     page_count = COALESCE(page_count, ?),
                     subjects = COALESCE(subjects, ?),
                     cover_url = COALESCE(cover_url, ?),
-                    cover_path = COALESCE(cover_path, ?),
+                    cover_data = COALESCE(cover_data, ?),
                     updated_at = ?
                 WHERE id = ?
                 """;
@@ -215,7 +215,7 @@ public class JdbcBookRepository implements BookRepository {
                 stmt.setString(6, null);
                 stmt.setString(7, null);
             }
-            stmt.setString(8, coverPath);
+            stmt.setBytes(8, coverData);
             stmt.setTimestamp(9, Timestamp.from(Instant.now()));
             stmt.setObject(10, bookId);
             stmt.executeUpdate();
@@ -253,7 +253,7 @@ public class JdbcBookRepository implements BookRepository {
             book.setSubjects(gson.fromJson(subjectsJson, new TypeToken<List<String>>(){}.getType()));
         }
         book.setReadStatus(ReadStatus.valueOf(rs.getString("read_status")));
-        book.setCoverPath(rs.getString("cover_path"));
+        book.setCoverData(rs.getBytes("cover_data"));
         book.setCoverUrl(rs.getString("cover_url"));
         Timestamp createdAt = rs.getTimestamp("created_at");
         if (createdAt != null) book.setCreatedAt(createdAt.toInstant());

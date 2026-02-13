@@ -64,7 +64,7 @@ public class InMemoryBookRepository implements BookRepository {
     }
 
     @Override
-    public void updateFromOpenLibrary(UUID bookId, BookMetadata metadata, String coverPath) {
+    public void updateFromOpenLibrary(UUID bookId, BookMetadata metadata, byte[] coverData) {
         Book book = store.get(bookId);
         if (book == null) return;
 
@@ -91,8 +91,8 @@ public class InMemoryBookRepository implements BookRepository {
                 book.setCoverUrl(metadata.getCoverUrl());
             }
         }
-        if (book.getCoverPath() == null && coverPath != null) {
-            book.setCoverPath(coverPath);
+        if (book.getCoverData() == null && coverData != null) {
+            book.setCoverData(coverData);
         }
         book.setUpdatedAt(Instant.now());
     }

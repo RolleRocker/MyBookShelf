@@ -11,9 +11,6 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Comparator;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -25,13 +22,11 @@ public class OpenLibraryTest {
     private static InMemoryBookRepository repository;
     private static OpenLibraryService openLibraryService;
     private static int port;
-    private static Path coversDir;
 
     @BeforeAll
     static void startServer() throws IOException, InterruptedException {
-        coversDir = Files.createTempDirectory("bookshelf-covers-test");
         repository = new InMemoryBookRepository();
-        openLibraryService = new OpenLibraryService(repository, coversDir);
+        openLibraryService = new OpenLibraryService(repository);
         BookController controller = new BookController(repository, openLibraryService);
         Router router = App.createRouter(controller);
         server = new HttpServer(0, router);
@@ -42,24 +37,14 @@ public class OpenLibraryTest {
     }
 
     @AfterAll
-    static void stopServer() throws IOException {
+    static void stopServer() {
         if (openLibraryService != null) openLibraryService.shutdown();
         if (server != null) server.stop();
-        // Clean up temp covers directory
-        if (coversDir != null && Files.exists(coversDir)) {
-            Files.walk(coversDir)
-                    .sorted(Comparator.reverseOrder())
-                    .forEach(p -> { try { Files.delete(p); } catch (IOException ignored) {} });
-        }
     }
 
     @BeforeEach
-    void cleanRepository() throws IOException {
+    void cleanRepository() {
         repository.clear();
-        // Clean cover files between tests
-        if (Files.exists(coversDir)) {
-            Files.list(coversDir).forEach(p -> { try { Files.delete(p); } catch (IOException ignored) {} });
-        }
     }
 
     // --- Helpers ---
@@ -134,6 +119,21 @@ public class OpenLibraryTest {
         return null;
     }
 
+    /**
+     * Polls GET /books/{id}/cover until it returns 200, up to maxWaitSeconds.
+     */
+    private void pollUntilCoverAvailable(String bookId, int maxWaitSeconds) throws Exception {
+        long deadline = System.currentTimeMillis() + maxWaitSeconds * 1000L;
+        while (System.currentTimeMillis() < deadline) {
+            HttpResponse<byte[]> resp = getBytes("/books/" + bookId + "/cover");
+            if (resp.statusCode() == 200) {
+                return;
+            }
+            Thread.sleep(2000);
+        }
+        fail("Timed out waiting for cover to become available on book " + bookId);
+    }
+
     // --- T25: Enrichment fills in metadata ---
     @Test
     void testT25_enrichmentFillsMetadata() throws Exception {
@@ -158,7 +158,7 @@ public class OpenLibraryTest {
         HttpResponse<String> resp = post("/books", body);
         String id = getIdFromResponse(resp);
 
-        pollUntilFieldPopulated(id, "coverPath", 30);
+        pollUntilCoverAvailable(id, 30);
 
         HttpResponse<byte[]> coverResp = getBytes("/books/" + id + "/cover");
         assertEquals(200, coverResp.statusCode());
@@ -192,7 +192,7 @@ public class OpenLibraryTest {
         assertTrue(book.get("publisher").isJsonNull());
         assertTrue(book.get("pageCount").isJsonNull());
         assertTrue(book.get("subjects").isJsonNull());
-        assertTrue(book.get("coverPath").isJsonNull());
+        assertTrue(book.get("coverUrl").isJsonNull());
     }
 
     // --- T29: User-provided fields are not overwritten ---
@@ -240,7 +240,7 @@ public class OpenLibraryTest {
         HttpResponse<String> resp = post("/books", body);
         String id = getIdFromResponse(resp);
 
-        pollUntilFieldPopulated(id, "coverPath", 30);
+        pollUntilCoverAvailable(id, 30);
 
         HttpResponse<String> deleteResp = delete("/books/" + id);
         assertEquals(204, deleteResp.statusCode());

@@ -16,7 +16,7 @@ public class Book {
     private Integer pageCount;
     private List<String> subjects;
     private ReadStatus readStatus;
-    private String coverPath;
+    private transient byte[] coverData;
     private String coverUrl;
     private transient Instant createdAt;
     private transient Instant updatedAt;
@@ -56,8 +56,8 @@ public class Book {
     public ReadStatus getReadStatus() { return readStatus; }
     public void setReadStatus(ReadStatus readStatus) { this.readStatus = readStatus; }
 
-    public String getCoverPath() { return coverPath; }
-    public void setCoverPath(String coverPath) { this.coverPath = coverPath; }
+    public byte[] getCoverData() { return coverData; }
+    public void setCoverData(byte[] coverData) { this.coverData = coverData; }
 
     public String getCoverUrl() { return coverUrl; }
     public void setCoverUrl(String coverUrl) { this.coverUrl = coverUrl; }

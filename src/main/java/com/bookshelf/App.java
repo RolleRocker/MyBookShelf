@@ -1,15 +1,11 @@
 package com.bookshelf;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
 public class App {
 
     public static void main(String[] args) throws Exception {
-        Path coversDir = Path.of("covers");
-        Files.createDirectories(coversDir);
-
         Path staticDir = Path.of("static");
         Files.createDirectories(staticDir);
 
@@ -17,7 +13,7 @@ public class App {
         dbConfig.runMigrations();
 
         BookRepository repository = new JdbcBookRepository(dbConfig.getDataSource());
-        OpenLibraryService openLibraryService = new OpenLibraryService(repository, coversDir);
+        OpenLibraryService openLibraryService = new OpenLibraryService(repository);
         BookController controller = new BookController(repository, openLibraryService);
         Router router = createRouter(controller);
 

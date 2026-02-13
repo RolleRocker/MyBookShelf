@@ -7,9 +7,6 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonSyntaxException;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -290,8 +287,7 @@ public class BookController {
                 book.setPageCount(null);
                 book.setSubjects(null);
                 book.setCoverUrl(null);
-                book.setCoverPath(null);
-                openLibraryService.deleteCover(id);
+                book.setCoverData(null);
             }
 
             book.setUpdatedAt(Instant.now());
@@ -317,9 +313,6 @@ public class BookController {
             }
 
             if (repository.delete(id)) {
-                if (openLibraryService != null) {
-                    openLibraryService.deleteCover(id);
-                }
                 return HttpResponse.noContent();
             }
             return HttpResponse.notFound("Book not found");
@@ -338,20 +331,11 @@ public class BookController {
             }
 
             var bookOpt = repository.findById(id);
-            if (bookOpt.isEmpty() || bookOpt.get().getCoverPath() == null) {
+            if (bookOpt.isEmpty() || bookOpt.get().getCoverData() == null) {
                 return HttpResponse.notFound("Cover not available");
             }
 
-            try {
-                Path coverFile = Path.of(bookOpt.get().getCoverPath());
-                if (!Files.exists(coverFile)) {
-                    return HttpResponse.notFound("Cover not available");
-                }
-                byte[] imageBytes = Files.readAllBytes(coverFile);
-                return HttpResponse.binary(imageBytes, "image/jpeg");
-            } catch (IOException e) {
-                return HttpResponse.notFound("Cover not available");
-            }
+            return HttpResponse.binary(bookOpt.get().getCoverData(), "image/jpeg");
         } catch (RuntimeException e) {
             return HttpResponse.internalServerError("Internal server error");
         }

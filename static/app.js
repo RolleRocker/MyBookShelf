@@ -171,7 +171,7 @@ function createBookCard(book) {
 }
 
 function loadCover(book) {
-    if (!book.coverPath) return;
+    if (!book.coverUrl) return;
     const img = new Image();
     img.onload = () => {
         const container = document.getElementById(`cover-${book.id}`);
