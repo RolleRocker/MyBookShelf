@@ -26,6 +26,10 @@ const modalClose    = document.getElementById('modal-close');
 const modalCancel   = document.getElementById('modal-cancel');
 const filterTabs    = document.querySelectorAll('.filter-tab');
 const toastContainer = document.getElementById('toast-container');
+const scanBtn        = document.getElementById('scan-btn');
+const scannerModal   = document.getElementById('scanner-modal');
+const scannerClose   = document.getElementById('scanner-close');
+const scannerError   = document.getElementById('scanner-error');
 
 // ---- ISBN Validation ----
 
@@ -427,7 +431,112 @@ function setFilter(status) {
     loadBooks();
 }
 
+// ---- ISBN Scanner ----
+
+let html5Qrcode = null;
+let isScanning = false;
+
+function openScanner() {
+    scannerError.hidden = true;
+    scannerModal.hidden = false;
+
+    html5Qrcode = new Html5Qrcode('scanner-viewfinder');
+    isScanning = true;
+
+    html5Qrcode.start(
+        { facingMode: 'environment' },
+        {
+            fps: 10,
+            qrbox: { width: 280, height: 120 },
+            formatsToSupport: [
+                Html5QrcodeSupportedFormats.EAN_13,
+                Html5QrcodeSupportedFormats.EAN_8
+            ]
+        },
+        onBarcodeDetected,
+        () => {} // Ignore per-frame errors
+    ).catch(err => {
+        isScanning = false;
+        const msg = String(err);
+        if (msg.includes('NotAllowedError') || msg.includes('Permission')) {
+            scannerError.textContent = 'Camera permission denied. Please allow camera access in your browser settings.';
+        } else if (msg.includes('NotFoundError') || msg.includes('Requested device not found')) {
+            scannerError.textContent = 'No camera found on this device.';
+        } else {
+            scannerError.textContent = 'Could not start camera: ' + msg;
+        }
+        scannerError.hidden = false;
+    });
+}
+
+function closeScanner() {
+    if (html5Qrcode && isScanning) {
+        html5Qrcode.stop().then(() => {
+            html5Qrcode.clear();
+            html5Qrcode = null;
+            isScanning = false;
+        }).catch(() => {
+            html5Qrcode = null;
+            isScanning = false;
+        });
+    }
+    scannerModal.hidden = true;
+}
+
+async function onBarcodeDetected(decodedText) {
+    // Prevent duplicate triggers
+    if (!isScanning) return;
+    isScanning = false;
+
+    // Stop camera and close modal
+    if (html5Qrcode) {
+        try { await html5Qrcode.stop(); } catch (e) {}
+        try { html5Qrcode.clear(); } catch (e) {}
+        html5Qrcode = null;
+    }
+    scannerModal.hidden = true;
+
+    const code = decodedText.trim();
+
+    if (!isValidIsbn(code)) {
+        showToast('Scanned barcode is not a valid ISBN', 'error');
+        return;
+    }
+
+    isbnInput.value = code;
+    isbnError.hidden = true;
+
+    // Check for existing copy
+    try {
+        const resp = await fetch(API + '/books/isbn/' + code);
+        if (resp.ok) {
+            const existing = await resp.json();
+            const title = existing.title || code;
+            if (!confirm(`You already have "${title}". Add another copy?`)) {
+                return; // Leave ISBN in input, user can decide
+            }
+        }
+        // 404 or user confirmed duplicate — auto-add
+        addBook();
+    } catch (e) {
+        // Network error — still try to add
+        addBook();
+    }
+}
+
+// Hide scan button if library failed to load
+if (typeof Html5Qrcode === 'undefined') {
+    scanBtn.style.display = 'none';
+}
+
 // ---- Event Listeners ----
+
+// Scanner
+scanBtn.addEventListener('click', openScanner);
+scannerClose.addEventListener('click', closeScanner);
+scannerModal.addEventListener('click', (e) => {
+    if (e.target === scannerModal) closeScanner();
+});
 
 // Add book
 addBtn.addEventListener('click', addBook);
@@ -488,10 +597,11 @@ editRating.addEventListener('click', (e) => {
     });
 });
 
-// Escape key closes modal
+// Escape key closes modals
 document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !editModal.hidden) {
-        closeEditModal();
+    if (e.key === 'Escape') {
+        if (!scannerModal.hidden) closeScanner();
+        else if (!editModal.hidden) closeEditModal();
     }
 });
 

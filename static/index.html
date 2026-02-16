@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/style.css">
+    <script src="/lib/html5-qrcode.min.js"></script>
 </head>
 <body>
     <div class="grain-overlay"></div>
@@ -35,6 +36,12 @@
                         autocomplete="off"
                         spellcheck="false"
                     >
+                    <button id="scan-btn" type="button" title="Scan ISBN barcode">
+                        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                            <path d="M1 4V2a1 1 0 011-1h3M14 1h2a1 1 0 011 1v3M17 14v2a1 1 0 01-1 1h-3M4 17H2a1 1 0 01-1-1v-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M4 5v8M7 5v8M10 5v8M13 5v8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity="0.8"/>
+                        </svg>
+                    </button>
                     <button id="add-btn" type="button">
                         <span>Add to Shelf</span>
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -137,6 +144,25 @@
                     <button type="submit" class="btn-save">Save Changes</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Scanner Modal -->
+    <div id="scanner-modal" class="modal-overlay" hidden>
+        <div class="modal scanner-modal">
+            <div class="modal-header">
+                <h2>Scan ISBN Barcode</h2>
+                <button class="modal-close" id="scanner-close" type="button" aria-label="Close">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <path d="M4 4l12 12M16 4L4 16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="scanner-body">
+                <div id="scanner-viewfinder"></div>
+                <p class="scanner-hint">Point your camera at the barcode on the back of a book</p>
+                <p id="scanner-error" class="scanner-error" hidden></p>
+            </div>
         </div>
     </div>
 
