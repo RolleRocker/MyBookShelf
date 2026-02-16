@@ -11,6 +11,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -22,6 +23,7 @@ public class OpenLibraryService {
     private final BookRepository repository;
     private final ExecutorService executor;
     private final HttpClient httpClient;
+    private final String userAgent;
 
     public OpenLibraryService(BookRepository repository) {
         this.repository = repository;
@@ -30,6 +32,7 @@ public class OpenLibraryService {
                 .version(HttpClient.Version.HTTP_1_1)
                 .followRedirects(HttpClient.Redirect.NORMAL)
                 .build();
+        this.userAgent = "MyBookShelf/1.0 (personal project)";
     }
 
     public void enrichBookAsync(UUID bookId, String isbn) {
@@ -48,6 +51,7 @@ public class OpenLibraryService {
         String url = "https://openlibrary.org/api/books?bibkeys=ISBN:" + isbn + "&jscmd=data&format=json";
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
+                .header("User-Agent", userAgent)
                 .GET()
                 .build();
 
@@ -134,6 +138,7 @@ public class OpenLibraryService {
         String url = "https://covers.openlibrary.org/b/isbn/" + isbn + "-L.jpg";
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
+                .header("User-Agent", userAgent)
                 .GET()
                 .build();
 
@@ -150,6 +155,40 @@ public class OpenLibraryService {
         }
 
         return data;
+    }
+
+    public int reEnrichAll(List<Book> books) {
+        // Sort: null-title first (stuck books), then by createdAt
+        List<Book> sorted = new ArrayList<>(books);
+        sorted.sort(Comparator
+                .comparing((Book b) -> b.getTitle() != null) // false (null) before true
+                .thenComparing(b -> b.getCreatedAt() != null ? b.getCreatedAt() : java.time.Instant.EPOCH));
+
+        int count = sorted.size();
+        executor.submit(() -> {
+            for (int i = 0; i < sorted.size(); i++) {
+                Book book = sorted.get(i);
+                try {
+                    BookMetadata metadata = fetchMetadata(book.getIsbn());
+                    byte[] coverData = downloadCover(book.getIsbn());
+                    repository.updateFromOpenLibrary(book.getId(), metadata, coverData);
+                    System.out.println("Re-enriched: " + book.getIsbn() + " (" + (i + 1) + "/" + sorted.size() + ")");
+                } catch (Exception e) {
+                    System.err.println("Re-enrichment failed for ISBN " + book.getIsbn() + ": " + e.getMessage());
+                }
+                // Rate-limit: wait 3 seconds between books (except after last)
+                if (i < sorted.size() - 1) {
+                    try {
+                        Thread.sleep(3000);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
+            }
+            System.out.println("Re-enrichment complete.");
+        });
+        return count;
     }
 
     public void shutdown() {

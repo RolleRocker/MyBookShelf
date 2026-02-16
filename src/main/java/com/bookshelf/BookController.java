@@ -321,6 +321,27 @@ public class BookController {
         }
     }
 
+    public HttpResponse handleReEnrich(HttpRequest request) {
+        try {
+            List<Book> booksWithIsbn = repository.findAll().stream()
+                    .filter(b -> b.getIsbn() != null && !b.getIsbn().isEmpty())
+                    .toList();
+
+            if (booksWithIsbn.isEmpty()) {
+                return HttpResponse.accepted("{\"queued\":0}");
+            }
+
+            if (openLibraryService == null) {
+                return HttpResponse.internalServerError("Open Library service not available");
+            }
+
+            int queued = openLibraryService.reEnrichAll(booksWithIsbn);
+            return HttpResponse.accepted("{\"queued\":" + queued + "}");
+        } catch (RuntimeException e) {
+            return HttpResponse.internalServerError("Internal server error");
+        }
+    }
+
     public HttpResponse handleGetCover(HttpRequest request) {
         try {
             UUID id;

@@ -36,6 +36,10 @@ public class HttpResponse {
         return new HttpResponse(201, "Created", new HashMap<>(), body);
     }
 
+    public static HttpResponse accepted(String body) {
+        return new HttpResponse(202, "Accepted", new HashMap<>(), body);
+    }
+
     public static HttpResponse noContent() {
         return new HttpResponse(204, "No Content", new HashMap<>(), null);
     }

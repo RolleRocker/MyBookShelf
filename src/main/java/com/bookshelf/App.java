@@ -40,6 +40,7 @@ public class App {
         Router router = new Router();
         router.addRoute("GET", "/books", controller::handleGetBooks);
         router.addRoute("POST", "/books", controller::handleCreateBook);
+        router.addRoute("POST", "/books/re-enrich", controller::handleReEnrich);
         router.addRoute("GET", "/books/{id}", controller::handleGetBook);
         router.addRoute("PUT", "/books/{id}", controller::handleUpdateBook);
         router.addRoute("DELETE", "/books/{id}", controller::handleDeleteBook);

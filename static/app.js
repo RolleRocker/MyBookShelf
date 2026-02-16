@@ -32,6 +32,7 @@ const scannerModal   = document.getElementById('scanner-modal');
 const scannerClose   = document.getElementById('scanner-close');
 const scannerError   = document.getElementById('scanner-error');
 const groupToggle    = document.getElementById('group-toggle');
+const refreshBtn     = document.getElementById('refresh-library-btn');
 
 // ---- ISBN Validation ----
 
@@ -676,6 +677,41 @@ groupToggle.addEventListener('click', () => {
     groupByAuthor = !groupByAuthor;
     groupToggle.classList.toggle('active', groupByAuthor);
     renderBooks(allBooks);
+});
+
+// Refresh Library
+refreshBtn.addEventListener('click', async () => {
+    refreshBtn.disabled = true;
+    refreshBtn.textContent = 'Refreshing...';
+    try {
+        const resp = await fetch(API + '/books/re-enrich', { method: 'POST' });
+        if (!resp.ok) throw new Error('Request failed');
+        const data = await resp.json();
+        const count = data.queued || 0;
+        if (count === 0) {
+            showToast('No books with ISBNs to refresh');
+        } else {
+            showToast(`Refreshing ${count} book${count > 1 ? 's' : ''}...`);
+            // Poll for updates: check every 4 seconds, for up to (count * 4) seconds
+            const totalTime = Math.max(10000, count * 4000);
+            let elapsed = 0;
+            const pollInterval = setInterval(async () => {
+                elapsed += 4000;
+                await loadBooks();
+                if (elapsed >= totalTime) {
+                    clearInterval(pollInterval);
+                }
+            }, 4000);
+        }
+    } catch (e) {
+        showToast('Failed to refresh library', 'error');
+    } finally {
+        // Re-enable after a short delay to prevent double-clicks
+        setTimeout(() => {
+            refreshBtn.disabled = false;
+            refreshBtn.textContent = 'Refresh Library';
+        }, 5000);
+    }
 });
 
 // Book grid event delegation
