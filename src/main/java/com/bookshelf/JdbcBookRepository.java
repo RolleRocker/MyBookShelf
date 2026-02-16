@@ -192,6 +192,7 @@ public class JdbcBookRepository implements BookRepository {
                     page_count = COALESCE(page_count, ?),
                     subjects = COALESCE(subjects, ?),
                     cover_url = COALESCE(cover_url, ?),
+                    genre = COALESCE(genre, ?),
                     cover_data = COALESCE(cover_data, ?),
                     updated_at = ?
                 WHERE id = ?
@@ -206,6 +207,7 @@ public class JdbcBookRepository implements BookRepository {
                 setNullableInt(stmt, 5, metadata.getPageCount());
                 stmt.setString(6, metadata.getSubjects() != null ? gson.toJson(metadata.getSubjects()) : null);
                 stmt.setString(7, metadata.getCoverUrl());
+                stmt.setString(8, metadata.getGenre());
             } else {
                 stmt.setString(1, null);
                 stmt.setString(2, null);
@@ -214,10 +216,11 @@ public class JdbcBookRepository implements BookRepository {
                 stmt.setNull(5, Types.INTEGER);
                 stmt.setString(6, null);
                 stmt.setString(7, null);
+                stmt.setString(8, null);
             }
-            stmt.setBytes(8, coverData);
-            stmt.setTimestamp(9, Timestamp.from(Instant.now()));
-            stmt.setObject(10, bookId);
+            stmt.setBytes(9, coverData);
+            stmt.setTimestamp(10, Timestamp.from(Instant.now()));
+            stmt.setObject(11, bookId);
             stmt.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException("Failed to update book from Open Library", e);

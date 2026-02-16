@@ -115,6 +115,7 @@ public class OpenLibraryService {
             }
             if (!subjects.isEmpty()) {
                 metadata.setSubjects(subjects);
+                metadata.setGenre(BookMetadata.deriveGenre(subjects));
             }
         }
 

@@ -90,6 +90,9 @@ public class InMemoryBookRepository implements BookRepository {
             if (book.getCoverUrl() == null && metadata.getCoverUrl() != null) {
                 book.setCoverUrl(metadata.getCoverUrl());
             }
+            if (book.getGenre() == null && metadata.getGenre() != null) {
+                book.setGenre(metadata.getGenre());
+            }
         }
         if (book.getCoverData() == null && coverData != null) {
             book.setCoverData(coverData);
