@@ -51,9 +51,9 @@ The project is built in progressive versions (V1 → V4), each adding a layer:
 - **`ResponseWriter`** — Writes formatted HTTP response to socket `OutputStream`
 
 ### Open Library Integration (V2)
-- **`OpenLibraryService`** — Single-thread `ExecutorService` that asynchronously fetches metadata and cover images from Open Library by ISBN. Enrichment is best-effort; POST returns immediately.
-- **`BookMetadata`** — Model for parsed Open Library data (publisher, publishDate, pageCount, subjects)
-- **`StaticFileHandler`** — Serves cover images from `/covers` directory with `Content-Type: image/jpeg`
+- **`OpenLibraryService`** — Single-thread `ExecutorService` that asynchronously fetches metadata and cover images from Open Library by ISBN. Enrichment is best-effort; POST returns immediately. Sends `User-Agent: MyBookShelf/1.0` header for better rate limits. Also provides `reEnrichAll()` for batch re-enrichment with 3-second rate-limit delays.
+- **`BookMetadata`** — Model for parsed Open Library data (title, author, publisher, publishDate, pageCount, subjects, genre, coverUrl)
+- **`StaticFileHandler`** — Serves static frontend files from `/static` directory
 
 ### Database Layer (V3)
 - **`DatabaseConfig`** — HikariCP connection pool, reads config from env vars, runs schema migration on startup
@@ -78,7 +78,7 @@ The project is built in progressive versions (V1 → V4), each adding a layer:
 | `pageCount`  | Integer                                     | no       | Auto-filled from Open Library. Boxed type for nullable |
 | `subjects`   | List\<String\>                              | no       | Auto-filled; stored as JSON array string in DB |
 | `readStatus` | enum: `WANT_TO_READ`, `READING`, `FINISHED` | yes      | |
-| `coverPath`  | String                                      | no       | Local file path to saved cover image |
+| `coverData`  | byte[] (transient)                          | no       | Cover image bytes, stored as BYTEA in DB. Not serialized to JSON |
 | `coverUrl`   | String                                      | no       | Original Open Library URL |
 
 ## API Endpoints
@@ -91,7 +91,8 @@ The project is built in progressive versions (V1 → V4), each adding a layer:
 | `POST`   | `/books`              | Add a new book                           | `201 Created`    |
 | `PUT`    | `/books/{id}`         | Partial update (only sent fields change) | `200 OK`         |
 | `DELETE` | `/books/{id}`         | Delete a book                            | `204 No Content` |
-| `GET`    | `/books/{id}/cover`   | Serve cover image (V2+)                  | `200 OK`         |
+| `POST`   | `/books/re-enrich`    | Re-enrich all books with ISBNs from Open Library | `202 Accepted` |
+| `GET`    | `/books/{id}/cover`   | Serve cover image from DB (V2+)          | `200 OK`         |
 
 ### Error Responses
 | Code  | When |
@@ -109,7 +110,9 @@ The project is built in progressive versions (V1 → V4), each adding a layer:
 - **Rating**: Integer 1–5, default `0` (not rated). User cannot explicitly set `0`; it's only the default
 - **`rating`/`pageCount` use `Integer`** (boxed) — nullable to distinguish "not provided" from 0 in partial updates
 - **Subjects**: stored as JSON array string in a TEXT column
-- **Open Library enrichment** only fills in `null` fields — user-provided values are never overwritten. On ISBN change (PUT), previously-enriched fields are cleared before re-enrichment
+- **Open Library enrichment** only fills in `null` fields — user-provided values are never overwritten. On ISBN change (PUT), previously-enriched fields are cleared before re-enrichment. Genre is auto-derived from subjects during enrichment
+- **Re-enrichment** — `POST /books/re-enrich` queues all ISBN-bearing books for background re-enrichment (null-title books first), with 3-second delays between requests to respect rate limits
+- **Cover images stored in DB** — as `BYTEA` in PostgreSQL (`cover_data` column), not on filesystem. `Book.coverData` is `transient` (not serialized to JSON)
 - **No genre filtering in V1** — added in V3 as SQL `findByGenre()`. Read status filtering (`?readStatus=`) added in V4
 - **DB schema allows NULL for `title`/`author`** from V1 onward to avoid migration when V4 makes them optional
 - **1x1 pixel detection**: Open Library returns a tiny placeholder instead of 404 for missing covers; check file size < 1KB
@@ -133,4 +136,4 @@ Tests use JUnit 5 with `java.net.HttpClient`. The server starts on a random port
 
 ## Database Column Mapping
 
-DB uses `snake_case` (`read_status`, `cover_path`, `publish_date`, `page_count`, `cover_url`, `created_at`, `updated_at`), Java uses `camelCase`. Map explicitly in `JdbcBookRepository`.
+DB uses `snake_case` (`read_status`, `cover_path`, `cover_data`, `publish_date`, `page_count`, `cover_url`, `created_at`, `updated_at`), Java uses `camelCase`. Map explicitly in `JdbcBookRepository`.
