@@ -162,8 +162,12 @@
                 </button>
             </div>
             <div class="scanner-body">
+                <select id="camera-select" class="camera-select" hidden>
+                    <option value="">Detecting cameras...</option>
+                </select>
                 <div id="scanner-viewfinder"></div>
                 <p class="scanner-hint">Point your camera at the barcode on the back of a book</p>
+                <p id="scanner-timeout-hint" class="scanner-timeout-hint" hidden></p>
                 <p id="scanner-error" class="scanner-error" hidden></p>
             </div>
         </div>

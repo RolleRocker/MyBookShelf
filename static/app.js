@@ -484,13 +484,108 @@ let html5Qrcode = null;
 let isScanning = false;
 let nativeStream = null;
 let nativeScanTimer = null;
+let scannerTimeoutTimer = null;
+let scannerHintTimer = null;
 
 const hasNativeBarcodeDetector = 'BarcodeDetector' in window;
+const cameraSelect = document.getElementById('camera-select');
+const scannerTimeoutHint = document.getElementById('scanner-timeout-hint');
 
-function openScanner() {
+const SCANNER_CAMERA_KEY = 'mybookshelf-camera-id';
+
+async function enumerateCameras() {
+    try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const cameras = devices.filter(d => d.kind === 'videoinput');
+        if (cameras.length === 0) return [];
+
+        cameraSelect.innerHTML = '';
+        cameras.forEach((cam, i) => {
+            const opt = document.createElement('option');
+            opt.value = cam.deviceId;
+            opt.textContent = cam.label || `Camera ${i + 1}`;
+            cameraSelect.appendChild(opt);
+        });
+
+        // Restore last-used camera, or default to last in list (USB cams appear last)
+        const saved = localStorage.getItem(SCANNER_CAMERA_KEY);
+        const savedExists = cameras.some(c => c.deviceId === saved);
+        if (saved && savedExists) {
+            cameraSelect.value = saved;
+        } else {
+            cameraSelect.value = cameras[cameras.length - 1].deviceId;
+        }
+
+        cameraSelect.hidden = cameras.length <= 1;
+        return cameras;
+    } catch (e) {
+        cameraSelect.hidden = true;
+        return [];
+    }
+}
+
+function getVideoConstraints() {
+    const deviceId = cameraSelect.value;
+    const constraints = {
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+    };
+    if (deviceId) {
+        constraints.deviceId = { exact: deviceId };
+    } else {
+        constraints.facingMode = 'environment';
+    }
+    // Hint for continuous autofocus (ignored if unsupported)
+    constraints.focusMode = { ideal: 'continuous' };
+    return constraints;
+}
+
+function startScannerTimeouts() {
+    scannerTimeoutHint.hidden = true;
+    scannerTimeoutHint.innerHTML = '';
+
+    scannerHintTimer = setTimeout(() => {
+        if (!isScanning) return;
+        scannerTimeoutHint.textContent = 'Having trouble? Try holding the barcode closer or switching cameras.';
+        scannerTimeoutHint.hidden = false;
+    }, 15000);
+
+    scannerTimeoutTimer = setTimeout(() => {
+        if (!isScanning) return;
+        scannerTimeoutHint.innerHTML = 'Still no detection. <a id="scanner-type-manually">Type ISBN manually</a>';
+        scannerTimeoutHint.hidden = false;
+        document.getElementById('scanner-type-manually')?.addEventListener('click', () => {
+            closeScanner();
+            isbnInput.focus();
+        });
+    }, 30000);
+}
+
+function clearScannerTimeouts() {
+    if (scannerHintTimer) { clearTimeout(scannerHintTimer); scannerHintTimer = null; }
+    if (scannerTimeoutTimer) { clearTimeout(scannerTimeoutTimer); scannerTimeoutTimer = null; }
+    scannerTimeoutHint.hidden = true;
+}
+
+async function openScanner() {
     scannerError.hidden = true;
+    scannerTimeoutHint.hidden = true;
     scannerModal.hidden = false;
     isScanning = true;
+
+    // Need an initial getUserMedia to get labeled device list
+    try {
+        const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        tempStream.getTracks().forEach(t => t.stop());
+    } catch (e) {
+        // Permission denied — enumerateCameras will still work but labels may be empty
+    }
+
+    await enumerateCameras();
+    startScannerTimeouts();
+
+    const viewfinder = document.getElementById('scanner-viewfinder');
+    viewfinder.classList.add('scanning');
 
     if (hasNativeBarcodeDetector) {
         openNativeScanner();
@@ -504,7 +599,7 @@ function openNativeScanner() {
     const viewfinder = document.getElementById('scanner-viewfinder');
 
     navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+        video: getVideoConstraints()
     }).then(stream => {
         nativeStream = stream;
         const video = document.createElement('video');
@@ -513,6 +608,9 @@ function openNativeScanner() {
         video.play();
         viewfinder.innerHTML = '';
         viewfinder.appendChild(video);
+
+        // Save selected camera
+        if (cameraSelect.value) localStorage.setItem(SCANNER_CAMERA_KEY, cameraSelect.value);
 
         nativeScanTimer = setInterval(async () => {
             if (!isScanning || video.readyState < 2) return;
@@ -531,18 +629,26 @@ function openNativeScanner() {
 
 function openHtml5Scanner() {
     html5Qrcode = new Html5Qrcode('scanner-viewfinder');
+    const deviceId = cameraSelect.value;
+
+    // Save selected camera
+    if (deviceId) localStorage.setItem(SCANNER_CAMERA_KEY, deviceId);
+
+    // Camera source: use deviceId if available, otherwise fall back to facingMode
+    const cameraSource = deviceId
+        ? { deviceId: { exact: deviceId } }
+        : { facingMode: 'environment' };
 
     html5Qrcode.start(
-        { facingMode: 'environment' },
+        cameraSource,
         {
             fps: 20,
-            qrbox: { width: 340, height: 160 },
+            qrbox: (viewfinderWidth, viewfinderHeight) => ({
+                width: Math.floor(viewfinderWidth * 0.8),
+                height: Math.floor(viewfinderHeight * 0.4)
+            }),
             disableFlip: true,
-            videoConstraints: {
-                facingMode: 'environment',
-                width: { ideal: 1280 },
-                height: { ideal: 720 }
-            },
+            videoConstraints: getVideoConstraints(),
             formatsToSupport: [
                 Html5QrcodeSupportedFormats.EAN_13,
                 Html5QrcodeSupportedFormats.EAN_8,
@@ -572,6 +678,10 @@ function showScannerError(err) {
 
 function closeScanner() {
     isScanning = false;
+    clearScannerTimeouts();
+
+    const viewfinder = document.getElementById('scanner-viewfinder');
+    viewfinder.classList.remove('scanning');
 
     if (nativeScanTimer) {
         clearInterval(nativeScanTimer);
@@ -593,6 +703,25 @@ function closeScanner() {
     scannerModal.hidden = true;
 }
 
+function stopCurrentCamera() {
+    if (nativeScanTimer) {
+        clearInterval(nativeScanTimer);
+        nativeScanTimer = null;
+    }
+    if (nativeStream) {
+        nativeStream.getTracks().forEach(t => t.stop());
+        nativeStream = null;
+    }
+    if (html5Qrcode) {
+        html5Qrcode.stop().then(() => {
+            html5Qrcode.clear();
+            html5Qrcode = null;
+        }).catch(() => {
+            html5Qrcode = null;
+        });
+    }
+}
+
 function handleScanResult(decodedText) {
     if (!isScanning) return;
     isScanning = false;
@@ -604,6 +733,7 @@ async function onBarcodeDetected(decodedText) {
     // html5-qrcode callback
     if (!isScanning) return;
     isScanning = false;
+    clearScannerTimeouts();
 
     if (html5Qrcode) {
         try { await html5Qrcode.stop(); } catch (e) {}
@@ -652,6 +782,20 @@ scanBtn.addEventListener('click', openScanner);
 scannerClose.addEventListener('click', closeScanner);
 scannerModal.addEventListener('click', (e) => {
     if (e.target === scannerModal) closeScanner();
+});
+cameraSelect.addEventListener('change', () => {
+    if (!isScanning) return;
+    stopCurrentCamera();
+    clearScannerTimeouts();
+    startScannerTimeouts();
+    const viewfinder = document.getElementById('scanner-viewfinder');
+    viewfinder.innerHTML = '';
+    viewfinder.classList.add('scanning');
+    if (hasNativeBarcodeDetector) {
+        openNativeScanner();
+    } else {
+        openHtml5Scanner();
+    }
 });
 
 // Add book

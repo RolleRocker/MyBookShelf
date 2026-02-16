@@ -924,6 +924,67 @@ body {
     animation: shake 0.35s var(--ease-out);
 }
 
+/* Camera select dropdown */
+.camera-select {
+    width: 100%;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.55rem 0.8rem;
+    color: var(--text-primary);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.82rem;
+    outline: none;
+    cursor: pointer;
+    margin-bottom: 0.8rem;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%237a6e5c' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.8rem center;
+    padding-right: 2.2rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.camera-select:focus {
+    border-color: var(--gold-dim);
+    box-shadow: 0 0 0 3px var(--gold-glow);
+}
+
+.camera-select[hidden] {
+    display: none;
+}
+
+/* Scanning indicator — pulsing gold border */
+#scanner-viewfinder.scanning {
+    animation: scanPulse 2s ease-in-out infinite;
+}
+
+@keyframes scanPulse {
+    0%, 100% { border-color: var(--gold-dim); box-shadow: 0 0 0 0 rgba(212, 160, 74, 0); }
+    50% { border-color: var(--gold); box-shadow: 0 0 12px 2px rgba(212, 160, 74, 0.25); }
+}
+
+/* Timeout hint */
+.scanner-timeout-hint {
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--gold-dim);
+    margin-top: 0.6rem;
+    line-height: 1.5;
+    animation: fadeIn 0.4s var(--ease-out);
+}
+
+.scanner-timeout-hint a {
+    color: var(--gold);
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.scanner-timeout-hint a:hover {
+    color: var(--text-primary);
+}
+
 /* ---- Responsive ---- */
 
 @media (max-width: 768px) {
