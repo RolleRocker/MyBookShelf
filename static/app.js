@@ -215,27 +215,38 @@ function renderBooks(books) {
     }
 }
 
+function normalizeAuthor(author) {
+    if (!author) return '';
+    return author.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
 function renderBooksGrouped(books) {
     const groups = new Map();
+    const displayNames = new Map(); // normalized key -> best display name
     books.forEach(book => {
-        const author = book.author || 'Unknown Author';
-        if (!groups.has(author)) groups.set(author, []);
-        groups.get(author).push(book);
+        const raw = book.author || '';
+        const key = normalizeAuthor(raw) || '_unknown';
+        if (!groups.has(key)) {
+            groups.set(key, []);
+            displayNames.set(key, raw || 'Unknown Author');
+        }
+        groups.get(key).push(book);
     });
 
-    const sortedAuthors = [...groups.keys()].sort((a, b) => {
-        if (a === 'Unknown Author') return 1;
-        if (b === 'Unknown Author') return -1;
+    const sortedKeys = [...groups.keys()].sort((a, b) => {
+        if (a === '_unknown') return 1;
+        if (b === '_unknown') return -1;
         return a.localeCompare(b, undefined, { sensitivity: 'base' });
     });
 
-    sortedAuthors.forEach(author => {
-        const authorBooks = groups.get(author);
+    sortedKeys.forEach(key => {
+        const authorBooks = groups.get(key);
+        const displayName = displayNames.get(key);
         authorBooks.sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base' }));
 
         const section = document.createElement('div');
         section.className = 'author-section';
-        section.innerHTML = `<h3 class="author-heading">${escapeHtml(author)} <span class="author-count">${authorBooks.length}</span></h3>`;
+        section.innerHTML = `<h3 class="author-heading">${escapeHtml(displayName)} <span class="author-count">${authorBooks.length}</span></h3>`;
         bookGrid.appendChild(section);
 
         authorBooks.forEach(book => {
