@@ -8,6 +8,7 @@ A personal bookshelf REST API built from scratch in Java 17 using only `java.net
 - **Full CRUD REST API** for managing books with filtering by genre and read status
 - **Open Library integration** — add a book by ISBN and metadata (title, author, publisher, page count, subjects, cover image) is fetched automatically in the background
 - **Cover image storage** — covers downloaded from Open Library and stored as binary data in PostgreSQL
+- **ISBN barcode scanner** — scan a book's barcode with your device camera to add it instantly
 - **Vanilla JS frontend** — dark antiquarian-library-themed UI with ISBN input, filter tabs, inline editing, and star ratings
 - **Dockerized** — single `docker compose up` to run the app and database together
 - **38 automated tests** covering the full API surface, validation, edge cases, and enrichment logic
@@ -24,6 +25,7 @@ A personal bookshelf REST API built from scratch in Java 17 using only `java.net
 | Build | Gradle 8 + Shadow plugin |
 | Container | Docker + Docker Compose |
 | Frontend | Vanilla HTML / CSS / JS |
+| Barcode Scanning | html5-qrcode |
 | Tests | JUnit 5 + `java.net.HttpClient` |
 
 ## Getting Started
@@ -179,7 +181,9 @@ src/test/java/com/bookshelf/
 static/
 ├── index.html                  # Frontend page
 ├── style.css                   # Dark antiquarian theme
-└── app.js                      # ISBN input, polling, inline editing
+├── app.js                      # ISBN input, polling, inline editing, barcode scanner
+└── lib/
+    └── html5-qrcode.min.js     # Vendored barcode scanning library
 ```
 
 ### Key Design Decisions
