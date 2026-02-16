@@ -290,6 +290,76 @@ body {
     color: var(--gold);
 }
 
+/* ---- Group by Author Toggle ---- */
+
+.filter-spacer {
+    flex: 1;
+}
+
+.group-toggle {
+    display: flex;
+    align-items: center;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 500;
+    padding: 0.45rem 0.9rem;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s, background 0.2s;
+    white-space: nowrap;
+    align-self: center;
+}
+
+.group-toggle:hover {
+    color: var(--text-secondary);
+    border-color: var(--border-strong);
+}
+
+.group-toggle.active {
+    color: var(--gold);
+    border-color: var(--gold-dim);
+    background: var(--gold-subtle);
+}
+
+/* ---- Author Section Headings ---- */
+
+.author-section {
+    grid-column: 1 / -1;
+    padding-top: 1rem;
+}
+
+.author-section:first-child {
+    padding-top: 0;
+}
+
+.author-heading {
+    font-family: 'Libre Baskerville', Georgia, serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.25rem;
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+}
+
+.author-count {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.68rem;
+    font-weight: 600;
+    background: var(--gold-subtle);
+    color: var(--text-dim);
+    border-radius: 10px;
+    padding: 0.1rem 0.5rem;
+    min-width: 1.4rem;
+    text-align: center;
+}
+
 /* ---- Main Shelf ---- */
 
 .shelf-container {

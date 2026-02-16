@@ -5,6 +5,7 @@
 const API = '';
 let currentFilter = 'all';
 let allBooks = [];
+let groupByAuthor = false;
 const pollingTimers = new Map();
 
 // ---- DOM References ----
@@ -30,6 +31,7 @@ const scanBtn        = document.getElementById('scan-btn');
 const scannerModal   = document.getElementById('scanner-modal');
 const scannerClose   = document.getElementById('scanner-close');
 const scannerError   = document.getElementById('scanner-error');
+const groupToggle    = document.getElementById('group-toggle');
 
 // ---- ISBN Validation ----
 
@@ -203,10 +205,43 @@ function renderBooks(books) {
         emptyState.hidden = false;
     } else {
         emptyState.hidden = true;
-        books.forEach(book => {
+        if (groupByAuthor) {
+            renderBooksGrouped(books);
+        } else {
+            books.forEach(book => {
+                bookGrid.appendChild(createBookCard(book));
+            });
+        }
+    }
+}
+
+function renderBooksGrouped(books) {
+    const groups = new Map();
+    books.forEach(book => {
+        const author = book.author || 'Unknown Author';
+        if (!groups.has(author)) groups.set(author, []);
+        groups.get(author).push(book);
+    });
+
+    const sortedAuthors = [...groups.keys()].sort((a, b) => {
+        if (a === 'Unknown Author') return 1;
+        if (b === 'Unknown Author') return -1;
+        return a.localeCompare(b, undefined, { sensitivity: 'base' });
+    });
+
+    sortedAuthors.forEach(author => {
+        const authorBooks = groups.get(author);
+        authorBooks.sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base' }));
+
+        const section = document.createElement('div');
+        section.className = 'author-section';
+        section.innerHTML = `<h3 class="author-heading">${escapeHtml(author)} <span class="author-count">${authorBooks.length}</span></h3>`;
+        bookGrid.appendChild(section);
+
+        authorBooks.forEach(book => {
             bookGrid.appendChild(createBookCard(book));
         });
-    }
+    });
 }
 
 // ---- Update Counts ----
@@ -554,6 +589,13 @@ isbnInput.addEventListener('keydown', (e) => {
 // Filter tabs
 filterTabs.forEach(tab => {
     tab.addEventListener('click', () => setFilter(tab.dataset.status));
+});
+
+// Group by author toggle
+groupToggle.addEventListener('click', () => {
+    groupByAuthor = !groupByAuthor;
+    groupToggle.classList.toggle('active', groupByAuthor);
+    renderBooks(allBooks);
 });
 
 // Book grid event delegation
