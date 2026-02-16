@@ -535,9 +535,42 @@ function getVideoConstraints() {
     } else {
         constraints.facingMode = 'environment';
     }
-    // Hint for continuous autofocus (ignored if unsupported)
+    // Hints for better scanning (ignored if unsupported by the camera)
     constraints.focusMode = { ideal: 'continuous' };
+    constraints.torch = false;  // flash causes glare on glossy pages
     return constraints;
+}
+
+// Canvas-based contrast enhancement for cutting through glare on glossy pages.
+// Converts to grayscale, stretches contrast, then applies a hard threshold
+// so washed-out bars under glare become crisp black/white.
+function createEnhancedFrame(video) {
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(video, 0, 0);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+
+    // Find min/max luminance for adaptive contrast stretch
+    let min = 255, max = 0;
+    for (let i = 0; i < data.length; i += 4) {
+        const gray = (data[i] * 77 + data[i + 1] * 150 + data[i + 2] * 29) >> 8;
+        if (gray < min) min = gray;
+        if (gray > max) max = gray;
+    }
+    const range = max - min || 1;
+
+    // Apply contrast stretch + threshold in a single pass
+    const threshold = min + range * 0.45;
+    for (let i = 0; i < data.length; i += 4) {
+        const gray = (data[i] * 77 + data[i + 1] * 150 + data[i + 2] * 29) >> 8;
+        const val = gray < threshold ? 0 : 255;
+        data[i] = data[i + 1] = data[i + 2] = val;
+    }
+    ctx.putImageData(imageData, 0, 0);
+    return canvas;
 }
 
 function startScannerTimeouts() {
@@ -546,7 +579,7 @@ function startScannerTimeouts() {
 
     scannerHintTimer = setTimeout(() => {
         if (!isScanning) return;
-        scannerTimeoutHint.textContent = 'Having trouble? Try holding the barcode closer or switching cameras.';
+        scannerTimeoutHint.textContent = 'Having trouble? Tilt the book slightly to reduce glare, move closer, or try switching cameras.';
         scannerTimeoutHint.hidden = false;
     }, 15000);
 
@@ -612,15 +645,26 @@ function openNativeScanner() {
         // Save selected camera
         if (cameraSelect.value) localStorage.setItem(SCANNER_CAMERA_KEY, cameraSelect.value);
 
+        let scanBusy = false;
         nativeScanTimer = setInterval(async () => {
-            if (!isScanning || video.readyState < 2) return;
+            if (!isScanning || video.readyState < 2 || scanBusy) return;
+            scanBusy = true;
             try {
-                const barcodes = await detector.detect(video);
+                // Try raw frame first
+                let barcodes = await detector.detect(video);
+                if (barcodes.length > 0) {
+                    handleScanResult(barcodes[0].rawValue);
+                    return;
+                }
+                // Try contrast-enhanced frame (cuts through glossy glare)
+                const enhanced = createEnhancedFrame(video);
+                barcodes = await detector.detect(enhanced);
                 if (barcodes.length > 0) {
                     handleScanResult(barcodes[0].rawValue);
                 }
             } catch (e) {}
-        }, 50);
+            scanBusy = false;
+        }, 40);
     }).catch(err => {
         isScanning = false;
         showScannerError(err);
@@ -642,7 +686,7 @@ function openHtml5Scanner() {
     html5Qrcode.start(
         cameraSource,
         {
-            fps: 20,
+            fps: 25,
             qrbox: (viewfinderWidth, viewfinderHeight) => ({
                 width: Math.floor(viewfinderWidth * 0.8),
                 height: Math.floor(viewfinderHeight * 0.4)
