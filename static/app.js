@@ -695,6 +695,7 @@ refreshBtn.addEventListener('click', async () => {
             // Poll for updates without re-rendering the whole page
             const totalTime = Math.max(10000, count * 4000);
             let elapsed = 0;
+            let updatedCount = 0;
             const pollInterval = setInterval(async () => {
                 elapsed += 4000;
                 try {
@@ -702,7 +703,6 @@ refreshBtn.addEventListener('click', async () => {
                     for (const fresh of freshBooks) {
                         const cached = allBooks.find(b => b.id === fresh.id);
                         if (!cached) continue;
-                        // Update card only if something changed
                         const changed = fresh.title !== cached.title
                             || fresh.author !== cached.author
                             || fresh.coverUrl !== cached.coverUrl
@@ -710,6 +710,9 @@ refreshBtn.addEventListener('click', async () => {
                             || fresh.genre !== cached.genre;
                         if (changed) {
                             updateCardInPlace(fresh);
+                            updatedCount++;
+                            const name = fresh.title || fresh.isbn || 'Book';
+                            showToast(`Updated: ${name}`);
                         }
                     }
                     allBooks = freshBooks;
@@ -717,6 +720,7 @@ refreshBtn.addEventListener('click', async () => {
                 } catch (e) { /* ignore polling errors */ }
                 if (elapsed >= totalTime) {
                     clearInterval(pollInterval);
+                    showToast(`Refresh complete — ${updatedCount} book${updatedCount !== 1 ? 's' : ''} updated`);
                 }
             }, 4000);
         }
