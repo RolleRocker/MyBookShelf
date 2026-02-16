@@ -692,12 +692,29 @@ refreshBtn.addEventListener('click', async () => {
             showToast('No books with ISBNs to refresh');
         } else {
             showToast(`Refreshing ${count} book${count > 1 ? 's' : ''}...`);
-            // Poll for updates: check every 4 seconds, for up to (count * 4) seconds
+            // Poll for updates without re-rendering the whole page
             const totalTime = Math.max(10000, count * 4000);
             let elapsed = 0;
             const pollInterval = setInterval(async () => {
                 elapsed += 4000;
-                await loadBooks();
+                try {
+                    const freshBooks = await apiGet('/books');
+                    for (const fresh of freshBooks) {
+                        const cached = allBooks.find(b => b.id === fresh.id);
+                        if (!cached) continue;
+                        // Update card only if something changed
+                        const changed = fresh.title !== cached.title
+                            || fresh.author !== cached.author
+                            || fresh.coverUrl !== cached.coverUrl
+                            || fresh.publisher !== cached.publisher
+                            || fresh.genre !== cached.genre;
+                        if (changed) {
+                            updateCardInPlace(fresh);
+                        }
+                    }
+                    allBooks = freshBooks;
+                    updateCounts(freshBooks);
+                } catch (e) { /* ignore polling errors */ }
                 if (elapsed >= totalTime) {
                     clearInterval(pollInterval);
                 }
