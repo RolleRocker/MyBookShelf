@@ -94,7 +94,7 @@ function showToast(message, type = 'success') {
     setTimeout(() => {
         toast.classList.add('toast-out');
         toast.addEventListener('animationend', () => toast.remove());
-    }, 2800);
+    }, 4500);
 }
 
 // ---- Status Helpers ----

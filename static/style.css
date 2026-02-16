@@ -818,12 +818,13 @@ body {
     background: var(--bg-card);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-md);
-    padding: 0.75rem 1.1rem;
-    font-size: 0.85rem;
+    padding: 0.9rem 1.3rem;
+    font-size: 0.95rem;
+    font-weight: 500;
     color: var(--text-primary);
-    box-shadow: var(--shadow-card);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
     animation: toastIn 0.3s var(--ease-out);
-    max-width: 320px;
+    max-width: 360px;
 }
 
 .toast.error {
