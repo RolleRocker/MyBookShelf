@@ -483,7 +483,6 @@ function setFilter(status) {
 let html5Qrcode = null;
 let isScanning = false;
 let nativeStream = null;
-let nativeScanTimer = null;
 let scannerTimeoutTimer = null;
 let scannerHintTimer = null;
 
@@ -541,36 +540,148 @@ function getVideoConstraints() {
     return constraints;
 }
 
-// Canvas-based contrast enhancement for cutting through glare on glossy pages.
-// Converts to grayscale, stretches contrast, then applies a hard threshold
-// so washed-out bars under glare become crisp black/white.
-function createEnhancedFrame(video) {
+// ---- Image Processing Pipeline for Barcode Detection ----
+// Capture at 1080p for sharpness, but downscale before processing.
+// Processing chain: downscale → sharpen → threshold → decode.
+
+const SCAN_WIDTH = 800; // Downscale target — barcodes are readable, processing is 4-6x faster
+
+// Grab a downscaled grayscale snapshot from the center of the video (ROI).
+// Returns { canvas, ctx, gray, width, height }.
+function captureROI(video) {
+    const vw = video.videoWidth, vh = video.videoHeight;
+    // Crop to central 80% x 50% — most likely barcode region
+    const roiW = Math.floor(vw * 0.8);
+    const roiH = Math.floor(vh * 0.5);
+    const roiX = Math.floor((vw - roiW) / 2);
+    const roiY = Math.floor((vh - roiH) / 2);
+
+    const scale = Math.min(1, SCAN_WIDTH / roiW);
+    const w = Math.floor(roiW * scale);
+    const h = Math.floor(roiH * scale);
+
     const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    canvas.width = w;
+    canvas.height = h;
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    ctx.drawImage(video, 0, 0);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imageData.data;
+    ctx.drawImage(video, roiX, roiY, roiW, roiH, 0, 0, w, h);
 
-    // Find min/max luminance for adaptive contrast stretch
+    // Pre-compute grayscale array (reused by all threshold passes)
+    const imgData = ctx.getImageData(0, 0, w, h);
+    const data = imgData.data;
+    const gray = new Uint8Array(w * h);
+    for (let i = 0, j = 0; i < data.length; i += 4, j++) {
+        gray[j] = (data[i] * 77 + data[i + 1] * 150 + data[i + 2] * 29) >> 8;
+    }
+    return { canvas, ctx, gray, width: w, height: h };
+}
+
+// Unsharp mask — boosts edge contrast for slightly out-of-focus USB cams.
+// Operates on the grayscale array in-place using a 3x3 box blur approximation.
+function unsharpMask(gray, w, h, amount) {
+    const blurred = new Uint8Array(gray.length);
+    for (let y = 1; y < h - 1; y++) {
+        for (let x = 1; x < w - 1; x++) {
+            let sum = 0;
+            for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    sum += gray[(y + dy) * w + (x + dx)];
+                }
+            }
+            blurred[y * w + x] = (sum / 9) | 0;
+        }
+    }
+    for (let i = 0; i < gray.length; i++) {
+        gray[i] = Math.min(255, Math.max(0, gray[i] + amount * (gray[i] - blurred[i]))) | 0;
+    }
+}
+
+// Global threshold at a given percentile between min and max luminance.
+// Returns a new canvas with black/white pixels.
+function globalThreshold(roi, fraction) {
+    const { gray, width: w, height: h } = roi;
     let min = 255, max = 0;
-    for (let i = 0; i < data.length; i += 4) {
-        const gray = (data[i] * 77 + data[i + 1] * 150 + data[i + 2] * 29) >> 8;
-        if (gray < min) min = gray;
-        if (gray > max) max = gray;
+    for (let i = 0; i < gray.length; i++) {
+        if (gray[i] < min) min = gray[i];
+        if (gray[i] > max) max = gray[i];
     }
-    const range = max - min || 1;
+    const thresh = min + (max - min || 1) * fraction;
 
-    // Apply contrast stretch + threshold in a single pass
-    const threshold = min + range * 0.45;
-    for (let i = 0; i < data.length; i += 4) {
-        const gray = (data[i] * 77 + data[i + 1] * 150 + data[i + 2] * 29) >> 8;
-        const val = gray < threshold ? 0 : 255;
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    const imgData = ctx.createImageData(w, h);
+    const data = imgData.data;
+    for (let i = 0, j = 0; j < gray.length; i += 4, j++) {
+        const val = gray[j] < thresh ? 0 : 255;
         data[i] = data[i + 1] = data[i + 2] = val;
+        data[i + 3] = 255;
     }
-    ctx.putImageData(imageData, 0, 0);
+    ctx.putImageData(imgData, 0, 0);
     return canvas;
+}
+
+// Adaptive (local mean) thresholding — handles uneven lighting / glare hotspots.
+// Uses an integral image for O(1) block-mean lookups.
+function adaptiveThreshold(roi, blockSize, C) {
+    const { gray, width: w, height: h } = roi;
+
+    // Build integral image
+    const integral = new Float64Array((w + 1) * (h + 1));
+    for (let y = 0; y < h; y++) {
+        let rowSum = 0;
+        for (let x = 0; x < w; x++) {
+            rowSum += gray[y * w + x];
+            integral[(y + 1) * (w + 1) + (x + 1)] = integral[y * (w + 1) + (x + 1)] + rowSum;
+        }
+    }
+
+    const half = blockSize >> 1;
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    const imgData = ctx.createImageData(w, h);
+    const data = imgData.data;
+
+    for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+            const x1 = Math.max(0, x - half), y1 = Math.max(0, y - half);
+            const x2 = Math.min(w - 1, x + half), y2 = Math.min(h - 1, y + half);
+            const area = (x2 - x1 + 1) * (y2 - y1 + 1);
+            const sum = integral[(y2 + 1) * (w + 1) + (x2 + 1)]
+                      - integral[y1 * (w + 1) + (x2 + 1)]
+                      - integral[(y2 + 1) * (w + 1) + x1]
+                      + integral[y1 * (w + 1) + x1];
+            const mean = sum / area;
+            const val = gray[y * w + x] < (mean - C) ? 0 : 255;
+            const idx = (y * w + x) * 4;
+            data[idx] = data[idx + 1] = data[idx + 2] = val;
+            data[idx + 3] = 255;
+        }
+    }
+    ctx.putImageData(imgData, 0, 0);
+    return canvas;
+}
+
+// Optimize camera hardware settings after stream starts.
+// Slightly negative exposure compensation is the best camera-level glare mitigation.
+async function optimizeCameraSettings(stream) {
+    const track = stream.getVideoTracks()[0];
+    try {
+        const caps = track.getCapabilities();
+        const settings = {};
+        if (caps.focusMode?.includes('continuous')) settings.focusMode = 'continuous';
+        if (caps.exposureMode?.includes('continuous')) settings.exposureMode = 'continuous';
+        if (caps.exposureCompensation) {
+            settings.exposureCompensation = Math.max(caps.exposureCompensation.min, -1.0);
+        }
+        if (caps.whiteBalanceMode?.includes('continuous')) settings.whiteBalanceMode = 'continuous';
+        if (Object.keys(settings).length > 0) {
+            await track.applyConstraints({ advanced: [settings] });
+        }
+    } catch (e) { /* not all cameras support all constraints */ }
 }
 
 function startScannerTimeouts() {
@@ -633,8 +744,10 @@ function openNativeScanner() {
 
     navigator.mediaDevices.getUserMedia({
         video: getVideoConstraints()
-    }).then(stream => {
+    }).then(async stream => {
         nativeStream = stream;
+        await optimizeCameraSettings(stream);
+
         const video = document.createElement('video');
         video.srcObject = stream;
         video.setAttribute('playsinline', 'true');
@@ -645,26 +758,44 @@ function openNativeScanner() {
         // Save selected camera
         if (cameraSelect.value) localStorage.setItem(SCANNER_CAMERA_KEY, cameraSelect.value);
 
+        // Scan loop using requestAnimationFrame (syncs with display, avoids duplicate frames)
         let scanBusy = false;
-        nativeScanTimer = setInterval(async () => {
-            if (!isScanning || video.readyState < 2 || scanBusy) return;
-            scanBusy = true;
-            try {
-                // Try raw frame first
-                let barcodes = await detector.detect(video);
-                if (barcodes.length > 0) {
-                    handleScanResult(barcodes[0].rawValue);
-                    return;
-                }
-                // Try contrast-enhanced frame (cuts through glossy glare)
-                const enhanced = createEnhancedFrame(video);
-                barcodes = await detector.detect(enhanced);
-                if (barcodes.length > 0) {
-                    handleScanResult(barcodes[0].rawValue);
-                }
-            } catch (e) {}
-            scanBusy = false;
-        }, 40);
+        let lastScanTime = 0;
+        const MIN_INTERVAL = 40; // ~25fps max decode rate
+
+        function scanLoop(timestamp) {
+            if (!isScanning) return;
+            if (timestamp - lastScanTime >= MIN_INTERVAL && video.readyState >= 2 && !scanBusy) {
+                lastScanTime = timestamp;
+                scanBusy = true;
+                (async () => {
+                    try {
+                        // 1. Try raw full frame (fastest path, works for clean barcodes)
+                        let barcodes = await detector.detect(video);
+                        if (barcodes.length > 0) { handleScanResult(barcodes[0].rawValue); return; }
+
+                        // 2. Capture downscaled ROI + sharpen for all enhanced passes
+                        const roi = captureROI(video);
+                        unsharpMask(roi.gray, roi.width, roi.height, 1.0);
+
+                        // 3. Multiple global thresholds (different lighting sweet spots)
+                        for (const frac of [0.35, 0.50, 0.65]) {
+                            const enhanced = globalThreshold(roi, frac);
+                            barcodes = await detector.detect(enhanced);
+                            if (barcodes.length > 0) { handleScanResult(barcodes[0].rawValue); return; }
+                        }
+
+                        // 4. Adaptive local threshold (handles uneven glare across the barcode)
+                        const adaptive = adaptiveThreshold(roi, 31, 10);
+                        barcodes = await detector.detect(adaptive);
+                        if (barcodes.length > 0) { handleScanResult(barcodes[0].rawValue); return; }
+                    } catch (e) {}
+                    scanBusy = false;
+                })();
+            }
+            requestAnimationFrame(scanLoop);
+        }
+        requestAnimationFrame(scanLoop);
     }).catch(err => {
         isScanning = false;
         showScannerError(err);
@@ -686,13 +817,14 @@ function openHtml5Scanner() {
     html5Qrcode.start(
         cameraSource,
         {
-            fps: 25,
+            fps: 15, // Sweet spot: fast enough to feel responsive, avoids frame queueing
             qrbox: (viewfinderWidth, viewfinderHeight) => ({
                 width: Math.floor(viewfinderWidth * 0.8),
                 height: Math.floor(viewfinderHeight * 0.4)
             }),
             disableFlip: true,
             videoConstraints: getVideoConstraints(),
+            experimentalFeatures: { useBarCodeDetectorIfSupported: true },
             formatsToSupport: [
                 Html5QrcodeSupportedFormats.EAN_13,
                 Html5QrcodeSupportedFormats.EAN_8,
@@ -721,16 +853,12 @@ function showScannerError(err) {
 }
 
 function closeScanner() {
-    isScanning = false;
+    isScanning = false;  // Stops the requestAnimationFrame scan loop
     clearScannerTimeouts();
 
     const viewfinder = document.getElementById('scanner-viewfinder');
     viewfinder.classList.remove('scanning');
 
-    if (nativeScanTimer) {
-        clearInterval(nativeScanTimer);
-        nativeScanTimer = null;
-    }
     if (nativeStream) {
         nativeStream.getTracks().forEach(t => t.stop());
         nativeStream = null;
@@ -748,10 +876,7 @@ function closeScanner() {
 }
 
 function stopCurrentCamera() {
-    if (nativeScanTimer) {
-        clearInterval(nativeScanTimer);
-        nativeScanTimer = null;
-    }
+    isScanning = false;  // Stops rAF loop
     if (nativeStream) {
         nativeStream.getTracks().forEach(t => t.stop());
         nativeStream = null;
@@ -828,8 +953,9 @@ scannerModal.addEventListener('click', (e) => {
     if (e.target === scannerModal) closeScanner();
 });
 cameraSelect.addEventListener('change', () => {
-    if (!isScanning) return;
+    if (!isScanning && scannerModal.hidden) return;
     stopCurrentCamera();
+    isScanning = true;  // Re-enable after stopCurrentCamera cleared it
     clearScannerTimeouts();
     startScannerTimeouts();
     const viewfinder = document.getElementById('scanner-viewfinder');
