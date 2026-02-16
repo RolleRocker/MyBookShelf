@@ -470,65 +470,129 @@ function setFilter(status) {
 
 let html5Qrcode = null;
 let isScanning = false;
+let nativeStream = null;
+let nativeScanTimer = null;
+
+const hasNativeBarcodeDetector = 'BarcodeDetector' in window;
 
 function openScanner() {
     scannerError.hidden = true;
     scannerModal.hidden = false;
-
-    html5Qrcode = new Html5Qrcode('scanner-viewfinder');
     isScanning = true;
+
+    if (hasNativeBarcodeDetector) {
+        openNativeScanner();
+    } else {
+        openHtml5Scanner();
+    }
+}
+
+function openNativeScanner() {
+    const detector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'code_128', 'upc_a'] });
+    const viewfinder = document.getElementById('scanner-viewfinder');
+
+    navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+    }).then(stream => {
+        nativeStream = stream;
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        video.setAttribute('playsinline', 'true');
+        video.play();
+        viewfinder.innerHTML = '';
+        viewfinder.appendChild(video);
+
+        nativeScanTimer = setInterval(async () => {
+            if (!isScanning || video.readyState < 2) return;
+            try {
+                const barcodes = await detector.detect(video);
+                if (barcodes.length > 0) {
+                    handleScanResult(barcodes[0].rawValue);
+                }
+            } catch (e) {}
+        }, 50);
+    }).catch(err => {
+        isScanning = false;
+        showScannerError(err);
+    });
+}
+
+function openHtml5Scanner() {
+    html5Qrcode = new Html5Qrcode('scanner-viewfinder');
 
     html5Qrcode.start(
         { facingMode: 'environment' },
         {
             fps: 20,
             qrbox: { width: 340, height: 160 },
+            disableFlip: true,
+            videoConstraints: {
+                facingMode: 'environment',
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            },
             formatsToSupport: [
                 Html5QrcodeSupportedFormats.EAN_13,
                 Html5QrcodeSupportedFormats.EAN_8,
                 Html5QrcodeSupportedFormats.CODE_128,
                 Html5QrcodeSupportedFormats.UPC_A
-            ],
-            experimentalFeatures: {
-                useBarCodeDetectorIfSupported: true
-            }
+            ]
         },
         onBarcodeDetected,
         () => {} // Ignore per-frame errors
     ).catch(err => {
         isScanning = false;
-        const msg = String(err);
-        if (msg.includes('NotAllowedError') || msg.includes('Permission')) {
-            scannerError.textContent = 'Camera permission denied. Please allow camera access in your browser settings.';
-        } else if (msg.includes('NotFoundError') || msg.includes('Requested device not found')) {
-            scannerError.textContent = 'No camera found on this device.';
-        } else {
-            scannerError.textContent = 'Could not start camera: ' + msg;
-        }
-        scannerError.hidden = false;
+        showScannerError(err);
     });
 }
 
+function showScannerError(err) {
+    const msg = String(err);
+    if (msg.includes('NotAllowedError') || msg.includes('Permission')) {
+        scannerError.textContent = 'Camera permission denied. Please allow camera access in your browser settings.';
+    } else if (msg.includes('NotFoundError') || msg.includes('Requested device not found')) {
+        scannerError.textContent = 'No camera found on this device.';
+    } else {
+        scannerError.textContent = 'Could not start camera: ' + msg;
+    }
+    scannerError.hidden = false;
+}
+
 function closeScanner() {
-    if (html5Qrcode && isScanning) {
+    isScanning = false;
+
+    if (nativeScanTimer) {
+        clearInterval(nativeScanTimer);
+        nativeScanTimer = null;
+    }
+    if (nativeStream) {
+        nativeStream.getTracks().forEach(t => t.stop());
+        nativeStream = null;
+    }
+    if (html5Qrcode) {
         html5Qrcode.stop().then(() => {
             html5Qrcode.clear();
             html5Qrcode = null;
-            isScanning = false;
         }).catch(() => {
             html5Qrcode = null;
-            isScanning = false;
         });
     }
+
     scannerModal.hidden = true;
 }
 
+function handleScanResult(decodedText) {
+    if (!isScanning) return;
+    isScanning = false;
+    closeScanner();
+    onBarcodeScanned(decodedText.trim());
+}
+
 async function onBarcodeDetected(decodedText) {
-    // Prevent duplicate triggers
+    // html5-qrcode callback
     if (!isScanning) return;
     isScanning = false;
 
-    // Stop camera and close modal
     if (html5Qrcode) {
         try { await html5Qrcode.stop(); } catch (e) {}
         try { html5Qrcode.clear(); } catch (e) {}
@@ -536,8 +600,10 @@ async function onBarcodeDetected(decodedText) {
     }
     scannerModal.hidden = true;
 
-    const code = decodedText.trim();
+    onBarcodeScanned(decodedText.trim());
+}
 
+async function onBarcodeScanned(code) {
     if (!isValidIsbn(code)) {
         showToast('Scanned barcode is not a valid ISBN', 'error');
         return;
@@ -553,19 +619,17 @@ async function onBarcodeDetected(decodedText) {
             const existing = await resp.json();
             const title = existing.title || code;
             if (!confirm(`You already have "${title}". Add another copy?`)) {
-                return; // Leave ISBN in input, user can decide
+                return;
             }
         }
-        // 404 or user confirmed duplicate — auto-add
         addBook();
     } catch (e) {
-        // Network error — still try to add
         addBook();
     }
 }
 
-// Hide scan button if library failed to load
-if (typeof Html5Qrcode === 'undefined') {
+// Hide scan button if no scanning capability available
+if (typeof Html5Qrcode === 'undefined' && !hasNativeBarcodeDetector) {
     scanBtn.style.display = 'none';
 }
 
