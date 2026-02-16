@@ -481,12 +481,17 @@ function openScanner() {
     html5Qrcode.start(
         { facingMode: 'environment' },
         {
-            fps: 10,
-            qrbox: { width: 280, height: 120 },
+            fps: 20,
+            qrbox: { width: 340, height: 160 },
             formatsToSupport: [
                 Html5QrcodeSupportedFormats.EAN_13,
-                Html5QrcodeSupportedFormats.EAN_8
-            ]
+                Html5QrcodeSupportedFormats.EAN_8,
+                Html5QrcodeSupportedFormats.CODE_128,
+                Html5QrcodeSupportedFormats.UPC_A
+            ],
+            experimentalFeatures: {
+                useBarCodeDetectorIfSupported: true
+            }
         },
         onBarcodeDetected,
         () => {} // Ignore per-frame errors
