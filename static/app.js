@@ -478,15 +478,13 @@ function setFilter(status) {
     loadBooks();
 }
 
-// ---- ISBN Scanner ----
+// ---- ISBN Scanner (zbar-wasm) ----
 
-let html5Qrcode = null;
 let isScanning = false;
-let nativeStream = null;
+let activeStream = null;
 let scannerTimeoutTimer = null;
 let scannerHintTimer = null;
 
-const hasNativeBarcodeDetector = 'BarcodeDetector' in window;
 const cameraSelect = document.getElementById('camera-select');
 const scannerTimeoutHint = document.getElementById('scanner-timeout-hint');
 
@@ -534,23 +532,18 @@ function getVideoConstraints() {
     } else {
         constraints.facingMode = 'environment';
     }
-    // Hints for better scanning (ignored if unsupported by the camera)
     constraints.focusMode = { ideal: 'continuous' };
-    constraints.torch = false;  // flash causes glare on glossy pages
+    constraints.torch = false;
     return constraints;
 }
 
-// ---- Image Processing Pipeline for Barcode Detection ----
-// Capture at 1080p for sharpness, but downscale before processing.
-// Processing chain: downscale → sharpen → threshold → decode.
+// ---- Image Processing Pipeline ----
 
-const SCAN_WIDTH = 800; // Downscale target — barcodes are readable, processing is 4-6x faster
+const SCAN_WIDTH = 800;
 
 // Grab a downscaled grayscale snapshot from the center of the video (ROI).
-// Returns { canvas, ctx, gray, width, height }.
 function captureROI(video) {
     const vw = video.videoWidth, vh = video.videoHeight;
-    // Crop to central 80% x 50% — most likely barcode region
     const roiW = Math.floor(vw * 0.8);
     const roiH = Math.floor(vh * 0.5);
     const roiX = Math.floor((vw - roiW) / 2);
@@ -566,18 +559,16 @@ function captureROI(video) {
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     ctx.drawImage(video, roiX, roiY, roiW, roiH, 0, 0, w, h);
 
-    // Pre-compute grayscale array (reused by all threshold passes)
     const imgData = ctx.getImageData(0, 0, w, h);
     const data = imgData.data;
     const gray = new Uint8Array(w * h);
     for (let i = 0, j = 0; i < data.length; i += 4, j++) {
         gray[j] = (data[i] * 77 + data[i + 1] * 150 + data[i + 2] * 29) >> 8;
     }
-    return { canvas, ctx, gray, width: w, height: h };
+    return { gray, width: w, height: h };
 }
 
 // Unsharp mask — boosts edge contrast for slightly out-of-focus USB cams.
-// Operates on the grayscale array in-place using a 3x3 box blur approximation.
 function unsharpMask(gray, w, h, amount) {
     const blurred = new Uint8Array(gray.length);
     for (let y = 1; y < h - 1; y++) {
@@ -596,38 +587,23 @@ function unsharpMask(gray, w, h, amount) {
     }
 }
 
-// Global threshold at a given percentile between min and max luminance.
-// Returns a new canvas with black/white pixels.
-function globalThreshold(roi, fraction) {
-    const { gray, width: w, height: h } = roi;
+// Global threshold — returns a new Uint8Array of thresholded grayscale values.
+function globalThresholdGray(gray, w, h, fraction) {
     let min = 255, max = 0;
     for (let i = 0; i < gray.length; i++) {
         if (gray[i] < min) min = gray[i];
         if (gray[i] > max) max = gray[i];
     }
     const thresh = min + (max - min || 1) * fraction;
-
-    const canvas = document.createElement('canvas');
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    const imgData = ctx.createImageData(w, h);
-    const data = imgData.data;
-    for (let i = 0, j = 0; j < gray.length; i += 4, j++) {
-        const val = gray[j] < thresh ? 0 : 255;
-        data[i] = data[i + 1] = data[i + 2] = val;
-        data[i + 3] = 255;
+    const out = new Uint8Array(gray.length);
+    for (let i = 0; i < gray.length; i++) {
+        out[i] = gray[i] < thresh ? 0 : 255;
     }
-    ctx.putImageData(imgData, 0, 0);
-    return canvas;
+    return out;
 }
 
 // Adaptive (local mean) thresholding — handles uneven lighting / glare hotspots.
-// Uses an integral image for O(1) block-mean lookups.
-function adaptiveThreshold(roi, blockSize, C) {
-    const { gray, width: w, height: h } = roi;
-
-    // Build integral image
+function adaptiveThresholdGray(gray, w, h, blockSize, C) {
     const integral = new Float64Array((w + 1) * (h + 1));
     for (let y = 0; y < h; y++) {
         let rowSum = 0;
@@ -638,13 +614,7 @@ function adaptiveThreshold(roi, blockSize, C) {
     }
 
     const half = blockSize >> 1;
-    const canvas = document.createElement('canvas');
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    const imgData = ctx.createImageData(w, h);
-    const data = imgData.data;
-
+    const out = new Uint8Array(w * h);
     for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
             const x1 = Math.max(0, x - half), y1 = Math.max(0, y - half);
@@ -655,18 +625,24 @@ function adaptiveThreshold(roi, blockSize, C) {
                       - integral[(y2 + 1) * (w + 1) + x1]
                       + integral[y1 * (w + 1) + x1];
             const mean = sum / area;
-            const val = gray[y * w + x] < (mean - C) ? 0 : 255;
-            const idx = (y * w + x) * 4;
-            data[idx] = data[idx + 1] = data[idx + 2] = val;
-            data[idx + 3] = 255;
+            out[y * w + x] = gray[y * w + x] < (mean - C) ? 0 : 255;
         }
     }
-    ctx.putImageData(imgData, 0, 0);
-    return canvas;
+    return out;
+}
+
+// Convert a grayscale Uint8Array to ImageData for zbar-wasm.
+function grayToImageData(gray, w, h) {
+    const imgData = new ImageData(w, h);
+    const data = imgData.data;
+    for (let i = 0, j = 0; i < gray.length; i++, j += 4) {
+        data[j] = data[j + 1] = data[j + 2] = gray[i];
+        data[j + 3] = 255;
+    }
+    return imgData;
 }
 
 // Optimize camera hardware settings after stream starts.
-// Slightly negative exposure compensation is the best camera-level glare mitigation.
 async function optimizeCameraSettings(stream) {
     const track = stream.getVideoTracks()[0];
     try {
@@ -711,6 +687,81 @@ function clearScannerTimeouts() {
     scannerTimeoutHint.hidden = true;
 }
 
+// Scan a single ImageData with zbar-wasm. Returns barcode string or null.
+async function zbarScan(imageData) {
+    const symbols = await zbarWasm.scanImageData(imageData);
+    for (const sym of symbols) {
+        const value = sym.decode();
+        if (value) return value;
+    }
+    return null;
+}
+
+async function startZbarScanner() {
+    const viewfinder = document.getElementById('scanner-viewfinder');
+
+    let stream;
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: getVideoConstraints() });
+    } catch (err) {
+        isScanning = false;
+        showScannerError(err);
+        return;
+    }
+
+    activeStream = stream;
+    await optimizeCameraSettings(stream);
+
+    const video = document.createElement('video');
+    video.srcObject = stream;
+    video.setAttribute('playsinline', 'true');
+    video.play();
+    viewfinder.innerHTML = '';
+    viewfinder.appendChild(video);
+
+    if (cameraSelect.value) localStorage.setItem(SCANNER_CAMERA_KEY, cameraSelect.value);
+
+    let scanBusy = false;
+    let lastScanTime = 0;
+    const MIN_INTERVAL = 80; // ~12 fps
+
+    function scanLoop(timestamp) {
+        if (!isScanning) return;
+        if (timestamp - lastScanTime >= MIN_INTERVAL && video.readyState >= 2 && !scanBusy) {
+            lastScanTime = timestamp;
+            scanBusy = true;
+            (async () => {
+                try {
+                    const roi = captureROI(video);
+                    const { gray, width: w, height: h } = roi;
+
+                    // Pass 1: Raw grayscale (fastest — catches clean barcodes)
+                    let result = await zbarScan(grayToImageData(gray, w, h));
+                    if (result) { handleScanResult(result); return; }
+
+                    // Sharpen in-place for enhanced passes
+                    unsharpMask(gray, w, h, 1.0);
+
+                    // Pass 2: Multiple global thresholds
+                    for (const frac of [0.35, 0.50, 0.65]) {
+                        const thresholded = globalThresholdGray(gray, w, h, frac);
+                        result = await zbarScan(grayToImageData(thresholded, w, h));
+                        if (result) { handleScanResult(result); return; }
+                    }
+
+                    // Pass 3: Adaptive local threshold
+                    const adaptive = adaptiveThresholdGray(gray, w, h, 31, 10);
+                    result = await zbarScan(grayToImageData(adaptive, w, h));
+                    if (result) { handleScanResult(result); return; }
+                } catch (e) {}
+                scanBusy = false;
+            })();
+        }
+        requestAnimationFrame(scanLoop);
+    }
+    requestAnimationFrame(scanLoop);
+}
+
 async function openScanner() {
     scannerError.hidden = true;
     scannerTimeoutHint.hidden = true;
@@ -731,113 +782,7 @@ async function openScanner() {
     const viewfinder = document.getElementById('scanner-viewfinder');
     viewfinder.classList.add('scanning');
 
-    if (hasNativeBarcodeDetector) {
-        openNativeScanner();
-    } else {
-        openHtml5Scanner();
-    }
-}
-
-function openNativeScanner() {
-    const detector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'code_128', 'upc_a'] });
-    const viewfinder = document.getElementById('scanner-viewfinder');
-
-    navigator.mediaDevices.getUserMedia({
-        video: getVideoConstraints()
-    }).then(async stream => {
-        nativeStream = stream;
-        await optimizeCameraSettings(stream);
-
-        const video = document.createElement('video');
-        video.srcObject = stream;
-        video.setAttribute('playsinline', 'true');
-        video.play();
-        viewfinder.innerHTML = '';
-        viewfinder.appendChild(video);
-
-        // Save selected camera
-        if (cameraSelect.value) localStorage.setItem(SCANNER_CAMERA_KEY, cameraSelect.value);
-
-        // Scan loop using requestAnimationFrame (syncs with display, avoids duplicate frames)
-        let scanBusy = false;
-        let lastScanTime = 0;
-        const MIN_INTERVAL = 40; // ~25fps max decode rate
-
-        function scanLoop(timestamp) {
-            if (!isScanning) return;
-            if (timestamp - lastScanTime >= MIN_INTERVAL && video.readyState >= 2 && !scanBusy) {
-                lastScanTime = timestamp;
-                scanBusy = true;
-                (async () => {
-                    try {
-                        // 1. Try raw full frame (fastest path, works for clean barcodes)
-                        let barcodes = await detector.detect(video);
-                        if (barcodes.length > 0) { handleScanResult(barcodes[0].rawValue); return; }
-
-                        // 2. Capture downscaled ROI + sharpen for all enhanced passes
-                        const roi = captureROI(video);
-                        unsharpMask(roi.gray, roi.width, roi.height, 1.0);
-
-                        // 3. Multiple global thresholds (different lighting sweet spots)
-                        for (const frac of [0.35, 0.50, 0.65]) {
-                            const enhanced = globalThreshold(roi, frac);
-                            barcodes = await detector.detect(enhanced);
-                            if (barcodes.length > 0) { handleScanResult(barcodes[0].rawValue); return; }
-                        }
-
-                        // 4. Adaptive local threshold (handles uneven glare across the barcode)
-                        const adaptive = adaptiveThreshold(roi, 31, 10);
-                        barcodes = await detector.detect(adaptive);
-                        if (barcodes.length > 0) { handleScanResult(barcodes[0].rawValue); return; }
-                    } catch (e) {}
-                    scanBusy = false;
-                })();
-            }
-            requestAnimationFrame(scanLoop);
-        }
-        requestAnimationFrame(scanLoop);
-    }).catch(err => {
-        isScanning = false;
-        showScannerError(err);
-    });
-}
-
-function openHtml5Scanner() {
-    html5Qrcode = new Html5Qrcode('scanner-viewfinder');
-    const deviceId = cameraSelect.value;
-
-    // Save selected camera
-    if (deviceId) localStorage.setItem(SCANNER_CAMERA_KEY, deviceId);
-
-    // Camera source: use deviceId if available, otherwise fall back to facingMode
-    const cameraSource = deviceId
-        ? { deviceId: { exact: deviceId } }
-        : { facingMode: 'environment' };
-
-    html5Qrcode.start(
-        cameraSource,
-        {
-            fps: 15, // Sweet spot: fast enough to feel responsive, avoids frame queueing
-            qrbox: (viewfinderWidth, viewfinderHeight) => ({
-                width: Math.floor(viewfinderWidth * 0.8),
-                height: Math.floor(viewfinderHeight * 0.4)
-            }),
-            disableFlip: true,
-            videoConstraints: getVideoConstraints(),
-            experimentalFeatures: { useBarCodeDetectorIfSupported: true },
-            formatsToSupport: [
-                Html5QrcodeSupportedFormats.EAN_13,
-                Html5QrcodeSupportedFormats.EAN_8,
-                Html5QrcodeSupportedFormats.CODE_128,
-                Html5QrcodeSupportedFormats.UPC_A
-            ]
-        },
-        onBarcodeDetected,
-        () => {} // Ignore per-frame errors
-    ).catch(err => {
-        isScanning = false;
-        showScannerError(err);
-    });
+    startZbarScanner();
 }
 
 function showScannerError(err) {
@@ -853,41 +798,25 @@ function showScannerError(err) {
 }
 
 function closeScanner() {
-    isScanning = false;  // Stops the requestAnimationFrame scan loop
+    isScanning = false;
     clearScannerTimeouts();
 
     const viewfinder = document.getElementById('scanner-viewfinder');
     viewfinder.classList.remove('scanning');
 
-    if (nativeStream) {
-        nativeStream.getTracks().forEach(t => t.stop());
-        nativeStream = null;
-    }
-    if (html5Qrcode) {
-        html5Qrcode.stop().then(() => {
-            html5Qrcode.clear();
-            html5Qrcode = null;
-        }).catch(() => {
-            html5Qrcode = null;
-        });
+    if (activeStream) {
+        activeStream.getTracks().forEach(t => t.stop());
+        activeStream = null;
     }
 
     scannerModal.hidden = true;
 }
 
 function stopCurrentCamera() {
-    isScanning = false;  // Stops rAF loop
-    if (nativeStream) {
-        nativeStream.getTracks().forEach(t => t.stop());
-        nativeStream = null;
-    }
-    if (html5Qrcode) {
-        html5Qrcode.stop().then(() => {
-            html5Qrcode.clear();
-            html5Qrcode = null;
-        }).catch(() => {
-            html5Qrcode = null;
-        });
+    isScanning = false;
+    if (activeStream) {
+        activeStream.getTracks().forEach(t => t.stop());
+        activeStream = null;
     }
 }
 
@@ -895,22 +824,6 @@ function handleScanResult(decodedText) {
     if (!isScanning) return;
     isScanning = false;
     closeScanner();
-    onBarcodeScanned(decodedText.trim());
-}
-
-async function onBarcodeDetected(decodedText) {
-    // html5-qrcode callback
-    if (!isScanning) return;
-    isScanning = false;
-    clearScannerTimeouts();
-
-    if (html5Qrcode) {
-        try { await html5Qrcode.stop(); } catch (e) {}
-        try { html5Qrcode.clear(); } catch (e) {}
-        html5Qrcode = null;
-    }
-    scannerModal.hidden = true;
-
     onBarcodeScanned(decodedText.trim());
 }
 
@@ -939,8 +852,8 @@ async function onBarcodeScanned(code) {
     }
 }
 
-// Hide scan button if no scanning capability available
-if (typeof Html5Qrcode === 'undefined' && !hasNativeBarcodeDetector) {
+// Hide scan button if zbar-wasm is not available
+if (typeof zbarWasm === 'undefined') {
     scanBtn.style.display = 'none';
 }
 
@@ -955,17 +868,13 @@ scannerModal.addEventListener('click', (e) => {
 cameraSelect.addEventListener('change', () => {
     if (!isScanning && scannerModal.hidden) return;
     stopCurrentCamera();
-    isScanning = true;  // Re-enable after stopCurrentCamera cleared it
+    isScanning = true;
     clearScannerTimeouts();
     startScannerTimeouts();
     const viewfinder = document.getElementById('scanner-viewfinder');
     viewfinder.innerHTML = '';
     viewfinder.classList.add('scanning');
-    if (hasNativeBarcodeDetector) {
-        openNativeScanner();
-    } else {
-        openHtml5Scanner();
-    }
+    startZbarScanner();
 });
 
 // Add book
