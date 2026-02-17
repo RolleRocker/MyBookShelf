@@ -62,6 +62,7 @@ The project is built in progressive versions (V1 → V4), each adding a layer:
 ### Frontend (V4)
 - Vanilla HTML/CSS/JS in `/static` directory, served by the same Java server
 - ISBN-only input flow: POST with just ISBN → placeholder card → polls until enrichment completes
+- **ISBN barcode scanner** — uses `html5-qrcode` library (vendored in `static/lib/`) for webcam-based EAN-13/EAN-8 barcode scanning. Auto-adds new ISBNs, prompts on duplicates. See `isbn-scanner-plan.md` for details
 
 ## Data Model — Book
 

@@ -943,5 +943,5 @@ curl http://localhost:8080/books
 - Add **authentication** (basic API key or token-based)
 - Add a **subjects filter** (`GET /books?subject=science+fiction`) with clickable subject tags
 - Add **sorting** (by title, author, rating, date added) with clickable column headers
-- Add a **barcode scanner** using the browser camera and a JS library like `quagga2`
+- ~~Add a **barcode scanner** using the browser camera and a JS library like `quagga2`~~ **Done** — implemented with `html5-qrcode` (see `isbn-scanner-plan.md`)
 - Add **reading progress** — a percentage field for books with status `READING`
