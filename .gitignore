@@ -3,3 +3,6 @@ build/
 .claude/
 covers/
 *.jar
+.classpath
+.project
+.settings/

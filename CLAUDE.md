@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Plan File
 
-**IMPORTANT:** Before starting any implementation work, always read `bookshelf-api-plan.md` in the project root. This is the master plan for the entire project — it contains the detailed build order, design decisions, data model, API specs, architecture, integration tests, and version roadmap (V1 through V4). All implementation should follow the plan file.
+**IMPORTANT:** Before starting any implementation work, always read `bookshelf-api-plan.md` in the project root. This is the master plan for the entire project — it contains the detailed build order, design decisions, data model, API specs, architecture, integration tests, and version roadmap (V1 through V4). All implementation should follow the plan file. For barcode scanner work specifically, also read `isbn-scanner-plan.md`.
 
 ## Project Overview
 
@@ -62,6 +62,7 @@ The project is built in progressive versions (V1 → V4), each adding a layer:
 ### Frontend (V4)
 - Vanilla HTML/CSS/JS in `/static` directory, served by the same Java server
 - ISBN-only input flow: POST with just ISBN → placeholder card → polls until enrichment completes
+- **Barcode scanner**: zbar-wasm (WASM C decoder) in `static/lib/zbar-wasm.js` (inlined UMD, 326 KB). Multi-pass pipeline: raw grayscale → sharpen → global thresholds → adaptive threshold. Scans camera ROI via `getUserMedia`. See `isbn-scanner-plan.md` for details.
 
 ## Data Model — Book
 
