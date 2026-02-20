@@ -977,6 +977,15 @@ refreshBtn.addEventListener('click', async () => {
             showToast('No books with ISBNs to refresh');
         } else {
             showToast(`Refreshing ${count} book${count > 1 ? 's' : ''}...`);
+
+            // Show per-book "Refreshing: X..." toasts timed to match server processing (~3 s each)
+            const booksToRefresh = allBooks
+                .filter(b => b.isbn)
+                .sort((a, b) => (!a.title ? -1 : !b.title ? 1 : 0)); // null-title books first
+            booksToRefresh.forEach((book, i) => {
+                setTimeout(() => showToast(`Refreshing: ${book.title || book.isbn}...`, 'info'), i * 3000);
+            });
+
             // Poll for updates without re-rendering the whole page
             const totalTime = Math.max(10000, count * 4000);
             let elapsed = 0;
