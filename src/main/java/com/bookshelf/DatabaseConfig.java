@@ -63,6 +63,14 @@ public class DatabaseConfig {
         } catch (SQLException e) {
             throw new RuntimeException("Failed to run migrations", e);
         }
+
+        try (Connection conn = dataSource.getConnection()) {
+            conn.createStatement().execute(
+                "ALTER TABLE books ADD COLUMN IF NOT EXISTS reading_progress INTEGER DEFAULT NULL"
+            );
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to run migrations", e);
+        }
     }
 
     public void close() {
