@@ -501,6 +501,30 @@ body {
     max-width: 10rem;
 }
 
+/* ---- Search Bar ---- */
+
+.search-bar {
+    margin-top: 0.5rem;
+}
+
+.search-bar input[type="search"] {
+    width: 100%;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.85rem;
+    padding: 0.45rem 0.75rem;
+    outline: none;
+    transition: border-color 0.2s;
+    -webkit-appearance: none;
+}
+
+.search-bar input[type="search"]:focus {
+    border-color: var(--gold-dim);
+}
+
 .book-badges {
     display: flex;
     align-items: center;

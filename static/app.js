@@ -6,6 +6,7 @@ const API = '';
 let currentFilter = 'all';
 let allBooks = [];
 let groupByAuthor = false;
+let searchQuery = '';
 const pollingTimers = new Map();
 
 // ---- DOM References ----
@@ -33,6 +34,7 @@ const scannerClose   = document.getElementById('scanner-close');
 const scannerError   = document.getElementById('scanner-error');
 const groupToggle    = document.getElementById('group-toggle');
 const refreshBtn     = document.getElementById('refresh-library-btn');
+const searchInput    = document.getElementById('search-input');
 
 // ---- ISBN Validation ----
 
@@ -199,6 +201,23 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
+// ---- Filtered Books ----
+
+function getFilteredBooks() {
+    let books = allBooks;
+    if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        books = books.filter(b =>
+            (b.title && b.title.toLowerCase().includes(q)) ||
+            (b.author && b.author.toLowerCase().includes(q))
+        );
+    }
+    if (currentFilter !== 'all') {
+        books = books.filter(b => b.readStatus === currentFilter);
+    }
+    return books;
+}
+
 // ---- Render All Books ----
 
 function renderBooks(books) {
@@ -276,7 +295,7 @@ async function loadBooks() {
         }
         const books = await apiGet(path);
         allBooks = books;
-        renderBooks(books);
+        renderBooks(getFilteredBooks());
 
         // Fetch all books for counts (if filtering, we need full list for counts)
         if (currentFilter !== 'all') {
@@ -891,6 +910,12 @@ isbnInput.addEventListener('keydown', (e) => {
     }
 });
 
+// Search bar
+searchInput.addEventListener('input', () => {
+    searchQuery = searchInput.value.trim();
+    renderBooks(getFilteredBooks());
+});
+
 // Filter tabs
 filterTabs.forEach(tab => {
     tab.addEventListener('click', () => setFilter(tab.dataset.status));
@@ -900,7 +925,7 @@ filterTabs.forEach(tab => {
 groupToggle.addEventListener('click', () => {
     groupByAuthor = !groupByAuthor;
     groupToggle.classList.toggle('active', groupByAuthor);
-    renderBooks(allBooks);
+    renderBooks(getFilteredBooks());
 });
 
 // Refresh Library
