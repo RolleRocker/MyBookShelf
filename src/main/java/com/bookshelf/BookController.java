@@ -9,6 +9,7 @@ import com.google.gson.JsonSyntaxException;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
@@ -58,6 +59,26 @@ public class BookController {
             if (readStatus != null && (search != null && !search.isBlank() || (genre != null && !genre.isEmpty()))) {
                 ReadStatus finalReadStatus = readStatus;
                 books = books.stream().filter(b -> b.getReadStatus() == finalReadStatus).toList();
+            }
+
+            String sortParam = request.getQueryParams().get("sort"); // e.g. "title,asc"
+            if (sortParam != null && !sortParam.isBlank()) {
+                String[] parts = sortParam.split(",", 2);
+                String field = parts[0].trim();
+                boolean desc = parts.length > 1 && "desc".equalsIgnoreCase(parts[1].trim());
+
+                Comparator<Book> comparator = switch (field) {
+                    case "title"   -> Comparator.comparing(b -> b.getTitle() != null ? b.getTitle().toLowerCase() : "");
+                    case "author"  -> Comparator.comparing(b -> b.getAuthor() != null ? b.getAuthor().toLowerCase() : "");
+                    case "rating"  -> Comparator.comparing(b -> b.getRating() != null ? b.getRating() : 0);
+                    case "created" -> Comparator.comparing(b -> b.getCreatedAt() != null ? b.getCreatedAt() : Instant.EPOCH);
+                    default        -> null;
+                };
+
+                if (comparator != null) {
+                    if (desc) comparator = comparator.reversed();
+                    books = books.stream().sorted(comparator).toList();
+                }
             }
 
             return HttpResponse.ok(gson.toJson(books));
