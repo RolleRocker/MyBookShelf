@@ -530,4 +530,36 @@ public class BookApiTest {
         assertEquals(1, books.size());
         assertEquals("Neuromancer", books.get(0).getAsJsonObject().get("title").getAsString());
     }
+
+    @Test
+    void testSortByTitleAsc() throws Exception {
+        post("/books", createBookJson("Zorro", "Johnston McCulley", "WANT_TO_READ"));
+        post("/books", createBookJson("Dune", "Frank Herbert", "WANT_TO_READ"));
+
+        HttpResponse<String> resp = client.send(
+            HttpRequest.newBuilder().uri(URI.create(baseUrl() + "/books?sort=title,asc")).GET().build(),
+            HttpResponse.BodyHandlers.ofString());
+
+        assertEquals(200, resp.statusCode());
+        JsonArray books = JsonParser.parseString(resp.body()).getAsJsonArray();
+        assertEquals(2, books.size());
+        assertEquals("Dune", books.get(0).getAsJsonObject().get("title").getAsString());
+        assertEquals("Zorro", books.get(1).getAsJsonObject().get("title").getAsString());
+    }
+
+    @Test
+    void testSortByTitleDesc() throws Exception {
+        post("/books", createBookJson("Zorro", "Johnston McCulley", "WANT_TO_READ"));
+        post("/books", createBookJson("Dune", "Frank Herbert", "WANT_TO_READ"));
+
+        HttpResponse<String> resp = client.send(
+            HttpRequest.newBuilder().uri(URI.create(baseUrl() + "/books?sort=title,desc")).GET().build(),
+            HttpResponse.BodyHandlers.ofString());
+
+        assertEquals(200, resp.statusCode());
+        JsonArray books = JsonParser.parseString(resp.body()).getAsJsonArray();
+        assertEquals(2, books.size());
+        assertEquals("Zorro", books.get(0).getAsJsonObject().get("title").getAsString());
+        assertEquals("Dune", books.get(1).getAsJsonObject().get("title").getAsString());
+    }
 }
