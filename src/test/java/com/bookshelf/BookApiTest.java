@@ -562,4 +562,59 @@ public class BookApiTest {
         assertEquals("Zorro", books.get(0).getAsJsonObject().get("title").getAsString());
         assertEquals("Dune", books.get(1).getAsJsonObject().get("title").getAsString());
     }
+
+    // --- readingProgress tests ---
+
+    @Test
+    void testReadingProgressSetOnCreate() throws Exception {
+        String body = "{\"title\":\"Dune\",\"author\":\"Frank Herbert\",\"readStatus\":\"READING\",\"readingProgress\":42}";
+        HttpResponse<String> resp = client.send(
+            HttpRequest.newBuilder().uri(URI.create(baseUrl() + "/books"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
+
+        assertEquals(201, resp.statusCode());
+        JsonObject book = JsonParser.parseString(resp.body()).getAsJsonObject();
+        assertEquals(42, book.get("readingProgress").getAsInt());
+    }
+
+    @Test
+    void testReadingProgressUpdated() throws Exception {
+        String createBody = "{\"title\":\"Dune\",\"author\":\"Frank Herbert\",\"readStatus\":\"READING\"}";
+        HttpResponse<String> createResp = client.send(
+            HttpRequest.newBuilder().uri(URI.create(baseUrl() + "/books"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(createBody))
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
+
+        String id = JsonParser.parseString(createResp.body()).getAsJsonObject().get("id").getAsString();
+
+        String updateBody = "{\"readingProgress\":75}";
+        HttpResponse<String> updateResp = client.send(
+            HttpRequest.newBuilder().uri(URI.create(baseUrl() + "/books/" + id))
+                .header("Content-Type", "application/json")
+                .method("PUT", HttpRequest.BodyPublishers.ofString(updateBody))
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
+
+        assertEquals(200, updateResp.statusCode());
+        JsonObject updated = JsonParser.parseString(updateResp.body()).getAsJsonObject();
+        assertEquals(75, updated.get("readingProgress").getAsInt());
+    }
+
+    @Test
+    void testReadingProgressValidation() throws Exception {
+        String body = "{\"title\":\"Dune\",\"author\":\"Frank Herbert\",\"readStatus\":\"READING\",\"readingProgress\":150}";
+        HttpResponse<String> resp = client.send(
+            HttpRequest.newBuilder().uri(URI.create(baseUrl() + "/books"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
+
+        assertEquals(400, resp.statusCode());
+    }
 }

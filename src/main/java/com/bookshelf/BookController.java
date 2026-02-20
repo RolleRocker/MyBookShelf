@@ -193,6 +193,14 @@ public class BookController {
                 book.setPageCount(json.get("pageCount").getAsInt());
             }
 
+            if (json.has("readingProgress") && !json.get("readingProgress").isJsonNull()) {
+                int progress = json.get("readingProgress").getAsInt();
+                if (progress < 0 || progress > 100) {
+                    return HttpResponse.badRequest("readingProgress must be between 0 and 100");
+                }
+                book.setReadingProgress(progress);
+            }
+
             Instant now = Instant.now();
             book.setCreatedAt(now);
             book.setUpdatedAt(now);
@@ -300,6 +308,17 @@ public class BookController {
                     List<String> subjects = new ArrayList<>();
                     json.get("subjects").getAsJsonArray().forEach(e -> subjects.add(e.getAsString()));
                     book.setSubjects(subjects);
+                }
+            }
+            if (json.has("readingProgress")) {
+                if (json.get("readingProgress").isJsonNull()) {
+                    book.setReadingProgress(null);
+                } else {
+                    int progress = json.get("readingProgress").getAsInt();
+                    if (progress < 0 || progress > 100) {
+                        return HttpResponse.badRequest("readingProgress must be between 0 and 100");
+                    }
+                    book.setReadingProgress(progress);
                 }
             }
 
