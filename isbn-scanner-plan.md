@@ -1,5 +1,12 @@
 # ISBN Barcode Scanner — Implementation Plan
 
+> **Status:** Implemented. Originally built with html5-qrcode, then replaced with
+> **zbar-wasm** (WebAssembly) for unified cross-platform scanning. The html5-qrcode
+> library ignored our image preprocessing pipeline on Windows Chrome (no native
+> `BarcodeDetector` API). zbar-wasm accepts `ImageData` directly, enabling a multi-pass
+> scan loop (raw grayscale → sharpen → global thresholds → adaptive threshold) that
+> works on all platforms.
+
 ## Overview
 
 Add a webcam-based ISBN barcode scanner to the MyBookShelf frontend. Users click a
@@ -13,29 +20,48 @@ the existing `POST /books` flow.
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Library | **html5-qrcode** | Simplest API, built-in camera management, supports EAN-13 (ISBN barcodes) |
-| Loading | **Local file** in `static/lib/` | Self-contained, no CDN dependency, works offline |
+| Library | **zbar-wasm** (`@undecaf/zbar-wasm@0.11.0`) | WASM-based C barcode decoder, accepts `ImageData` input directly (integrates with our preprocessing pipeline), 2-10ms per decode, works on all platforms without `BarcodeDetector` API |
+| Loading | **Local file** in `static/lib/` (inlined UMD build, 326 KB) | Self-contained, no CDN dependency, works offline |
 | After scan | **Auto-submit if no duplicate** | If no copy of that ISBN exists on shelf, add immediately. If a copy exists, prompt "You already have this book. Add another copy?" |
 | Multi-scan | **One-at-a-time** | Scanner closes after each successful scan. Click "Scan" again for the next book. |
 
 ## Technical Details
 
-### Library: html5-qrcode
+### Library: zbar-wasm
 
-- **Source**: Download `html5-qrcode.min.js` from the html5-qrcode GitHub releases
-- **Location**: `static/lib/html5-qrcode.min.js`
-- **Size**: ~370KB minified
-- **Barcode formats needed**: `EAN_13` (ISBN-13), `EAN_8` (some older books)
-- **API used**: The lower-level `Html5Qrcode` class (not the full scanner widget), giving
-  us full control over the UI while the library handles camera + detection
+- **Source**: `@undecaf/zbar-wasm@0.11.0` inlined UMD build from jsdelivr
+- **Location**: `static/lib/zbar-wasm.js`
+- **Size**: ~326 KB (WASM binary inlined in JS)
+- **Barcode formats supported**: EAN-13, EAN-8, UPC-A, CODE-128 (covers all ISBN formats)
+- **API used**: `zbarWasm.scanImageData(imageData)` — accepts `ImageData` directly
+- **Exposes**: global `zbarWasm` object via UMD module
 
-### Why not the built-in `Html5QrcodeScanner` widget?
+### Why zbar-wasm instead of html5-qrcode?
 
-The built-in widget comes with its own HTML/CSS that would clash with the antiquarian
-theme. Using the lower-level `Html5Qrcode` class lets us:
-- Build our own modal UI that matches the existing dark/gold theme
-- Control exactly what happens on detection (duplicate check + auto-add)
-- Keep the camera viewfinder styled consistently
+html5-qrcode uses a pure JavaScript ZXing port that is 5-10x slower than WASM and
+ignores external image preprocessing — its internal scanner captures its own video
+frames. On Windows Chrome (no native `BarcodeDetector` API), our entire image
+processing pipeline (ROI crop, unsharp mask, multi-threshold, adaptive threshold)
+was dead code. zbar-wasm:
+- Accepts `ImageData` input so our preprocessing integrates directly
+- 2-10ms per decode vs 40-80ms for ZXing-js
+- Better at damaged/low-quality/glossy barcodes (designed for industrial scanners)
+- No platform branching needed — one unified scan pipeline everywhere
+
+### Scan Pipeline (per frame, ~12 fps)
+
+```
+1. captureROI(video)                       ~2ms  (downscale 1080p → 800px, crop center 80%×50%)
+2. grayToImageData → scanImageData          ~5ms  (raw grayscale, fastest path)
+3. unsharpMask (in-place on gray)           ~2ms  (3×3 box sharpen)
+4. globalThresholdGray(0.35) → scan         ~5ms  (dark-bar recovery under glare)
+5. globalThresholdGray(0.50) → scan         ~5ms  (balanced)
+6. globalThresholdGray(0.65) → scan         ~5ms  (light-bar recovery in shadow)
+7. adaptiveThresholdGray(31, 10) → scan     ~15ms (handles uneven glare)
+   Total worst case: ~39ms — well within 80ms budget
+```
+
+Short-circuits on first successful decode, so clean barcodes decode in ~7ms.
 
 ## UX Flow
 
@@ -58,17 +84,16 @@ theme. Using the lower-level `Html5Qrcode` class lets us:
 
 ### Step 1: Add the library file
 
-- Download `html5-qrcode.min.js` (latest stable release)
-- Create directory `static/lib/`
-- Place the file at `static/lib/html5-qrcode.min.js`
+- Download inlined UMD build from `https://cdn.jsdelivr.net/npm/@undecaf/zbar-wasm@0.11.0/dist/inlined/index.js`
+- Save as `static/lib/zbar-wasm.js`
 - The existing `StaticFileHandler` already serves subdirectories, so the file will
-  be accessible at `/lib/html5-qrcode.min.js` with no Java changes
+  be accessible at `/lib/zbar-wasm.js` with no Java changes
 
 ### Step 2: HTML changes (`static/index.html`)
 
 Add to `<head>`:
 ```html
-<script src="/lib/html5-qrcode.min.js"></script>
+<script src="/lib/zbar-wasm.js"></script>
 ```
 
 Add a "Scan" button next to the existing "Add to Shelf" button inside `.search-terminal`:
@@ -97,7 +122,7 @@ Add a scanner modal (after the edit modal):
 </div>
 ```
 
-The `#scanner-viewfinder` div is where `Html5Qrcode` renders the camera feed.
+The `#scanner-viewfinder` div is where the `<video>` element is placed for the camera feed.
 
 ### Step 3: CSS changes (`static/style.css`)
 
@@ -134,30 +159,34 @@ const scannerError = document.getElementById('scanner-error');
 
 #### Scanner state
 ```javascript
-let html5Qrcode = null;
 let isScanning = false;
+let activeStream = null;
 ```
 
 #### `openScanner()`
 1. Show the scanner modal
-2. Create `Html5Qrcode` instance targeting `#scanner-viewfinder`
-3. Start scanning with config:
-   - `fps: 10` (frames per second for detection)
-   - `qrbox: { width: 300, height: 150 }` — landscape rectangle matching barcode shape
-   - `formatsToSupport: [Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8]`
-   - Prefer back camera (`facingMode: "environment"`) on mobile
-4. On success callback → call `onBarcodeDetected(decodedText)`
-5. On error → ignore (continuous scanning, errors are expected between frames)
+2. Request camera permission, enumerate cameras
+3. Call `startZbarScanner()` to begin the scan loop
+
+#### `startZbarScanner()`
+1. `getUserMedia` with `getVideoConstraints()` (supports camera selection)
+2. `optimizeCameraSettings(stream)` (continuous focus, slight negative exposure)
+3. Create `<video>`, attach to viewfinder
+4. `requestAnimationFrame` scan loop at ~12 fps with multi-pass pipeline:
+   - Pass 1: Raw ROI grayscale → `zbarWasm.scanImageData()`
+   - Pass 2: Sharpened + global thresholds (0.35, 0.50, 0.65)
+   - Pass 3: Adaptive local threshold
+   - Short-circuit on first successful decode
 
 #### `closeScanner()`
-1. If scanning, call `html5Qrcode.stop()`
-2. Hide the scanner modal
-3. Clear any error messages
+1. Set `isScanning = false` (stops rAF loop)
+2. Stop all stream tracks
+3. Hide the scanner modal, clear timeouts
 
-#### `onBarcodeDetected(code)`
+#### `handleScanResult(code)` → `onBarcodeScanned(code)`
 1. Stop the scanner and close the modal
 2. Validate the code as an ISBN using existing `isValidIsbn(code)`
-   - If invalid: show toast "Scanned barcode is not a valid ISBN", keep scanner open
+   - If invalid: show toast "Scanned barcode is not a valid ISBN"
 3. Set `isbnInput.value = code`
 4. Check for existing copy: `GET /books/isbn/{code}`
    - If **404** (no copy): call `addBook()` directly (auto-submit)
@@ -170,7 +199,7 @@ let isScanning = false;
 - **Camera not available**: show error in `#scanner-error`: "No camera found"
 - **Permission denied**: show error: "Camera permission denied. Please allow camera
   access in your browser settings."
-- **Library not loaded**: if `typeof Html5Qrcode === 'undefined'`, hide the scan button
+- **Library not loaded**: if `typeof zbarWasm === 'undefined'`, hide the scan button
   entirely on page load (graceful degradation)
 
 #### Event listeners
@@ -204,9 +233,9 @@ Manual testing checklist:
 
 | File | Change | Lines |
 |------|--------|-------|
-| `static/lib/html5-qrcode.min.js` | **New** — vendored library | ~370KB |
+| `static/lib/zbar-wasm.js` | **New** — vendored WASM barcode library | ~326 KB |
 | `static/index.html` | Add script tag, scan button, scanner modal | ~25 new lines |
-| `static/app.js` | Add scanner logic | ~80–100 new lines |
+| `static/app.js` | Scanner logic + image processing pipeline | ~250 lines |
 | `static/style.css` | Add scanner styles | ~60–80 new lines |
 | Backend (Java) | **No changes** | 0 |
 

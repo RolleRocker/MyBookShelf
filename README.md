@@ -25,7 +25,7 @@ A personal bookshelf REST API built from scratch in Java 17 using only `java.net
 | Build | Gradle 8 + Shadow plugin |
 | Container | Docker + Docker Compose |
 | Frontend | Vanilla HTML / CSS / JS |
-| Barcode Scanning | html5-qrcode |
+| Barcode Scanning | zbar-wasm (WebAssembly) |
 | Tests | JUnit 5 + `java.net.HttpClient` |
 
 ## Getting Started
@@ -183,7 +183,7 @@ static/
 ├── style.css                   # Dark antiquarian theme
 ├── app.js                      # ISBN input, polling, inline editing, barcode scanner
 └── lib/
-    └── html5-qrcode.min.js     # Vendored barcode scanning library
+    └── zbar-wasm.js            # Vendored barcode scanning library (WebAssembly)
 ```
 
 ### Key Design Decisions
