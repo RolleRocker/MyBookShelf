@@ -73,6 +73,24 @@ public class JdbcBookRepository implements BookRepository {
     }
 
     @Override
+    public List<Book> findBySearch(String query) {
+        String sql = "SELECT * FROM books WHERE LOWER(title) LIKE LOWER(?) OR LOWER(author) LIKE LOWER(?) ORDER BY created_at ASC";
+        String pattern = "%" + query + "%";
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, pattern);
+            stmt.setString(2, pattern);
+            try (ResultSet rs = stmt.executeQuery()) {
+                List<Book> books = new ArrayList<>();
+                while (rs.next()) books.add(mapRow(rs));
+                return books;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to search books", e);
+        }
+    }
+
+    @Override
     public Optional<Book> findById(UUID id) {
         String sql = "SELECT * FROM books WHERE id = ?";
         try (Connection conn = dataSource.getConnection();

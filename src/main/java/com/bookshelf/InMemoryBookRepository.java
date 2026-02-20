@@ -32,6 +32,16 @@ public class InMemoryBookRepository implements BookRepository {
     }
 
     @Override
+    public List<Book> findBySearch(String query) {
+        String q = query.toLowerCase();
+        return store.values().stream()
+            .filter(b -> (b.getTitle() != null && b.getTitle().toLowerCase().contains(q))
+                      || (b.getAuthor() != null && b.getAuthor().toLowerCase().contains(q)))
+            .sorted(Comparator.comparing(b -> b.getCreatedAt() != null ? b.getCreatedAt() : Instant.EPOCH))
+            .toList();
+    }
+
+    @Override
     public Optional<Book> findById(UUID id) {
         return Optional.ofNullable(store.get(id));
     }
