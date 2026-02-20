@@ -525,6 +525,25 @@ body {
     border-color: var(--gold-dim);
 }
 
+/* ---- Sort Select ---- */
+
+.sort-select {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.8rem;
+    padding: 0.35rem 0.6rem;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.sort-select:focus {
+    border-color: var(--gold-dim);
+}
+
 .book-badges {
     display: flex;
     align-items: center;

@@ -7,6 +7,7 @@ let currentFilter = 'all';
 let allBooks = [];
 let groupByAuthor = false;
 let searchQuery = '';
+let currentSort = '';
 const pollingTimers = new Map();
 
 // ---- DOM References ----
@@ -35,6 +36,7 @@ const scannerError   = document.getElementById('scanner-error');
 const groupToggle    = document.getElementById('group-toggle');
 const refreshBtn     = document.getElementById('refresh-library-btn');
 const searchInput    = document.getElementById('search-input');
+const sortSelect     = document.getElementById('sort-select');
 
 // ---- ISBN Validation ----
 
@@ -203,6 +205,22 @@ function escapeHtml(str) {
 
 // ---- Filtered Books ----
 
+function getSortedBooks(books) {
+    if (!currentSort) return books;
+    const [field, dir] = currentSort.split(',');
+    const asc = dir !== 'desc';
+    return [...books].sort((a, b) => {
+        let av, bv;
+        if (field === 'title')   { av = (a.title  || '').toLowerCase(); bv = (b.title  || '').toLowerCase(); }
+        if (field === 'author')  { av = (a.author || '').toLowerCase(); bv = (b.author || '').toLowerCase(); }
+        if (field === 'rating')  { av = a.rating  || 0; bv = b.rating  || 0; }
+        if (field === 'created') { av = a.createdAt || ''; bv = b.createdAt || ''; }
+        if (av < bv) return asc ? -1 : 1;
+        if (av > bv) return asc ? 1 : -1;
+        return 0;
+    });
+}
+
 function getFilteredBooks() {
     let books = allBooks;
     if (searchQuery) {
@@ -215,7 +233,7 @@ function getFilteredBooks() {
     if (currentFilter !== 'all') {
         books = books.filter(b => b.readStatus === currentFilter);
     }
-    return books;
+    return getSortedBooks(books);
 }
 
 // ---- Render All Books ----
@@ -925,6 +943,12 @@ filterTabs.forEach(tab => {
 groupToggle.addEventListener('click', () => {
     groupByAuthor = !groupByAuthor;
     groupToggle.classList.toggle('active', groupByAuthor);
+    renderBooks(getFilteredBooks());
+});
+
+// Sort select
+sortSelect.addEventListener('change', () => {
+    currentSort = sortSelect.value;
     renderBooks(getFilteredBooks());
 });
 

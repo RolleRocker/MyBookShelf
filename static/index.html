@@ -87,6 +87,14 @@
             </button>
             <div class="filter-spacer"></div>
             <button class="group-toggle" id="group-toggle" type="button">Group by Author</button>
+            <select id="sort-select" class="sort-select">
+                <option value="">Sort: Default</option>
+                <option value="title,asc">Title A–Z</option>
+                <option value="title,desc">Title Z–A</option>
+                <option value="author,asc">Author A–Z</option>
+                <option value="rating,desc">Highest Rated</option>
+                <option value="created,desc">Recently Added</option>
+            </select>
             <button class="group-toggle" id="refresh-library-btn" type="button" title="Re-fetch metadata from Open Library for all books">Refresh Library</button>
         </div>
     </nav>
