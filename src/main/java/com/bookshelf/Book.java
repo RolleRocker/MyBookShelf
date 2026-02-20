@@ -18,7 +18,7 @@ public class Book {
     private ReadStatus readStatus;
     private transient byte[] coverData;
     private String coverUrl;
-    private transient Instant createdAt;
+    private Instant createdAt;
     private transient Instant updatedAt;
 
     public Book() {}

@@ -5,6 +5,8 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.gson.JsonPrimitive;
+import com.google.gson.JsonSerializer;
 import com.google.gson.JsonSyntaxException;
 
 import java.time.Instant;
@@ -26,7 +28,11 @@ public class BookController {
     public BookController(BookRepository repository, OpenLibraryService openLibraryService) {
         this.repository = repository;
         this.openLibraryService = openLibraryService;
-        this.gson = new GsonBuilder().serializeNulls().create();
+        this.gson = new GsonBuilder()
+                .serializeNulls()
+                .registerTypeAdapter(Instant.class,
+                        (JsonSerializer<Instant>) (src, type, ctx) -> new JsonPrimitive(src.toString()))
+                .create();
     }
 
     public HttpResponse handleGetBooks(HttpRequest request) {
