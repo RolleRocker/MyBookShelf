@@ -164,6 +164,7 @@ function createBookCard(book) {
             </div>
             <div class="book-stars">${renderStars(rating, book.id)}</div>
             ${metaText ? `<div class="book-meta">${escapeHtml(metaText)}</div>` : ''}
+            ${book.subjects && book.subjects.length > 0 ? `<div class="subject-tags">${book.subjects.slice(0, 4).map(s => `<span class="subject-tag">${escapeHtml(s)}</span>`).join('')}</div>` : ''}
             <div class="book-actions">
                 <button class="btn-edit" data-id="${book.id}">Edit</button>
                 <button class="btn-delete" data-id="${book.id}">Delete</button>

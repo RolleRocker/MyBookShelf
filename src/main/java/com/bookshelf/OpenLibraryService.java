@@ -10,6 +10,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -52,6 +53,7 @@ public class OpenLibraryService {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .header("User-Agent", userAgent)
+                .timeout(Duration.ofSeconds(10))
                 .GET()
                 .build();
 
@@ -139,6 +141,7 @@ public class OpenLibraryService {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .header("User-Agent", userAgent)
+                .timeout(Duration.ofSeconds(10))
                 .GET()
                 .build();
 

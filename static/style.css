@@ -480,6 +480,27 @@ body {
     margin-bottom: 0.5rem;
 }
 
+.subject-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin-bottom: 0.5rem;
+}
+
+.subject-tag {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    background: rgba(212, 160, 74, 0.06);
+    border: 1px solid rgba(212, 160, 74, 0.12);
+    border-radius: var(--radius-sm);
+    padding: 0.15rem 0.4rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 10rem;
+}
+
 .book-badges {
     display: flex;
     align-items: center;
