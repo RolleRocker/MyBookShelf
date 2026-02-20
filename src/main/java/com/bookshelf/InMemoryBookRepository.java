@@ -64,8 +64,8 @@ public class InMemoryBookRepository implements BookRepository {
     public Optional<Book> update(UUID id, Book updates) {
         Book existing = store.get(id);
         if (existing == null) return Optional.empty();
-        store.put(id, existing);
-        return Optional.of(existing);
+        store.put(id, updates);
+        return Optional.of(updates);
     }
 
     @Override

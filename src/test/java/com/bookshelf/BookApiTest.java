@@ -617,4 +617,26 @@ public class BookApiTest {
 
         assertEquals(400, resp.statusCode());
     }
+
+    @Test
+    void testReadingProgressClearedByNull() throws Exception {
+        String createBody = "{\"title\":\"Dune\",\"author\":\"Frank Herbert\",\"readStatus\":\"READING\",\"readingProgress\":42}";
+        HttpResponse<String> createResp = client.send(
+            HttpRequest.newBuilder().uri(URI.create(baseUrl() + "/books"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(createBody))
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
+        assertEquals(201, createResp.statusCode());
+        String id = JsonParser.parseString(createResp.body()).getAsJsonObject().get("id").getAsString();
+
+        HttpResponse<String> updateResp = client.send(
+            HttpRequest.newBuilder().uri(URI.create(baseUrl() + "/books/" + id))
+                .header("Content-Type", "application/json")
+                .PUT(HttpRequest.BodyPublishers.ofString("{\"readingProgress\":null}"))
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, updateResp.statusCode());
+        assertTrue(JsonParser.parseString(updateResp.body()).getAsJsonObject().get("readingProgress").isJsonNull());
+    }
 }
