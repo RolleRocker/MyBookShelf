@@ -62,6 +62,11 @@ public class Book {
     public String getCoverUrl() { return coverUrl; }
     public void setCoverUrl(String coverUrl) { this.coverUrl = coverUrl; }
 
+    private Integer readingProgress;
+
+    public Integer getReadingProgress() { return readingProgress; }
+    public void setReadingProgress(Integer readingProgress) { this.readingProgress = readingProgress; }
+
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
 

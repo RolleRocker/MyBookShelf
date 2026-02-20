@@ -129,8 +129,9 @@ public class JdbcBookRepository implements BookRepository {
     public Book save(Book book) {
         String sql = """
                 INSERT INTO books (id, title, author, genre, rating, isbn, publisher, publish_date,
-                    page_count, subjects, read_status, cover_data, cover_url, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    page_count, subjects, read_status, cover_data, cover_url, reading_progress,
+                    created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """;
         try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -147,8 +148,9 @@ public class JdbcBookRepository implements BookRepository {
             stmt.setString(11, book.getReadStatus().name());
             stmt.setBytes(12, book.getCoverData());
             stmt.setString(13, book.getCoverUrl());
-            stmt.setTimestamp(14, Timestamp.from(book.getCreatedAt()));
-            stmt.setTimestamp(15, Timestamp.from(book.getUpdatedAt()));
+            setNullableInt(stmt, 14, book.getReadingProgress());
+            stmt.setTimestamp(15, Timestamp.from(book.getCreatedAt()));
+            stmt.setTimestamp(16, Timestamp.from(book.getUpdatedAt()));
             stmt.executeUpdate();
             return book;
         } catch (SQLException e) {
@@ -161,7 +163,8 @@ public class JdbcBookRepository implements BookRepository {
         String sql = """
                 UPDATE books SET title = ?, author = ?, genre = ?, rating = ?, isbn = ?,
                     publisher = ?, publish_date = ?, page_count = ?, subjects = ?,
-                    read_status = ?, cover_data = ?, cover_url = ?, updated_at = ?
+                    read_status = ?, cover_data = ?, cover_url = ?, reading_progress = ?,
+                    updated_at = ?
                 WHERE id = ?
                 """;
         try (Connection conn = dataSource.getConnection();
@@ -178,8 +181,9 @@ public class JdbcBookRepository implements BookRepository {
             stmt.setString(10, book.getReadStatus().name());
             stmt.setBytes(11, book.getCoverData());
             stmt.setString(12, book.getCoverUrl());
-            stmt.setTimestamp(13, Timestamp.from(book.getUpdatedAt()));
-            stmt.setObject(14, id);
+            setNullableInt(stmt, 13, book.getReadingProgress());
+            stmt.setTimestamp(14, Timestamp.from(book.getUpdatedAt()));
+            stmt.setObject(15, id);
             int rows = stmt.executeUpdate();
             return rows > 0 ? Optional.of(book) : Optional.empty();
         } catch (SQLException e) {
@@ -276,6 +280,8 @@ public class JdbcBookRepository implements BookRepository {
         book.setReadStatus(ReadStatus.valueOf(rs.getString("read_status")));
         book.setCoverData(rs.getBytes("cover_data"));
         book.setCoverUrl(rs.getString("cover_url"));
+        int readingProgress = rs.getInt("reading_progress");
+        book.setReadingProgress(rs.wasNull() ? null : readingProgress);
         Timestamp createdAt = rs.getTimestamp("created_at");
         if (createdAt != null) book.setCreatedAt(createdAt.toInstant());
         Timestamp updatedAt = rs.getTimestamp("updated_at");
