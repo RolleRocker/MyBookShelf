@@ -544,6 +544,23 @@ body {
     border-color: var(--gold-dim);
 }
 
+/* ---- Reading Progress Bar ---- */
+
+.progress-bar-wrap {
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-bottom: 0.5rem;
+    overflow: hidden;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background: var(--gold);
+    border-radius: 2px;
+    transition: width 0.4s var(--ease-out);
+}
+
 .book-badges {
     display: flex;
     align-items: center;

@@ -25,6 +25,8 @@ const editAuthor    = document.getElementById('edit-author');
 const editGenre     = document.getElementById('edit-genre');
 const editRating    = document.getElementById('edit-rating');
 const editStatus    = document.getElementById('edit-status');
+const editProgress  = document.getElementById('edit-progress');
+const progressGroup = document.getElementById('progress-group');
 const modalClose    = document.getElementById('modal-close');
 const modalCancel   = document.getElementById('modal-cancel');
 const filterTabs    = document.querySelectorAll('.filter-tab');
@@ -167,6 +169,11 @@ function createBookCard(book) {
                 <span class="badge badge-status ${statusClass(book.readStatus)}">${statusLabel(book.readStatus)}</span>
             </div>
             <div class="book-stars">${renderStars(rating, book.id)}</div>
+            ${book.readStatus === 'READING' && book.readingProgress != null
+                ? `<div class="progress-bar-wrap" title="${book.readingProgress}% read">
+                     <div class="progress-bar-fill" style="width:${book.readingProgress}%"></div>
+                   </div>`
+                : ''}
             ${metaText ? `<div class="book-meta">${escapeHtml(metaText)}</div>` : ''}
             ${book.subjects && book.subjects.length > 0 ? `<div class="subject-tags">${book.subjects.slice(0, 4).map(s => `<span class="subject-tag">${escapeHtml(s)}</span>`).join('')}</div>` : ''}
             <div class="book-actions">
@@ -438,6 +445,8 @@ function openEditModal(bookId) {
     editAuthor.value = book.author || '';
     editGenre.value = book.genre || '';
     editStatus.value = book.readStatus;
+    editProgress.value = book.readingProgress != null ? book.readingProgress : '';
+    progressGroup.hidden = book.readStatus !== 'READING';
 
     // Set star rating
     const stars = editRating.querySelectorAll('.star');
@@ -469,6 +478,9 @@ async function submitEdit(e) {
     updates.author = authorVal || null;
     updates.genre = genreVal || null;
     updates.readStatus = editStatus.value;
+    updates.readingProgress = editStatus.value === 'READING' && editProgress.value !== ''
+        ? parseInt(editProgress.value, 10)
+        : null;
 
     const ratingVal = parseInt(editRating.dataset.currentValue) || 0;
     if (ratingVal >= 1 && ratingVal <= 5) {
@@ -1036,6 +1048,11 @@ editModal.addEventListener('click', (e) => {
     if (e.target === editModal) closeEditModal();
 });
 editForm.addEventListener('submit', submitEdit);
+
+// Show/hide progress group based on reading status
+editStatus.addEventListener('change', () => {
+    progressGroup.hidden = editStatus.value !== 'READING';
+});
 
 // Star picker in modal
 editRating.addEventListener('click', (e) => {
