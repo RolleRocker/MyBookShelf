@@ -534,9 +534,17 @@ let isScanning = false;
 let activeStream = null;
 let scannerTimeoutTimer = null;
 let scannerHintTimer = null;
+let isBulkMode = false;
+let bulkScannedIds = [];
+let bulkCooldownCode = null;
 
 const cameraSelect = document.getElementById('camera-select');
 const scannerTimeoutHint = document.getElementById('scanner-timeout-hint');
+const scannerModalTitle = document.getElementById('scanner-modal-title');
+const scannerBulkFooter = document.getElementById('scanner-bulk-footer');
+const scannerBulkCount  = document.getElementById('scanner-bulk-count');
+const scannerDoneBtn    = document.getElementById('scanner-done');
+const bulkScanBtn       = document.getElementById('bulk-scan-btn');
 
 const SCANNER_CAMERA_KEY = 'mybookshelf-camera-id';
 
@@ -812,7 +820,15 @@ async function startZbarScanner() {
     requestAnimationFrame(scanLoop);
 }
 
-async function openScanner() {
+async function openScanner(bulk = false) {
+    isBulkMode = bulk;
+    bulkScannedIds = [];
+    bulkCooldownCode = null;
+
+    scannerModalTitle.textContent = bulk ? 'Scan ISBN Barcodes' : 'Scan ISBN Barcode';
+    scannerBulkFooter.hidden = !bulk;
+    scannerBulkCount.textContent = '0 books scanned';
+
     scannerError.hidden = true;
     scannerTimeoutHint.hidden = true;
     scannerModal.hidden = false;
@@ -849,6 +865,8 @@ function showScannerError(err) {
 
 function closeScanner() {
     isScanning = false;
+    isBulkMode = false;
+    bulkCooldownCode = null;
     clearScannerTimeouts();
 
     const viewfinder = document.getElementById('scanner-viewfinder');
@@ -872,9 +890,73 @@ function stopCurrentCamera() {
 
 function handleScanResult(decodedText) {
     if (!isScanning) return;
+    const code = decodedText.trim();
+
+    if (isBulkMode) {
+        // Ignore same barcode during cooldown to prevent re-triggering
+        if (bulkCooldownCode === code) return;
+        bulkCooldownCode = code;
+        setTimeout(() => { if (bulkCooldownCode === code) bulkCooldownCode = null; }, 1500);
+        bulkAddBook(code);
+        return;
+    }
+
+    // Single mode — existing behaviour
     isScanning = false;
     closeScanner();
-    onBarcodeScanned(decodedText.trim());
+    onBarcodeScanned(code);
+}
+
+async function bulkAddBook(code) {
+    if (!isBulkMode) return; // guard: Done may have been pressed while this was in-flight
+    if (!isValidIsbn(code)) {
+        showToast('Not a valid ISBN: ' + code, 'error');
+        return;
+    }
+
+    // Check for duplicate — silent skip with distinct toast
+    try {
+        const resp = await fetch(API + '/books/isbn/' + code);
+        if (resp.ok) {
+            const existing = await resp.json();
+            const label = existing.title || code;
+            showToast(`Already in your library: "${label}"`, 'info');
+            return;
+        }
+    } catch (e) { /* network error — try to add anyway */ }
+
+    try {
+        const book = await apiPost('/books', { isbn: code, readStatus: 'WANT_TO_READ' });
+        bulkScannedIds.push(book.id);
+
+        // Update counter in modal
+        scannerBulkCount.textContent = `${bulkScannedIds.length} book${bulkScannedIds.length !== 1 ? 's' : ''} scanned`;
+
+        showToast('Added: ' + code);
+
+        // Reset timeout hints so the user gets the full window for the next book
+        clearScannerTimeouts();
+        startScannerTimeouts();
+
+        if (!book.title) pollForEnrichment(book.id);
+    } catch (e) {
+        showToast(e.message || 'Failed to add book', 'error');
+    }
+}
+
+async function doneBulkScan() {
+    const idsToScroll = [...bulkScannedIds]; // capture before closeScanner clears
+    closeScanner();
+
+    if (idsToScroll.length === 0) return;
+
+    if (currentFilter !== 'all') setFilter('all');
+    await loadBooks();
+
+    // Scroll to the first newly added book
+    const firstId = idsToScroll[0];
+    const card = bookGrid.querySelector(`[data-id="${firstId}"]`);
+    if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 async function onBarcodeScanned(code) {
@@ -905,12 +987,15 @@ async function onBarcodeScanned(code) {
 // Hide scan button if zbar-wasm is not available
 if (typeof zbarWasm === 'undefined') {
     scanBtn.style.display = 'none';
+    bulkScanBtn.style.display = 'none';
 }
 
 // ---- Event Listeners ----
 
 // Scanner
 scanBtn.addEventListener('click', openScanner);
+bulkScanBtn.addEventListener('click', () => openScanner(true));
+scannerDoneBtn.addEventListener('click', doneBulkScan);
 scannerClose.addEventListener('click', closeScanner);
 scannerModal.addEventListener('click', (e) => {
     if (e.target === scannerModal) closeScanner();
