@@ -795,7 +795,7 @@ async function startZbarScanner() {
 
                     // Pass 1: Raw grayscale (fastest — catches clean barcodes)
                     let result = await zbarScan(grayToImageData(gray, w, h));
-                    if (result) { handleScanResult(result); return; }
+                    if (result) { handleScanResult(result); scanBusy = false; return; }
 
                     // Sharpen in-place for enhanced passes
                     unsharpMask(gray, w, h, 1.0);
@@ -804,13 +804,13 @@ async function startZbarScanner() {
                     for (const frac of [0.35, 0.50, 0.65]) {
                         const thresholded = globalThresholdGray(gray, w, h, frac);
                         result = await zbarScan(grayToImageData(thresholded, w, h));
-                        if (result) { handleScanResult(result); return; }
+                        if (result) { handleScanResult(result); scanBusy = false; return; }
                     }
 
                     // Pass 3: Adaptive local threshold
                     const adaptive = adaptiveThresholdGray(gray, w, h, 31, 10);
                     result = await zbarScan(grayToImageData(adaptive, w, h));
-                    if (result) { handleScanResult(result); return; }
+                    if (result) { handleScanResult(result); scanBusy = false; return; }
                 } catch (e) {}
                 scanBusy = false;
             })();
