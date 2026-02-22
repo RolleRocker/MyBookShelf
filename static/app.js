@@ -993,7 +993,7 @@ if (typeof zbarWasm === 'undefined') {
 // ---- Event Listeners ----
 
 // Scanner
-scanBtn.addEventListener('click', openScanner);
+scanBtn.addEventListener('click', () => openScanner());
 bulkScanBtn.addEventListener('click', () => openScanner(true));
 scannerDoneBtn.addEventListener('click', doneBulkScan);
 scannerClose.addEventListener('click', closeScanner);
