@@ -160,9 +160,13 @@ public class BookController {
 
         // Validate rating if provided
         if (json.has("rating") && !json.get("rating").isJsonNull()) {
-            int rating = json.get("rating").getAsInt();
-            if (rating < 1 || rating > 5) {
-                return HttpResponse.badRequest("Rating must be between 1 and 5");
+            try {
+                int rating = json.get("rating").getAsInt();
+                if (rating < 1 || rating > 5) {
+                    return HttpResponse.badRequest("Rating must be between 1 and 5");
+                }
+            } catch (NumberFormatException | UnsupportedOperationException e) {
+                return HttpResponse.badRequest("'rating' must be a valid integer");
             }
         }
 
@@ -184,21 +188,25 @@ public class BookController {
             book.setPublishDate(getStringField(json, "publishDate"));
 
             if (json.has("rating") && !json.get("rating").isJsonNull()) {
-                book.setRating(json.get("rating").getAsInt());
+                book.setRating(safeGetInt(json, "rating"));
             } else {
                 book.setRating(0);
             }
 
             if (json.has("pageCount") && !json.get("pageCount").isJsonNull()) {
-                book.setPageCount(json.get("pageCount").getAsInt());
+                book.setPageCount(safeGetInt(json, "pageCount"));
             }
 
             if (json.has("readingProgress") && !json.get("readingProgress").isJsonNull()) {
-                int progress = json.get("readingProgress").getAsInt();
-                if (progress < 0 || progress > 100) {
-                    return HttpResponse.badRequest("readingProgress must be between 0 and 100");
+                try {
+                    int progress = json.get("readingProgress").getAsInt();
+                    if (progress < 0 || progress > 100) {
+                        return HttpResponse.badRequest("readingProgress must be between 0 and 100");
+                    }
+                    book.setReadingProgress(progress);
+                } catch (NumberFormatException | UnsupportedOperationException e) {
+                    return HttpResponse.badRequest("'readingProgress' must be a valid integer");
                 }
-                book.setReadingProgress(progress);
             }
 
             Instant now = Instant.now();
@@ -213,6 +221,8 @@ public class BookController {
             }
 
             return HttpResponse.created(gson.toJson(book));
+        } catch (IllegalArgumentException e) {
+            return HttpResponse.badRequest(e.getMessage());
         } catch (RuntimeException e) {
             return HttpResponse.internalServerError("Internal server error");
         }
@@ -246,9 +256,13 @@ public class BookController {
 
         // Validate rating if provided
         if (json.has("rating") && !json.get("rating").isJsonNull()) {
-            int rating = json.get("rating").getAsInt();
-            if (rating < 1 || rating > 5) {
-                return HttpResponse.badRequest("Rating must be between 1 and 5");
+            try {
+                int rating = json.get("rating").getAsInt();
+                if (rating < 1 || rating > 5) {
+                    return HttpResponse.badRequest("Rating must be between 1 and 5");
+                }
+            } catch (NumberFormatException | UnsupportedOperationException e) {
+                return HttpResponse.badRequest("'rating' must be a valid integer");
             }
         }
 
@@ -293,10 +307,10 @@ public class BookController {
                 book.setPublishDate(json.get("publishDate").isJsonNull() ? null : json.get("publishDate").getAsString());
             }
             if (json.has("rating")) {
-                book.setRating(json.get("rating").isJsonNull() ? null : json.get("rating").getAsInt());
+                book.setRating(json.get("rating").isJsonNull() ? null : safeGetInt(json, "rating"));
             }
             if (json.has("pageCount")) {
-                book.setPageCount(json.get("pageCount").isJsonNull() ? null : json.get("pageCount").getAsInt());
+                book.setPageCount(json.get("pageCount").isJsonNull() ? null : safeGetInt(json, "pageCount"));
             }
             if (json.has("readStatus")) {
                 book.setReadStatus(json.get("readStatus").isJsonNull() ? null : ReadStatus.valueOf(json.get("readStatus").getAsString()));
@@ -314,11 +328,15 @@ public class BookController {
                 if (json.get("readingProgress").isJsonNull()) {
                     book.setReadingProgress(null);
                 } else {
-                    int progress = json.get("readingProgress").getAsInt();
-                    if (progress < 0 || progress > 100) {
-                        return HttpResponse.badRequest("readingProgress must be between 0 and 100");
+                    try {
+                        int progress = json.get("readingProgress").getAsInt();
+                        if (progress < 0 || progress > 100) {
+                            return HttpResponse.badRequest("readingProgress must be between 0 and 100");
+                        }
+                        book.setReadingProgress(progress);
+                    } catch (NumberFormatException | UnsupportedOperationException e) {
+                        return HttpResponse.badRequest("'readingProgress' must be a valid integer");
                     }
-                    book.setReadingProgress(progress);
                 }
             }
 
@@ -345,6 +363,8 @@ public class BookController {
             }
 
             return HttpResponse.ok(gson.toJson(book));
+        } catch (IllegalArgumentException e) {
+            return HttpResponse.badRequest(e.getMessage());
         } catch (RuntimeException e) {
             return HttpResponse.internalServerError("Internal server error");
         }
@@ -414,6 +434,15 @@ public class BookController {
             return null;
         }
         return json.get(field).getAsString();
+    }
+
+    private Integer safeGetInt(JsonObject json, String field) {
+        if (!json.has(field) || json.get(field).isJsonNull()) return null;
+        try {
+            return json.get(field).getAsInt();
+        } catch (NumberFormatException | UnsupportedOperationException e) {
+            throw new IllegalArgumentException("'" + field + "' must be a valid integer");
+        }
     }
 
     private boolean isValidIsbn(String isbn) {

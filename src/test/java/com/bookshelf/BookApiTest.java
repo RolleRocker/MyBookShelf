@@ -6,6 +6,8 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
 import java.net.URI;
@@ -638,5 +640,35 @@ public class BookApiTest {
             HttpResponse.BodyHandlers.ofString());
         assertEquals(200, updateResp.statusCode());
         assertTrue(JsonParser.parseString(updateResp.body()).getAsJsonObject().get("readingProgress").isJsonNull());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"rating", "pageCount", "readingProgress"})
+    void testInvalidIntegerFieldReturns400(String field) throws Exception {
+        String body = String.format(
+                "{\"title\":\"Dune\",\"author\":\"Frank Herbert\",\"readStatus\":\"READING\",\"%s\":\"not-a-number\"}", field);
+        HttpResponse<String> resp = post("/books", body);
+        assertEquals(400, resp.statusCode());
+    }
+
+    @Test
+    void testReadingProgressZeroIsAccepted() throws Exception {
+        HttpResponse<String> resp = post("/books",
+                "{\"title\":\"Dune\",\"author\":\"Frank Herbert\",\"readStatus\":\"READING\",\"readingProgress\":0}");
+        assertEquals(201, resp.statusCode());
+        JsonObject body = JsonParser.parseString(resp.body()).getAsJsonObject();
+        assertEquals(0, body.get("readingProgress").getAsInt());
+    }
+
+    @Test
+    void testSearchLiteralUnderscore() throws Exception {
+        post("/books", "{\"title\":\"Test_Book\",\"author\":\"Author A\",\"readStatus\":\"WANT_TO_READ\"}");
+        post("/books", "{\"title\":\"TestXBook\",\"author\":\"Author B\",\"readStatus\":\"WANT_TO_READ\"}");
+
+        HttpResponse<String> resp = get("/books?search=Test_Book");
+        assertEquals(200, resp.statusCode());
+        JsonArray results = JsonParser.parseString(resp.body()).getAsJsonArray();
+        assertEquals(1, results.size());
+        assertEquals("Test_Book", results.get(0).getAsJsonObject().get("title").getAsString());
     }
 }

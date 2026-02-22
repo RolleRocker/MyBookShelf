@@ -9,6 +9,8 @@ import java.util.Map;
 
 public class RequestParser {
 
+    private static final int MAX_BODY_SIZE = 10 * 1024 * 1024; // 10 MB
+
     public static HttpRequest parse(InputStream input) throws IOException {
         String requestLine = readLine(input);
         if (requestLine == null || requestLine.isEmpty()) {
@@ -41,7 +43,8 @@ public class RequestParser {
             int colonIndex = headerLine.indexOf(':');
             if (colonIndex > 0) {
                 String key = headerLine.substring(0, colonIndex).trim().toLowerCase();
-                String value = headerLine.substring(colonIndex + 1).trim();
+                String value = headerLine.substring(colonIndex + 1).trim()
+                        .replace("\r", "").replace("\n", "");
                 headers.put(key, value);
             }
         }
@@ -50,7 +53,18 @@ public class RequestParser {
         String body = null;
         String contentLengthStr = headers.get("content-length");
         if (contentLengthStr != null) {
-            int contentLength = Integer.parseInt(contentLengthStr.trim());
+            int contentLength;
+            try {
+                contentLength = Integer.parseInt(contentLengthStr.trim());
+            } catch (NumberFormatException e) {
+                throw new IOException("Invalid Content-Length header: " + contentLengthStr.trim());
+            }
+            if (contentLength < 0) {
+                throw new IOException("Invalid Content-Length: " + contentLength);
+            }
+            if (contentLength > MAX_BODY_SIZE) {
+                throw new RequestTooLargeException("Request body too large (" + contentLength + " bytes)");
+            }
             if (contentLength > 0) {
                 byte[] bodyBytes = new byte[contentLength];
                 int totalRead = 0;
@@ -87,14 +101,18 @@ public class RequestParser {
         return sb.length() == 0 && c == -1 ? null : sb.toString();
     }
 
-    private static void parseQueryString(String queryString, Map<String, String> params) {
+    private static void parseQueryString(String queryString, Map<String, String> params) throws IOException {
         if (queryString == null || queryString.isEmpty()) return;
         for (String pair : queryString.split("&")) {
             int eqIndex = pair.indexOf('=');
             if (eqIndex > 0) {
-                String key = URLDecoder.decode(pair.substring(0, eqIndex), StandardCharsets.UTF_8);
-                String value = URLDecoder.decode(pair.substring(eqIndex + 1), StandardCharsets.UTF_8);
-                params.put(key, value);
+                try {
+                    String key = URLDecoder.decode(pair.substring(0, eqIndex), StandardCharsets.UTF_8);
+                    String value = URLDecoder.decode(pair.substring(eqIndex + 1), StandardCharsets.UTF_8);
+                    params.put(key, value);
+                } catch (IllegalArgumentException e) {
+                    throw new IOException("Malformed percent-encoding in query string", e);
+                }
             }
         }
     }

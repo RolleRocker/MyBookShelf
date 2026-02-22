@@ -62,6 +62,10 @@ public class HttpResponse {
         return new HttpResponse(500, "Internal Server Error", new HashMap<>(), "{\"error\":\"" + escapeJson(error) + "\"}");
     }
 
+    public static HttpResponse payloadTooLarge(String error) {
+        return new HttpResponse(413, "Payload Too Large", new HashMap<>(), "{\"error\":\"" + escapeJson(error) + "\"}");
+    }
+
     public static HttpResponse methodNotAllowed() {
         return new HttpResponse(405, "Method Not Allowed", new HashMap<>(), "{\"error\":\"Method not allowed\"}");
     }

@@ -72,10 +72,14 @@ public class JdbcBookRepository implements BookRepository {
         }
     }
 
+    private String escapeLike(String input) {
+        return input.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+    }
+
     @Override
     public List<Book> findBySearch(String query) {
-        String sql = "SELECT * FROM books WHERE LOWER(title) LIKE LOWER(?) OR LOWER(author) LIKE LOWER(?) ORDER BY created_at ASC";
-        String pattern = "%" + query + "%";
+        String sql = "SELECT * FROM books WHERE LOWER(title) LIKE LOWER(?) ESCAPE '\\' OR LOWER(author) LIKE LOWER(?) ESCAPE '\\' ORDER BY created_at ASC";
+        String pattern = "%" + escapeLike(query) + "%";
         try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, pattern);

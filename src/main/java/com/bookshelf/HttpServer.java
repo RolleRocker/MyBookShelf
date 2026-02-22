@@ -41,12 +41,24 @@ public class HttpServer {
         acceptThread.start();
     }
 
+    private static final int READ_TIMEOUT_MS = 30_000;
+
     private void handleConnection(Socket socket) {
         try {
+            socket.setSoTimeout(READ_TIMEOUT_MS);
             HttpRequest request = RequestParser.parse(socket.getInputStream());
             HttpResponse response = router.route(request);
             ResponseWriter.write(socket.getOutputStream(), response);
             socket.shutdownOutput();
+        } catch (RequestTooLargeException e) {
+            try {
+                ResponseWriter.write(socket.getOutputStream(), HttpResponse.payloadTooLarge("Request body too large"));
+            } catch (IOException ignored) {}
+        } catch (IOException e) {
+            try {
+                ResponseWriter.write(socket.getOutputStream(), HttpResponse.badRequest("Bad request"));
+            } catch (IOException ignored) {}
+            System.err.println("Error parsing request: " + e.getMessage());
         } catch (Exception e) {
             System.err.println("Error handling request: " + e.getMessage());
         } finally {

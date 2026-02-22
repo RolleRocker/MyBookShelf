@@ -7,7 +7,6 @@ import java.util.Map;
 
 public class StaticFileHandler {
 
-    private final Path staticDir;
     private static final Map<String, String> CONTENT_TYPES = Map.of(
             ".html", "text/html",
             ".css", "text/css",
@@ -20,8 +19,10 @@ public class StaticFileHandler {
             ".ico", "image/x-icon"
     );
 
+    private final Path normalizedStaticDir;
+
     public StaticFileHandler(Path staticDir) {
-        this.staticDir = staticDir;
+        this.normalizedStaticDir = staticDir.normalize();
     }
 
     public HttpResponse handle(HttpRequest request) {
@@ -38,8 +39,8 @@ public class StaticFileHandler {
         }
 
         // Directory traversal protection
-        Path resolved = staticDir.resolve(path).normalize();
-        if (!resolved.startsWith(staticDir.normalize())) {
+        Path resolved = normalizedStaticDir.resolve(path).normalize();
+        if (!resolved.startsWith(normalizedStaticDir)) {
             return HttpResponse.notFound("Not found");
         }
 

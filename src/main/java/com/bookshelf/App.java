@@ -21,7 +21,14 @@ public class App {
         router.setFallbackHandler(staticHandler::handle);
 
         String portEnv = System.getenv("APP_PORT");
-        int port = portEnv != null ? Integer.parseInt(portEnv) : 8080;
+        int port = 8080;
+        if (portEnv != null) {
+            try {
+                port = Integer.parseInt(portEnv);
+            } catch (NumberFormatException e) {
+                System.err.println("Warning: Invalid APP_PORT '" + portEnv + "', defaulting to 8080");
+            }
+        }
         HttpServer server = new HttpServer(port, router);
         server.start();
         System.out.println("Bookshelf server started on port " + port);

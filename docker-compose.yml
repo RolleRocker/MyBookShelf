@@ -14,9 +14,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    volumes:
-      - covers:/app/covers
-
   db:
     image: postgres:16-alpine
     restart: always
@@ -36,4 +33,3 @@ services:
 
 volumes:
   pgdata:
-  covers:
