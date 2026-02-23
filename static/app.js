@@ -7,6 +7,7 @@ let currentFilter = 'all';
 let allBooks = [];
 let groupByAuthor = false;
 let searchQuery = '';
+let currentSubjectFilter = '';
 let currentSort = '';
 const pollingTimers = new Map();
 
@@ -175,7 +176,7 @@ function createBookCard(book) {
                    </div>`
                 : ''}
             ${metaText ? `<div class="book-meta">${escapeHtml(metaText)}</div>` : ''}
-            ${book.subjects && book.subjects.length > 0 ? `<div class="subject-tags">${book.subjects.slice(0, 4).map(s => `<span class="subject-tag">${escapeHtml(s)}</span>`).join('')}</div>` : ''}
+            ${book.subjects && book.subjects.length > 0 ? `<div class="subject-tags">${book.subjects.slice(0, 4).map(s => `<button class="subject-tag${currentSubjectFilter && s.toLowerCase() === currentSubjectFilter.toLowerCase() ? ' active-filter' : ''}" data-subject="${escapeHtml(s)}" type="button" title="Filter by ${escapeHtml(s)}">${escapeHtml(s)}</button>`).join('')}</div>` : ''}
             <div class="book-actions">
                 <button class="btn-edit" data-id="${book.id}">Edit</button>
                 <button class="btn-delete" data-id="${book.id}">Delete</button>
@@ -237,15 +238,31 @@ function getFilteredBooks() {
             (b.author && b.author.toLowerCase().includes(q))
         );
     }
+    if (currentSubjectFilter) {
+        const sq = currentSubjectFilter.toLowerCase();
+        books = books.filter(b => b.subjects && b.subjects.some(s => s.toLowerCase() === sq));
+    }
     if (currentFilter !== 'all') {
         books = books.filter(b => b.readStatus === currentFilter);
     }
     return getSortedBooks(books);
 }
 
+function updateSubjectFilterChip() {
+    const chip = document.getElementById('active-tag-filter');
+    if (!chip) return;
+    if (currentSubjectFilter) {
+        document.getElementById('active-tag-label').textContent = currentSubjectFilter;
+        chip.hidden = false;
+    } else {
+        chip.hidden = true;
+    }
+}
+
 // ---- Render All Books ----
 
 function renderBooks(books) {
+    updateSubjectFilterChip();
     bookGrid.innerHTML = '';
     if (books.length === 0) {
         emptyState.hidden = false;
@@ -1133,6 +1150,18 @@ bookGrid.addEventListener('click', (e) => {
         handleStarClick(starBtn.dataset.book, parseInt(starBtn.dataset.value));
         return;
     }
+
+    const subjectTag = e.target.closest('.subject-tag');
+    if (subjectTag) {
+        const subject = subjectTag.dataset.subject;
+        if (currentSubjectFilter && currentSubjectFilter.toLowerCase() === subject.toLowerCase()) {
+            currentSubjectFilter = '';
+        } else {
+            currentSubjectFilter = subject;
+        }
+        renderBooks(getFilteredBooks());
+        return;
+    }
 });
 
 // Modal
@@ -1166,6 +1195,12 @@ document.addEventListener('keydown', (e) => {
         if (!scannerModal.hidden) closeScanner();
         else if (!editModal.hidden) closeEditModal();
     }
+});
+
+// Clear subject tag filter
+document.getElementById('clear-tag-filter').addEventListener('click', () => {
+    currentSubjectFilter = '';
+    renderBooks(getFilteredBooks());
 });
 
 // ---- Init ----
