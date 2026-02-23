@@ -111,6 +111,7 @@ function statusLabel(status) {
         case 'WANT_TO_READ': return 'Want to Read';
         case 'READING':      return 'Reading';
         case 'FINISHED':     return 'Finished';
+        case 'DNF':          return 'Did Not Finish';
         default:             return status;
     }
 }
@@ -120,6 +121,7 @@ function statusClass(status) {
         case 'WANT_TO_READ': return 'want';
         case 'READING':      return 'reading';
         case 'FINISHED':     return 'finished';
+        case 'DNF':          return 'dnf';
         default:             return '';
     }
 }
@@ -136,7 +138,7 @@ function renderStars(rating, bookId) {
 
 function createBookCard(book) {
     const card = document.createElement('div');
-    card.className = 'book-card';
+    card.className = `book-card${book.readStatus === 'DNF' ? ' dnf' : ''}`;
     card.dataset.id = book.id;
     card.style.animationDelay = `${Math.random() * 0.15}s`;
 
@@ -170,7 +172,7 @@ function createBookCard(book) {
                 <span class="badge badge-status ${statusClass(book.readStatus)}">${statusLabel(book.readStatus)}</span>
             </div>
             <div class="book-stars">${renderStars(rating, book.id)}</div>
-            ${book.readStatus === 'READING' && book.readingProgress != null
+            ${(book.readStatus === 'READING' || book.readStatus === 'DNF') && book.readingProgress != null
                 ? `<div class="progress-bar-wrap" title="${book.readingProgress}% read">
                      <div class="progress-bar-fill" style="width:${book.readingProgress}%"></div>
                    </div>`
@@ -325,6 +327,7 @@ function updateCounts(books) {
     document.getElementById('count-want').textContent = books.filter(b => b.readStatus === 'WANT_TO_READ').length;
     document.getElementById('count-reading').textContent = books.filter(b => b.readStatus === 'READING').length;
     document.getElementById('count-finished').textContent = books.filter(b => b.readStatus === 'FINISHED').length;
+    document.getElementById('count-dnf').textContent = books.filter(b => b.readStatus === 'DNF').length;
 }
 
 // ---- Load Books ----
@@ -463,7 +466,7 @@ function openEditModal(bookId) {
     editGenre.value = book.genre || '';
     editStatus.value = book.readStatus;
     editProgress.value = book.readingProgress != null ? book.readingProgress : '';
-    progressGroup.hidden = book.readStatus !== 'READING';
+    progressGroup.hidden = book.readStatus !== 'READING' && book.readStatus !== 'DNF';
 
     // Set star rating
     const stars = editRating.querySelectorAll('.star');
@@ -495,7 +498,7 @@ async function submitEdit(e) {
     updates.author = authorVal || null;
     updates.genre = genreVal || null;
     updates.readStatus = editStatus.value;
-    updates.readingProgress = editStatus.value === 'READING' && editProgress.value !== ''
+    updates.readingProgress = (editStatus.value === 'READING' || editStatus.value === 'DNF') && editProgress.value !== ''
         ? parseInt(editProgress.value, 10)
         : null;
 
@@ -1174,7 +1177,7 @@ editForm.addEventListener('submit', submitEdit);
 
 // Show/hide progress group based on reading status
 editStatus.addEventListener('change', () => {
-    progressGroup.hidden = editStatus.value !== 'READING';
+    progressGroup.hidden = editStatus.value !== 'READING' && editStatus.value !== 'DNF';
 });
 
 // Star picker in modal

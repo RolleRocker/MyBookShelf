@@ -30,6 +30,8 @@
     --status-reading-bg: rgba(196, 147, 63, 0.12);
     --status-finished: #6a9a6e;
     --status-finished-bg: rgba(106, 154, 110, 0.12);
+    --status-dnf:      #a06060;
+    --status-dnf-bg:   rgba(160, 96, 96, 0.12);
 
     /* Borders */
     --border:        rgba(212, 160, 74, 0.1);
@@ -271,6 +273,7 @@ body {
 .dot-want      { background: var(--status-want); }
 .dot-reading   { background: var(--status-reading); }
 .dot-finished  { background: var(--status-finished); }
+.dot-dnf       { background: var(--status-dnf); }
 
 .filter-tab.active .dot-all { background: var(--gold); }
 
@@ -401,6 +404,16 @@ body {
     transform: translateY(-2px);
     box-shadow: var(--shadow-lift);
     border-color: var(--border-strong);
+}
+
+.book-card.dnf {
+    opacity: 0.6;
+    filter: saturate(0.7);
+}
+
+.book-card.dnf:hover {
+    opacity: 0.85;
+    filter: saturate(0.9);
 }
 
 .book-cover {
@@ -649,6 +662,12 @@ body {
     background: var(--status-finished-bg);
     color: var(--status-finished);
     border-color: rgba(106, 154, 110, 0.2);
+}
+
+.badge-status.dnf {
+    background: var(--status-dnf-bg);
+    color: var(--status-dnf);
+    border-color: rgba(160, 96, 96, 0.2);
 }
 
 .book-stars {
