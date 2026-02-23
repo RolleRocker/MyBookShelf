@@ -671,4 +671,24 @@ public class BookApiTest {
         assertEquals(1, results.size());
         assertEquals("Test_Book", results.get(0).getAsJsonObject().get("title").getAsString());
     }
+
+    @Test
+    void testCreateBookWithDnfStatus() throws Exception {
+        String body = createBookJson("Flowers for Algernon", "Daniel Keyes", "DNF");
+        HttpResponse<String> resp = post("/books", body);
+        assertEquals(201, resp.statusCode());
+        JsonObject book = gson.fromJson(resp.body(), JsonObject.class);
+        assertEquals("DNF", book.get("readStatus").getAsString());
+    }
+
+    @Test
+    void testUpdateBookToDnfStatus() throws Exception {
+        HttpResponse<String> create = post("/books", createBookJson("Dune", "Frank Herbert", "READING"));
+        String id = gson.fromJson(create.body(), JsonObject.class).get("id").getAsString();
+
+        HttpResponse<String> update = put("/books/" + id, "{\"readStatus\":\"DNF\"}");
+        assertEquals(200, update.statusCode());
+        JsonObject book = gson.fromJson(update.body(), JsonObject.class);
+        assertEquals("DNF", book.get("readStatus").getAsString());
+    }
 }
