@@ -672,6 +672,24 @@ public class BookApiTest {
         assertEquals("Test_Book", results.get(0).getAsJsonObject().get("title").getAsString());
     }
 
+
+    @Test
+    void testInvalidReadStatusOnCreate() throws Exception {
+        String body = "{\"title\":\"Something\",\"author\":\"Someone\",\"readStatus\":\"DID_NOT_FINISH\"}";
+        HttpResponse<String> resp = post("/books", body);
+        assertEquals(400, resp.statusCode());
+    }
+
+    @Test
+    void testInvalidReadStatusOnUpdate() throws Exception {
+        HttpResponse<String> create = post("/books", createBookJson("Dune", "Frank Herbert", "READING"));
+        assertEquals(201, create.statusCode());
+        String id = gson.fromJson(create.body(), JsonObject.class).get("id").getAsString();
+
+        HttpResponse<String> update = put("/books/" + id, "{\"readStatus\":\"DID_NOT_FINISH\"}");
+        assertEquals(400, update.statusCode());
+    }
+
     @Test
     void testCreateBookWithDnfStatus() throws Exception {
         String body = createBookJson("Flowers for Algernon", "Daniel Keyes", "DNF");
