@@ -249,6 +249,41 @@ public class OpenLibraryTest {
         assertEquals(404, coverResp.statusCode());
     }
 
+    // --- T33: POST /books/re-enrich queues books and returns count ---
+    @Test
+    void testT33_reEnrichQueuesBooks() throws Exception {
+        post("/books", "{\"title\":\"Dune\",\"author\":\"Frank Herbert\",\"isbn\":\"9780441013593\",\"readStatus\":\"READING\"}");
+        post("/books", "{\"title\":\"Hobbit\",\"author\":\"Tolkien\",\"isbn\":\"9780261102217\",\"readStatus\":\"WANT_TO_READ\"}");
+        post("/books", "{\"title\":\"No ISBN\",\"author\":\"Someone\",\"readStatus\":\"READING\"}"); // no ISBN, not queued
+
+        HttpResponse<String> resp = post("/books/re-enrich", "");
+        assertEquals(202, resp.statusCode());
+        JsonObject body = JsonParser.parseString(resp.body()).getAsJsonObject();
+        assertEquals(2, body.get("queued").getAsInt());
+    }
+
+    // --- T34: Changing ISBN clears previously-enriched fields immediately ---
+    @Test
+    void testT34_isbnChangeClearsEnrichedFields() throws Exception {
+        // Create a book with a user-provided publisher
+        String createBody = "{\"title\":\"Dune\",\"author\":\"Frank Herbert\",\"isbn\":\"9780441013593\"," +
+                "\"publisher\":\"My Publisher\",\"readStatus\":\"READING\"}";
+        HttpResponse<String> createResp = post("/books", createBody);
+        assertEquals(201, createResp.statusCode());
+        String id = getIdFromResponse(createResp);
+
+        // Change ISBN — the handler must clear enriched fields immediately in the PUT response
+        HttpResponse<String> updateResp = put("/books/" + id, "{\"isbn\":\"9780261102217\"}");
+        assertEquals(200, updateResp.statusCode());
+
+        JsonObject updated = JsonParser.parseString(updateResp.body()).getAsJsonObject();
+        assertTrue(updated.get("publisher").isJsonNull(), "publisher should be cleared on ISBN change");
+        assertTrue(updated.get("publishDate").isJsonNull(), "publishDate should be cleared on ISBN change");
+        assertTrue(updated.get("pageCount").isJsonNull(), "pageCount should be cleared on ISBN change");
+        assertTrue(updated.get("subjects").isJsonNull(), "subjects should be cleared on ISBN change");
+        assertTrue(updated.get("coverUrl").isJsonNull(), "coverUrl should be cleared on ISBN change");
+    }
+
     // --- T32: Re-enrichment on ISBN change ---
     @Test
     void testT32_reEnrichmentOnIsbnChange() throws Exception {

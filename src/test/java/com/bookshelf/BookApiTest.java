@@ -709,4 +709,85 @@ public class BookApiTest {
         JsonObject book = gson.fromJson(update.body(), JsonObject.class);
         assertEquals("DNF", book.get("readStatus").getAsString());
     }
+
+    // --- Rating edge cases on PUT ---
+
+    @Test
+    void testRatingZeroRejectedOnPut() throws Exception {
+        HttpResponse<String> create = post("/books", createBookJson("Dune", "Frank Herbert", "READING"));
+        String id = getIdFromResponse(create);
+
+        HttpResponse<String> update = put("/books/" + id, "{\"rating\":0}");
+        assertEquals(400, update.statusCode());
+    }
+
+    @Test
+    void testRatingNullClearsOnPut() throws Exception {
+        HttpResponse<String> create = post("/books",
+                createBookJson("Dune", "Frank Herbert", "READING", null, 4, null));
+        String id = getIdFromResponse(create);
+        assertEquals(4, gson.fromJson(create.body(), JsonObject.class).get("rating").getAsInt());
+
+        HttpResponse<String> update = put("/books/" + id, "{\"rating\":null}");
+        assertEquals(200, update.statusCode());
+        assertTrue(gson.fromJson(update.body(), JsonObject.class).get("rating").isJsonNull());
+    }
+
+    // --- Sort: unknown field is silently ignored ---
+
+    @Test
+    void testUnknownSortFieldIgnored() throws Exception {
+        post("/books", createBookJson("Dune", "Frank Herbert", "WANT_TO_READ"));
+        post("/books", createBookJson("Neuromancer", "William Gibson", "WANT_TO_READ"));
+
+        HttpResponse<String> resp = get("/books?sort=invalid,asc");
+        assertEquals(200, resp.statusCode());
+        JsonArray books = JsonParser.parseString(resp.body()).getAsJsonArray();
+        assertEquals(2, books.size()); // all books returned, just unsorted
+    }
+
+    // --- Search combined with readStatus filter ---
+
+    @Test
+    void testSearchCombinedWithReadStatusFilter() throws Exception {
+        post("/books", createBookJson("Dune", "Frank Herbert", "READING"));
+        post("/books", createBookJson("Dune Messiah", "Frank Herbert", "FINISHED"));
+        post("/books", createBookJson("Neuromancer", "William Gibson", "READING"));
+
+        HttpResponse<String> resp = get("/books?search=dune&readStatus=READING");
+        assertEquals(200, resp.statusCode());
+        JsonArray books = JsonParser.parseString(resp.body()).getAsJsonArray();
+        assertEquals(1, books.size());
+        assertEquals("Dune", books.get(0).getAsJsonObject().get("title").getAsString());
+    }
+
+    // --- POST /books/re-enrich ---
+
+    @Test
+    void testReEnrichReturns202WhenNoBooksWithIsbn() throws Exception {
+        // No books at all → queued: 0
+        HttpResponse<String> resp = post("/books/re-enrich", "");
+        assertEquals(202, resp.statusCode());
+        JsonObject body = JsonParser.parseString(resp.body()).getAsJsonObject();
+        assertEquals(0, body.get("queued").getAsInt());
+    }
+
+    @Test
+    void testReEnrichReturns202WhenBooksHaveNoIsbn() throws Exception {
+        post("/books", createBookJson("Dune", "Frank Herbert", "READING")); // no ISBN
+
+        HttpResponse<String> resp = post("/books/re-enrich", "");
+        assertEquals(202, resp.statusCode());
+        JsonObject body = JsonParser.parseString(resp.body()).getAsJsonObject();
+        assertEquals(0, body.get("queued").getAsInt());
+    }
+
+    @Test
+    void testReEnrichReturns500WhenServiceUnavailable() throws Exception {
+        // BookApiTest has no OpenLibraryService — re-enrich with ISBN books should be 500
+        post("/books", createBookJson("Dune", "Frank Herbert", "READING", null, null, "9780441013593"));
+
+        HttpResponse<String> resp = post("/books/re-enrich", "");
+        assertEquals(500, resp.statusCode());
+    }
 }

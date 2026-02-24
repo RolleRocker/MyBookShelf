@@ -58,8 +58,8 @@ public class BookMetadata {
         if (joined.contains("comics") || joined.contains("graphic novel")) return "Comics";
         if (joined.contains("cooking") || joined.contains("cookbook")) return "Cooking";
         if (joined.contains("science")) return "Science";
-        if (joined.contains("fiction")) return "Fiction";
         if (joined.contains("nonfiction") || joined.contains("non-fiction")) return "Non-Fiction";
+        if (joined.contains("fiction")) return "Fiction";
         return null;
     }
 }
