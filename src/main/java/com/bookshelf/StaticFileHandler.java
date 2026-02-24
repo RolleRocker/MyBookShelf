@@ -12,6 +12,7 @@ public class StaticFileHandler {
             ".css", "text/css",
             ".js", "application/javascript",
             ".json", "application/json",
+            ".wasm", "application/wasm",
             ".png", "image/png",
             ".jpg", "image/jpeg",
             ".jpeg", "image/jpeg",
