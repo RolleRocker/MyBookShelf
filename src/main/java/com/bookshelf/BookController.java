@@ -320,7 +320,11 @@ public class BookController {
                     book.setSubjects(null);
                 } else {
                     List<String> subjects = new ArrayList<>();
-                    json.get("subjects").getAsJsonArray().forEach(e -> subjects.add(e.getAsString()));
+                    try {
+                        json.get("subjects").getAsJsonArray().forEach(e -> subjects.add(e.getAsString()));
+                    } catch (IllegalStateException | UnsupportedOperationException e) {
+                        return HttpResponse.badRequest("'subjects' must be an array of strings");
+                    }
                     book.setSubjects(subjects);
                 }
             }

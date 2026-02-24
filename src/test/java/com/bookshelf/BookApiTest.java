@@ -792,6 +792,16 @@ public class BookApiTest {
     }
 
     @Test
+    void testSubjectsNotArrayReturns400() throws Exception {
+        HttpResponse<String> create = post("/books", createBookJson("Dune", "Frank Herbert", "READING"));
+        String id = getIdFromResponse(create);
+
+        // "subjects" is a string, not an array — should be 400, not 500
+        HttpResponse<String> update = put("/books/" + id, "{\"subjects\": \"not-an-array\"}");
+        assertEquals(400, update.statusCode());
+    }
+
+    @Test
     void testGenreFilterWhitespaceOnlyReturnsAllBooks() throws Exception {
         post("/books", createBookJson("Dune", "Frank Herbert", "READING", "sci-fi", null, null));
         post("/books", createBookJson("1984", "George Orwell", "WANT_TO_READ", "dystopia", null, null));
