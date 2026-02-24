@@ -792,6 +792,23 @@ public class BookApiTest {
     }
 
     @Test
+    void testBadRequestBodyWithControlCharsIsValidJson() {
+        // Directly test HttpResponse.badRequest() with control characters in the message
+        com.bookshelf.HttpResponse resp = com.bookshelf.HttpResponse.badRequest("line1\nline2\ttab\r");
+        String body = resp.getBody();
+        // Raw control characters must NOT appear in the JSON body — they must be escaped
+        assertFalse(body.contains("\n"), "Body must not contain raw newline");
+        assertFalse(body.contains("\r"), "Body must not contain raw carriage return");
+        assertFalse(body.contains("\t"), "Body must not contain raw tab");
+        // The escaped sequences must be present
+        assertTrue(body.contains("\\n"), "Body must contain escaped newline");
+        assertTrue(body.contains("\\t"), "Body must contain escaped tab");
+        // Gson must be able to parse the body and round-trip correctly
+        JsonObject json = JsonParser.parseString(body).getAsJsonObject();
+        assertEquals("line1\nline2\ttab\r", json.get("error").getAsString());
+    }
+
+    @Test
     void testSubjectsNotArrayReturns400() throws Exception {
         HttpResponse<String> create = post("/books", createBookJson("Dune", "Frank Herbert", "READING"));
         String id = getIdFromResponse(create);
