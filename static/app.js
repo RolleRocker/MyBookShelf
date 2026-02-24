@@ -1052,10 +1052,14 @@ isbnInput.addEventListener('keydown', (e) => {
     }
 });
 
-// Search bar
+// Search bar — debounced to avoid re-rendering on every keystroke
+let searchDebounceTimer;
 searchInput.addEventListener('input', () => {
-    searchQuery = searchInput.value.trim();
-    renderBooks(getFilteredBooks());
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(() => {
+        searchQuery = searchInput.value.trim();
+        renderBooks(getFilteredBooks());
+    }, 300);
 });
 
 // Filter tabs
