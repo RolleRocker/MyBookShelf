@@ -10,6 +10,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.Socket;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -828,5 +831,30 @@ public class BookApiTest {
         assertEquals(200, resp.statusCode());
         JsonArray books = JsonParser.parseString(resp.body()).getAsJsonArray();
         assertEquals(2, books.size(), "Whitespace-only genre param should not filter out books");
+    }
+
+    @Test
+    void testOversizedHeaderReturns400() throws Exception {
+        // Send a raw HTTP request with a header line > 8 KB, bypassing HttpClient
+        try (Socket socket = new Socket("localhost", port)) {
+            socket.setSoTimeout(5000);
+            OutputStream out = socket.getOutputStream();
+            // "X-Test: " (8 chars) + 8193 'a' chars = 8201-char line, exceeds the 8 KB cap
+            String bigHeader = "X-Test: " + "a".repeat(8193);
+            String request = "GET /books HTTP/1.1\r\n" +
+                    "Host: localhost\r\n" +
+                    bigHeader + "\r\n" +
+                    "\r\n";
+            out.write(request.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            out.flush();
+
+            // Read the first chunk of the response
+            byte[] buf = new byte[256];
+            int n = socket.getInputStream().read(buf);
+            assertTrue(n > 0, "Server must respond");
+            String responseStart = new String(buf, 0, n, java.nio.charset.StandardCharsets.UTF_8);
+            assertTrue(responseStart.startsWith("HTTP/1.1 400"),
+                    "Expected 400 for oversized header, got: " + responseStart);
+        }
     }
 }

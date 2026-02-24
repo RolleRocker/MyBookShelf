@@ -10,6 +10,7 @@ import java.util.Map;
 public class RequestParser {
 
     private static final int MAX_BODY_SIZE = 10 * 1024 * 1024; // 10 MB
+    private static final int MAX_HEADER_LINE_SIZE = 8 * 1024;  // 8 KB per header line
 
     public static HttpRequest parse(InputStream input) throws IOException {
         String requestLine = readLine(input);
@@ -89,6 +90,9 @@ public class RequestParser {
                 if (next != '\n' && next != -1) {
                     sb.append((char) c);
                     sb.append((char) next);
+                    if (sb.length() > MAX_HEADER_LINE_SIZE) {
+                        throw new IOException("Header line too long");
+                    }
                     continue;
                 }
                 break;
@@ -97,6 +101,9 @@ public class RequestParser {
                 break;
             }
             sb.append((char) c);
+            if (sb.length() > MAX_HEADER_LINE_SIZE) {
+                throw new IOException("Header line too long");
+            }
         }
         return sb.length() == 0 && c == -1 ? null : sb.toString();
     }
