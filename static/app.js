@@ -334,21 +334,10 @@ function updateCounts(books) {
 
 async function loadBooks() {
     try {
-        let path = '/books';
-        if (currentFilter !== 'all') {
-            path += `?readStatus=${currentFilter}`;
-        }
-        const books = await apiGet(path);
+        const books = await apiGet('/books');
         allBooks = books;
         renderBooks(getFilteredBooks());
-
-        // Fetch all books for counts (if filtering, we need full list for counts)
-        if (currentFilter !== 'all') {
-            const allList = await apiGet('/books');
-            updateCounts(allList);
-        } else {
-            updateCounts(books);
-        }
+        updateCounts(books);
     } catch (e) {
         showToast('Failed to load books', 'error');
     }
