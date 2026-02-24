@@ -53,7 +53,7 @@ public class BookController {
             List<Book> books;
             if (search != null && !search.isBlank()) {
                 books = repository.findBySearch(search.trim());
-            } else if (genre != null && !genre.isEmpty()) {
+            } else if (genre != null && !genre.isBlank()) {
                 books = repository.findByGenre(genre);
             } else if (readStatus != null) {
                 books = repository.findByReadStatus(readStatus);
@@ -62,7 +62,7 @@ public class BookController {
             }
 
             // Apply readStatus filter on top of search or genre result
-            if (readStatus != null && (search != null && !search.isBlank() || (genre != null && !genre.isEmpty()))) {
+            if (readStatus != null && (search != null && !search.isBlank() || (genre != null && !genre.isBlank()))) {
                 ReadStatus finalReadStatus = readStatus;
                 books = books.stream().filter(b -> b.getReadStatus() == finalReadStatus).toList();
             }

@@ -790,4 +790,16 @@ public class BookApiTest {
         HttpResponse<String> resp = post("/books/re-enrich", "");
         assertEquals(500, resp.statusCode());
     }
+
+    @Test
+    void testGenreFilterWhitespaceOnlyReturnsAllBooks() throws Exception {
+        post("/books", createBookJson("Dune", "Frank Herbert", "READING", "sci-fi", null, null));
+        post("/books", createBookJson("1984", "George Orwell", "WANT_TO_READ", "dystopia", null, null));
+
+        // ?genre=%20%20 decodes to "  " (two spaces); should be treated as "no genre filter"
+        HttpResponse<String> resp = get("/books?genre=%20%20");
+        assertEquals(200, resp.statusCode());
+        JsonArray books = JsonParser.parseString(resp.body()).getAsJsonArray();
+        assertEquals(2, books.size(), "Whitespace-only genre param should not filter out books");
+    }
 }
