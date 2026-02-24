@@ -498,9 +498,16 @@ async function submitEdit(e) {
     updates.author = authorVal || null;
     updates.genre = genreVal || null;
     updates.readStatus = editStatus.value;
-    updates.readingProgress = (editStatus.value === 'READING' || editStatus.value === 'DNF') && editProgress.value !== ''
-        ? parseInt(editProgress.value, 10)
-        : null;
+    if ((editStatus.value === 'READING' || editStatus.value === 'DNF') && editProgress.value !== '') {
+        const progressVal = parseInt(editProgress.value, 10);
+        if (isNaN(progressVal) || progressVal < 0 || progressVal > 100) {
+            showToast('Reading progress must be between 0 and 100', 'error');
+            return;
+        }
+        updates.readingProgress = progressVal;
+    } else {
+        updates.readingProgress = null;
+    }
 
     const ratingVal = parseInt(editRating.dataset.currentValue) || 0;
     if (ratingVal >= 1 && ratingVal <= 5) {
