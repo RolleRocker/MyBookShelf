@@ -46,7 +46,6 @@ public class DatabaseConfig {
                     page_count INTEGER,
                     subjects TEXT,
                     read_status VARCHAR(20) NOT NULL,
-                    cover_path VARCHAR(512),
                     cover_url VARCHAR(512),
                     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
                     updated_at TIMESTAMP NOT NULL DEFAULT NOW()

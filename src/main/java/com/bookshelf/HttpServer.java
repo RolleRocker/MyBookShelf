@@ -1,6 +1,8 @@
 package com.bookshelf;
 
+import java.io.BufferedInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.concurrent.ExecutorService;
@@ -46,7 +48,8 @@ public class HttpServer {
     private void handleConnection(Socket socket) {
         try {
             socket.setSoTimeout(READ_TIMEOUT_MS);
-            HttpRequest request = RequestParser.parse(socket.getInputStream());
+            InputStream buffered = new BufferedInputStream(socket.getInputStream());
+            HttpRequest request = RequestParser.parse(buffered);
             HttpResponse response = router.route(request);
             ResponseWriter.write(socket.getOutputStream(), response);
             socket.shutdownOutput();

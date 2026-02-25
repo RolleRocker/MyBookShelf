@@ -62,6 +62,9 @@ public class InMemoryBookRepository implements BookRepository {
 
     @Override
     public Optional<Book> update(UUID id, Book updates) {
+        // NOTE: This works because BookController mutates the existing object in-place
+        // before calling update(). The `updates` param IS the same reference as store.get(id).
+        // A proper implementation would merge fields, but this is test-only code.
         Book existing = store.get(id);
         if (existing == null) return Optional.empty();
         store.put(id, updates);

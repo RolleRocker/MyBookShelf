@@ -213,7 +213,7 @@ src/main/java/com/bookshelf/
 ├── Router.java                 # Route matching with path params
 ├── BookController.java         # API endpoint handlers + sorting
 ├── Book.java                   # Book domain model (16 fields)
-├── ReadStatus.java             # WANT_TO_READ / READING / FINISHED
+├── ReadStatus.java             # WANT_TO_READ / READING / FINISHED / DNF
 ├── BookRepository.java         # Repository interface
 ├── InMemoryBookRepository.java # ConcurrentHashMap implementation
 ├── JdbcBookRepository.java     # PostgreSQL implementation
@@ -248,7 +248,7 @@ static/
 | `HttpRequest.java` | Request model (method, path, pathParams, queryParams, headers, body) |
 | `HttpResponse.java` | Response model + factory methods (`ok`, `created`, `notFound`, `badRequest`, etc.) |
 | `Book.java` | Book entity with all 16 fields and getters/setters |
-| `ReadStatus.java` | Enum: `WANT_TO_READ`, `READING`, `FINISHED` |
+| `ReadStatus.java` | Enum: `WANT_TO_READ`, `READING`, `FINISHED`, `DNF` |
 | `BookRepository.java` | Repository interface |
 | `InMemoryBookRepository.java` | `ConcurrentHashMap`-backed implementation (used in tests and `./gradlew run`) |
 | `JdbcBookRepository.java` | PostgreSQL JDBC implementation |
@@ -276,7 +276,7 @@ static/
 | `publishDate` | String | no | Auto-filled from Open Library |
 | `pageCount` | Integer | no | Auto-filled from Open Library. Boxed type for nullable |
 | `subjects` | List\<String\> | no | Auto-filled; stored as JSON array string in DB |
-| `readStatus` | enum | yes | `WANT_TO_READ`, `READING`, `FINISHED` |
+| `readStatus` | enum | yes | `WANT_TO_READ`, `READING`, `FINISHED`, `DNF` |
 | `readingProgress` | Integer (0–100) | no | Only meaningful when `readStatus == READING`. Nullable. |
 | `coverData` | byte[] (transient) | no | Cover image bytes, stored as BYTEA in DB. Not serialized to JSON |
 | `coverUrl` | String | no | Original Open Library URL |

@@ -7,9 +7,9 @@ services:
     environment:
       DB_HOST: db
       DB_PORT: "5432"
-      DB_NAME: bookshelf
-      DB_USER: bookshelf
-      DB_PASS: bookshelf
+      DB_NAME: ${DB_NAME:-bookshelf}
+      DB_USER: ${DB_USER:-bookshelf}
+      DB_PASS: ${DB_PASS:-bookshelf}
       APP_PORT: "8080"
     depends_on:
       db:
@@ -18,11 +18,11 @@ services:
     image: postgres:16-alpine
     restart: always
     environment:
-      POSTGRES_DB: bookshelf
-      POSTGRES_USER: bookshelf
-      POSTGRES_PASSWORD: bookshelf
+      POSTGRES_DB: ${DB_NAME:-bookshelf}
+      POSTGRES_USER: ${DB_USER:-bookshelf}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bookshelf}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:

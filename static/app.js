@@ -101,6 +101,7 @@ function showToast(message, type = 'success') {
     setTimeout(() => {
         toast.classList.add('toast-out');
         toast.addEventListener('animationend', () => toast.remove());
+        setTimeout(() => { if (toast.parentNode) toast.remove(); }, 500);
     }, 4500);
 }
 
@@ -208,9 +209,8 @@ function loadCover(book) {
 }
 
 function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+              .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
 // ---- Filtered Books ----
@@ -221,10 +221,11 @@ function getSortedBooks(books) {
     const asc = dir !== 'desc';
     return [...books].sort((a, b) => {
         let av, bv;
-        if (field === 'title')   { av = (a.title  || '').toLowerCase(); bv = (b.title  || '').toLowerCase(); }
-        if (field === 'author')  { av = (a.author || '').toLowerCase(); bv = (b.author || '').toLowerCase(); }
-        if (field === 'rating')  { av = a.rating  || 0; bv = b.rating  || 0; }
-        if (field === 'created') { av = a.createdAt || ''; bv = b.createdAt || ''; }
+        if (field === 'title')        { av = (a.title  || '').toLowerCase(); bv = (b.title  || '').toLowerCase(); }
+        else if (field === 'author')  { av = (a.author || '').toLowerCase(); bv = (b.author || '').toLowerCase(); }
+        else if (field === 'rating')  { av = a.rating  || 0; bv = b.rating  || 0; }
+        else if (field === 'created') { av = a.createdAt || ''; bv = b.createdAt || ''; }
+        else return 0;
         if (av < bv) return asc ? -1 : 1;
         if (av > bv) return asc ? 1 : -1;
         return 0;
@@ -541,7 +542,7 @@ function setFilter(status) {
     filterTabs.forEach(tab => {
         tab.classList.toggle('active', tab.dataset.status === status);
     });
-    loadBooks();
+    renderBooks(getFilteredBooks());
 }
 
 // ---- ISBN Scanner (zbar-wasm) ----
@@ -615,6 +616,9 @@ function getVideoConstraints() {
 
 const SCAN_WIDTH = 800;
 
+let roiCanvas = null;
+let roiCtx = null;
+
 // Grab a downscaled grayscale snapshot from the center of the video (ROI).
 function captureROI(video) {
     const vw = video.videoWidth, vh = video.videoHeight;
@@ -627,13 +631,15 @@ function captureROI(video) {
     const w = Math.floor(roiW * scale);
     const h = Math.floor(roiH * scale);
 
-    const canvas = document.createElement('canvas');
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    ctx.drawImage(video, roiX, roiY, roiW, roiH, 0, 0, w, h);
+    if (!roiCanvas) {
+        roiCanvas = document.createElement('canvas');
+        roiCtx = roiCanvas.getContext('2d', { willReadFrequently: true });
+    }
+    roiCanvas.width = w;
+    roiCanvas.height = h;
+    roiCtx.drawImage(video, roiX, roiY, roiW, roiH, 0, 0, w, h);
 
-    const imgData = ctx.getImageData(0, 0, w, h);
+    const imgData = roiCtx.getImageData(0, 0, w, h);
     const data = imgData.data;
     const gray = new Uint8Array(w * h);
     for (let i = 0, j = 0; i < data.length; i += 4, j++) {
@@ -894,6 +900,8 @@ function closeScanner() {
     }
 
     scannerModal.hidden = true;
+    roiCanvas = null;
+    roiCtx = null;
 }
 
 function stopCurrentCamera() {

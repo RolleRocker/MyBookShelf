@@ -11,6 +11,7 @@
     <script src="/lib/zbar-wasm.js"></script>
 </head>
 <body>
+    <noscript><p style="text-align:center;padding:2rem;color:#ccc;">This app requires JavaScript to run.</p></noscript>
     <div class="grain-overlay"></div>
 
     <header class="site-header">
@@ -72,28 +73,28 @@
     </header>
 
     <nav class="filter-bar">
-        <div class="filter-inner">
-            <button class="filter-tab active" data-status="all">
+        <div class="filter-inner" role="tablist">
+            <button class="filter-tab active" data-status="all" role="tab">
                 <span class="tab-dot dot-all"></span>
                 All Books
                 <span class="tab-count" id="count-all">0</span>
             </button>
-            <button class="filter-tab" data-status="WANT_TO_READ">
+            <button class="filter-tab" data-status="WANT_TO_READ" role="tab">
                 <span class="tab-dot dot-want"></span>
                 Want to Read
                 <span class="tab-count" id="count-want">0</span>
             </button>
-            <button class="filter-tab" data-status="READING">
+            <button class="filter-tab" data-status="READING" role="tab">
                 <span class="tab-dot dot-reading"></span>
                 Reading
                 <span class="tab-count" id="count-reading">0</span>
             </button>
-            <button class="filter-tab" data-status="FINISHED">
+            <button class="filter-tab" data-status="FINISHED" role="tab">
                 <span class="tab-dot dot-finished"></span>
                 Finished
                 <span class="tab-count" id="count-finished">0</span>
             </button>
-            <button class="filter-tab" data-status="DNF">
+            <button class="filter-tab" data-status="DNF" role="tab">
                 <span class="tab-dot dot-dnf"></span>
                 Did Not Finish
                 <span class="tab-count" id="count-dnf">0</span>
@@ -217,7 +218,7 @@
     </div>
 
     <!-- Toast container -->
-    <div id="toast-container" class="toast-container"></div>
+    <div id="toast-container" class="toast-container" aria-live="polite" role="status"></div>
 
     <script src="/app.js"></script>
 </body>

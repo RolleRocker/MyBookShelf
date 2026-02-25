@@ -80,7 +80,7 @@ The project is built in progressive versions (V1 → V4), each adding a layer:
 | `publishDate`    | String                                      | no       | Auto-filled from Open Library |
 | `pageCount`      | Integer                                     | no       | Auto-filled from Open Library. Boxed type for nullable |
 | `subjects`       | List\<String\>                              | no       | Auto-filled; stored as JSON array string in DB |
-| `readStatus`     | enum: `WANT_TO_READ`, `READING`, `FINISHED` | yes      | |
+| `readStatus`     | enum: `WANT_TO_READ`, `READING`, `FINISHED`, `DNF` | yes      | |
 | `readingProgress`| Integer (0–100)                             | no       | Only meaningful when `readStatus == READING`. Nullable. |
 | `coverData`      | byte[] (transient)                          | no       | Cover image bytes, stored as BYTEA in DB. Not serialized to JSON |
 | `coverUrl`       | String                                      | no       | Original Open Library URL |

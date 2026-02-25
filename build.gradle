@@ -28,7 +28,19 @@ dependencies {
 }
 
 test {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        excludeTags 'integration'
+    }
+    testLogging {
+        exceptionFormat = 'full'
+        events 'passed', 'skipped', 'failed'
+    }
+}
+
+tasks.register('integrationTest', Test) {
+    useJUnitPlatform {
+        includeTags 'integration'
+    }
 }
 
 shadowJar {

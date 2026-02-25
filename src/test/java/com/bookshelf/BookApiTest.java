@@ -834,6 +834,78 @@ public class BookApiTest {
     }
 
     @Test
+    void testUpdateReadStatusToNullReturns400() throws Exception {
+        HttpResponse<String> create = post("/books", createBookJson("Dune", "Frank Herbert", "READING"));
+        String id = getIdFromResponse(create);
+
+        HttpResponse<String> update = put("/books/" + id, "{\"readStatus\": null}");
+        assertEquals(400, update.statusCode());
+    }
+
+    @Test
+    void testIsbnChangePreservesUserProvidedFields() throws Exception {
+        String body = createBookJson("Dune", "Frank Herbert", "READING", null, null, "9780261103573");
+        HttpResponse<String> create = post("/books", body);
+        String id = getIdFromResponse(create);
+
+        HttpResponse<String> update = put("/books/" + id, "{\"isbn\": \"9780140328721\", \"publisher\": \"Custom Publisher\"}");
+        assertEquals(200, update.statusCode());
+        JsonObject updated = JsonParser.parseString(update.body()).getAsJsonObject();
+        assertEquals("Custom Publisher", updated.get("publisher").getAsString());
+    }
+
+    @Test
+    void testCreateBookWithNonArraySubjectsReturns400() throws Exception {
+        String body = "{\"title\":\"Test\",\"author\":\"Test\",\"readStatus\":\"WANT_TO_READ\",\"subjects\":\"not-an-array\"}";
+        HttpResponse<String> resp = post("/books", body);
+        assertEquals(400, resp.statusCode());
+    }
+
+    @Test
+    void testGetBookWithNonUuidReturns404() throws Exception {
+        HttpResponse<String> resp = get("/books/not-a-uuid");
+        assertEquals(404, resp.statusCode());
+    }
+
+    @Test
+    void testNegativeReadingProgressOnCreateReturns400() throws Exception {
+        String body = "{\"title\":\"Test\",\"author\":\"Test\",\"readStatus\":\"READING\",\"readingProgress\":-1}";
+        HttpResponse<String> resp = post("/books", body);
+        assertEquals(400, resp.statusCode());
+    }
+
+    @Test
+    void testNegativeReadingProgressOnUpdateReturns400() throws Exception {
+        HttpResponse<String> create = post("/books", createBookJson("Test", "Author", "READING"));
+        String id = getIdFromResponse(create);
+
+        HttpResponse<String> update = put("/books/" + id, "{\"readingProgress\": -1}");
+        assertEquals(400, update.statusCode());
+    }
+
+    @Test
+    void testSortWithoutDirectionDefaultsAsc() throws Exception {
+        post("/books", createBookJson("Bravo", "Author B", "READING"));
+        post("/books", createBookJson("Alpha", "Author A", "READING"));
+
+        HttpResponse<String> resp = get("/books?sort=title");
+        assertEquals(200, resp.statusCode());
+        JsonArray books = JsonParser.parseString(resp.body()).getAsJsonArray();
+        assertEquals(2, books.size());
+        assertEquals("Alpha", books.get(0).getAsJsonObject().get("title").getAsString());
+        assertEquals("Bravo", books.get(1).getAsJsonObject().get("title").getAsString());
+    }
+
+    @Test
+    void testEmptyPutBodyReturns400() throws Exception {
+        HttpResponse<String> create = post("/books", createBookJson("Test", "Author", "READING"));
+        String id = getIdFromResponse(create);
+
+        HttpResponse<String> update = put("/books/" + id, "");
+        assertEquals(400, update.statusCode());
+    }
+
+    @Test
     void testOversizedHeaderReturns400() throws Exception {
         // Send a raw HTTP request with a header line > 8 KB, bypassing HttpClient
         try (Socket socket = new Socket("localhost", port)) {

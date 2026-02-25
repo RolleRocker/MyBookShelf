@@ -89,6 +89,8 @@ public class BookController {
 
             return HttpResponse.ok(gson.toJson(books));
         } catch (RuntimeException e) {
+            System.err.println("Error in handleGetBooks: " + e.getMessage());
+            e.printStackTrace();
             return HttpResponse.internalServerError("Internal server error");
         }
     }
@@ -106,6 +108,8 @@ public class BookController {
                     .map(book -> HttpResponse.ok(gson.toJson(book)))
                     .orElse(HttpResponse.notFound("Book not found"));
         } catch (RuntimeException e) {
+            System.err.println("Error in handleGetBook: " + e.getMessage());
+            e.printStackTrace();
             return HttpResponse.internalServerError("Internal server error");
         }
     }
@@ -117,6 +121,8 @@ public class BookController {
                     .map(book -> HttpResponse.ok(gson.toJson(book)))
                     .orElse(HttpResponse.notFound("Book not found"));
         } catch (RuntimeException e) {
+            System.err.println("Error in handleGetBookByIsbn: " + e.getMessage());
+            e.printStackTrace();
             return HttpResponse.internalServerError("Internal server error");
         }
     }
@@ -209,6 +215,17 @@ public class BookController {
                 }
             }
 
+            if (json.has("subjects") && !json.get("subjects").isJsonNull()) {
+                if (!json.get("subjects").isJsonArray()) {
+                    return HttpResponse.badRequest("subjects must be an array");
+                }
+                List<String> subjects = new ArrayList<>();
+                for (var el : json.getAsJsonArray("subjects")) {
+                    subjects.add(el.getAsString());
+                }
+                book.setSubjects(subjects);
+            }
+
             Instant now = Instant.now();
             book.setCreatedAt(now);
             book.setUpdatedAt(now);
@@ -224,6 +241,8 @@ public class BookController {
         } catch (IllegalArgumentException e) {
             return HttpResponse.badRequest(e.getMessage());
         } catch (RuntimeException e) {
+            System.err.println("Error in handleCreateBook: " + e.getMessage());
+            e.printStackTrace();
             return HttpResponse.internalServerError("Internal server error");
         }
     }
@@ -313,7 +332,14 @@ public class BookController {
                 book.setPageCount(json.get("pageCount").isJsonNull() ? null : safeGetInt(json, "pageCount"));
             }
             if (json.has("readStatus")) {
-                book.setReadStatus(json.get("readStatus").isJsonNull() ? null : ReadStatus.valueOf(json.get("readStatus").getAsString()));
+                if (json.get("readStatus").isJsonNull()) {
+                    return HttpResponse.badRequest("readStatus cannot be null");
+                }
+                try {
+                    book.setReadStatus(ReadStatus.valueOf(json.get("readStatus").getAsString()));
+                } catch (IllegalArgumentException e) {
+                    return HttpResponse.badRequest("Invalid readStatus");
+                }
             }
             if (json.has("subjects")) {
                 if (json.get("subjects").isJsonNull()) {
@@ -351,11 +377,12 @@ public class BookController {
 
             if (isbnChanged && newIsbn != null) {
                 // Clear previously-enriched fields before re-enrichment
-                book.setPublisher(null);
-                book.setPublishDate(null);
-                book.setPageCount(null);
-                book.setSubjects(null);
-                book.setCoverUrl(null);
+                // but preserve fields explicitly provided in this request
+                if (!json.has("publisher")) book.setPublisher(null);
+                if (!json.has("publishDate")) book.setPublishDate(null);
+                if (!json.has("pageCount")) book.setPageCount(null);
+                if (!json.has("subjects")) book.setSubjects(null);
+                if (!json.has("coverUrl")) book.setCoverUrl(null);
                 book.setCoverData(null);
             }
 
@@ -370,6 +397,8 @@ public class BookController {
         } catch (IllegalArgumentException e) {
             return HttpResponse.badRequest(e.getMessage());
         } catch (RuntimeException e) {
+            System.err.println("Error in handleUpdateBook: " + e.getMessage());
+            e.printStackTrace();
             return HttpResponse.internalServerError("Internal server error");
         }
     }
@@ -388,6 +417,8 @@ public class BookController {
             }
             return HttpResponse.notFound("Book not found");
         } catch (RuntimeException e) {
+            System.err.println("Error in handleDeleteBook: " + e.getMessage());
+            e.printStackTrace();
             return HttpResponse.internalServerError("Internal server error");
         }
     }
@@ -409,6 +440,8 @@ public class BookController {
             int queued = openLibraryService.reEnrichAll(booksWithIsbn);
             return HttpResponse.accepted("{\"queued\":" + queued + "}");
         } catch (RuntimeException e) {
+            System.err.println("Error in handleReEnrich: " + e.getMessage());
+            e.printStackTrace();
             return HttpResponse.internalServerError("Internal server error");
         }
     }
@@ -429,6 +462,8 @@ public class BookController {
 
             return HttpResponse.binary(bookOpt.get().getCoverData(), "image/jpeg");
         } catch (RuntimeException e) {
+            System.err.println("Error in handleGetCover: " + e.getMessage());
+            e.printStackTrace();
             return HttpResponse.internalServerError("Internal server error");
         }
     }

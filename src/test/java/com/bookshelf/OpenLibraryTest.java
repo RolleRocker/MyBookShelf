@@ -5,6 +5,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.Tag;
 
 import java.io.IOException;
 import java.net.URI;
@@ -14,6 +15,7 @@ import java.net.http.HttpResponse;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@Tag("integration")
 @TestMethodOrder(MethodOrderer.MethodName.class)
 public class OpenLibraryTest {
 

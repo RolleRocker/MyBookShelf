@@ -1,5 +1,6 @@
 package com.bookshelf;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLDecoder;
@@ -67,14 +68,17 @@ public class RequestParser {
                 throw new RequestTooLargeException("Request body too large (" + contentLength + " bytes)");
             }
             if (contentLength > 0) {
-                byte[] bodyBytes = new byte[contentLength];
+                byte[] buffer = new byte[8192];
+                ByteArrayOutputStream baos = new ByteArrayOutputStream(Math.min(contentLength, 8192));
                 int totalRead = 0;
                 while (totalRead < contentLength) {
-                    int read = input.read(bodyBytes, totalRead, contentLength - totalRead);
+                    int toRead = Math.min(buffer.length, contentLength - totalRead);
+                    int read = input.read(buffer, 0, toRead);
                     if (read == -1) break;
+                    baos.write(buffer, 0, read);
                     totalRead += read;
                 }
-                body = new String(bodyBytes, 0, totalRead, StandardCharsets.UTF_8);
+                body = baos.toString(StandardCharsets.UTF_8);
             }
         }
 

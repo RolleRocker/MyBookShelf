@@ -43,7 +43,7 @@ Build an HTTP server using only `java.net.ServerSocket` (no Spring, no Javalin, 
 | `publishDate`| String                                        | no (auto-filled from Open Library) |
 | `pageCount`  | Integer                                       | no (auto-filled from Open Library) |
 | `subjects`   | List\<String\>                                | no (auto-filled from Open Library) |
-| `readStatus` | enum: `WANT_TO_READ`, `READING`, `FINISHED`   | yes      |
+| `readStatus` | enum: `WANT_TO_READ`, `READING`, `FINISHED`, `DNF`   | yes      |
 
 \* `title` and `author` are required in V1–V3. In V4, they become optional if `isbn` is provided (enriched async from Open Library). The DB schema allows NULL for both from V1 onward to avoid a migration later.
 
@@ -101,7 +101,7 @@ Build these as separate classes with clear responsibilities:
 - Calls `BookRepository` and builds `HttpResponse` objects
 
 ### 7. `BookRepository` (interface)
-- Defines the contract: `findAll()`, `findById(UUID)`, `findByIsbn(String)`, `save(Book)`, `update(UUID, Book)`, `delete(UUID)`, `updateFromOpenLibrary(UUID, BookMetadata, String coverPath)` *(added in V2)*
+- Defines the contract: `findAll()`, `findById(UUID)`, `findByIsbn(String)`, `save(Book)`, `update(UUID, Book)`, `delete(UUID)`, `updateFromOpenLibrary(UUID, BookMetadata, String coverData)` *(added in V2)*
 - `findByIsbn()` returns the oldest (first-created) book when multiple books share the same ISBN
 - V1 implementation: `InMemoryBookRepository` using `ConcurrentHashMap<UUID, Book>`
 - V3 implementation: `JdbcBookRepository` using PostgreSQL + HikariCP
@@ -360,7 +360,7 @@ Sizes: `S` (small), `M` (medium), `L` (large).
 | `publishDate` | String         | Publication date (auto-filled from Open Library)|
 | `pageCount`   | int            | Number of pages (auto-filled from Open Library) |
 | `subjects`    | List\<String\> | Topic tags (auto-filled from Open Library)      |
-| `coverPath`   | String         | Local file path to the saved cover image        |
+| `coverData`   | byte[] (transient) | Cover image bytes, stored as BYTEA in DB. Not serialized to JSON |
 | `coverUrl`    | String         | Original Open Library URL (for reference)       |
 
 **API URL:** `https://openlibrary.org/api/books?bibkeys=ISBN:{isbn}&jscmd=data&format=json`
@@ -396,10 +396,10 @@ public void enrichBookAsync(UUID bookId, String isbn) {
             BookMetadata metadata = fetchMetadata(isbn);
 
             // 2. Download cover image
-            String coverPath = downloadCover(bookId, isbn);
+            String coverData = downloadCover(bookId, isbn);
 
             // 3. Update book with all enriched data
-            bookRepository.updateFromOpenLibrary(bookId, metadata, coverPath);
+            bookRepository.updateFromOpenLibrary(bookId, metadata, coverData);
         } catch (Exception e) {
             // Log and move on — enrichment is best-effort
         }
@@ -417,7 +417,7 @@ public void enrichBookAsync(UUID bookId, String isbn) {
 
 ### Integration Points
 - **On `POST /books`** — if ISBN is present, fire off `enrichBookAsync()`. Response returns immediately with user-provided fields only. Open Library data fills in shortly after.
-- **On `PUT /books/{id}`** — if ISBN changed, clear all previously-enriched metadata fields (`publisher`, `publishDate`, `pageCount`, `subjects`, `coverPath`, `coverUrl`) and fire off a new async enrichment. This ensures the new ISBN's data replaces the old. User-provided fields in the same PUT request are preserved (enrichment still only fills `null` fields).
+- **On `PUT /books/{id}`** — if ISBN changed, clear all previously-enriched metadata fields (`publisher`, `publishDate`, `pageCount`, `subjects`, `coverData`, `coverUrl`) and fire off a new async enrichment. This ensures the new ISBN's data replaces the old. User-provided fields in the same PUT request are preserved (enrichment still only fills `null` fields).
 - **On `DELETE /books/{id}`** — delete the cover file from disk
 - **On `GET /books/{id}`** — fields like `publisher`, `pageCount`, `subjects` will be `null` until the async enrichment finishes. Clients should handle this gracefully.
 - **Shutdown** — call `executor.shutdown()` when the server stops to avoid orphaned threads
@@ -446,7 +446,7 @@ These tests require network access to Open Library. Consider also writing unit t
 
 **T26 — Cover image is downloaded**
 1. Create a book with a valid ISBN
-2. Poll `GET /books/{id}` until `coverPath` is non-null
+2. Poll `GET /books/{id}` until `coverData` is non-null
 3. `GET /books/{id}/cover`
 4. Assert `200 OK` with `Content-Type: image/jpeg`
 5. Assert response body is more than 1KB (not the 1x1 placeholder)
@@ -460,7 +460,7 @@ These tests require network access to Open Library. Consider also writing unit t
 1. `POST /books` with no `isbn` field
 2. Wait 5 seconds
 3. `GET /books/{id}`
-4. Assert `publisher`, `pageCount`, `subjects`, `coverPath` are all still `null`
+4. Assert `publisher`, `pageCount`, `subjects`, `coverData` are all still `null`
 
 **T29 — User-provided fields are not overwritten**
 1. `POST /books` with `isbn: "9780441013593"` AND `publisher: "My Custom Publisher"`
@@ -476,7 +476,7 @@ These tests require network access to Open Library. Consider also writing unit t
 
 **T31 — Cover deleted when book is deleted**
 1. Create a book with a valid ISBN
-2. Poll until `coverPath` is non-null
+2. Poll until `coverData` is non-null
 3. `DELETE /books/{id}`
 4. Assert `204 No Content`
 5. `GET /books/{id}/cover` — assert `404`
@@ -799,7 +799,7 @@ No build tools, no npm, no React — just plain HTML, CSS, and vanilla JavaScrip
 1. User types an ISBN into the input field and presses Enter (or clicks "Add")
 2. Frontend sends `POST /books` with `{"isbn": "{isbn}", "readStatus": "WANT_TO_READ"}`
 3. Server returns `201` immediately with the book (title/author will be `null` initially if only ISBN was provided)
-4. Frontend adds a placeholder card and polls `GET /books/{id}` every 2 seconds until `publisher` or `coverPath` is populated (indicating Open Library enrichment is complete)
+4. Frontend adds a placeholder card and polls `GET /books/{id}` every 2 seconds until `publisher` or `coverData` is populated (indicating Open Library enrichment is complete)
 5. Card updates in place with the full book data and cover
 
 #### Edit / Update

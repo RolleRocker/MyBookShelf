@@ -34,9 +34,9 @@ public class App {
         System.out.println("Bookshelf server started on port " + port);
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            openLibraryService.shutdown();
-            server.stop();
-            dbConfig.close();
+            try { openLibraryService.shutdown(); } catch (Exception e) { System.err.println("Shutdown error: " + e.getMessage()); }
+            try { server.stop(); } catch (Exception e) { System.err.println("Shutdown error: " + e.getMessage()); }
+            try { dbConfig.close(); } catch (Exception e) { System.err.println("Shutdown error: " + e.getMessage()); }
         }));
 
         // Block main thread to keep JVM alive (accept thread is daemon)
