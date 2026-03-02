@@ -7,3 +7,4 @@ covers/
 .project
 .settings/
 .env
+bin/

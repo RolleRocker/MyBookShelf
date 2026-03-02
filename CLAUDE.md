@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Plan File
 
-**IMPORTANT:** Before starting any implementation work, always read `bookshelf-api-plan.md` in the project root. This is the master plan for the entire project — it contains the detailed build order, design decisions, data model, API specs, architecture, integration tests, and version roadmap (V1 through V4). All implementation should follow the plan file. For barcode scanner work specifically, also read `isbn-scanner-plan.md`. For search/sorting/reading-progress work, read `docs/plans/2026-02-20-search-sorting-reading-progress.md`.
+**IMPORTANT:** Before starting any implementation work, always read `bookshelf-api-plan.md` in the project root. This is the master plan for the entire project — it contains the detailed build order, design decisions, data model, API specs, architecture, integration tests, and version roadmap (V1 through V4). All implementation should follow the plan file.
 
 ## Project Overview
 
@@ -47,7 +47,7 @@ The project is built in progressive versions (V1 → V4), each adding a layer:
 - **`HttpRequest` / `HttpResponse`** — Simple model classes
 - **`Router`** — Maps method + path patterns (with `{param}` extraction) to handler functions. Static segments (`isbn`) take priority over parameters (`{id}`) to avoid route conflicts
 - **`BookController`** — Endpoint handlers: deserializes JSON via Gson, validates input, calls repository, returns `HttpResponse`
-- **`BookRepository`** (interface) — `findAll()`, `findByGenre()`, `findByReadStatus()`, `findBySearch()`, `findById()`, `findByIsbn()`, `save()`, `update()`, `delete()`. V1 uses `InMemoryBookRepository` (ConcurrentHashMap), V3 uses `JdbcBookRepository` (PostgreSQL + HikariCP)
+- **`BookRepository`** (interface) — `findAll()`, `findByGenre()`, `findByReadStatus()`, `findBySearch()`, `findById()`, `findByIsbn()`, `save()`, `update()`, `delete()`, `updateFromOpenLibrary()`, `clear()`. V1 uses `InMemoryBookRepository` (ConcurrentHashMap), V3 uses `JdbcBookRepository` (PostgreSQL + HikariCP)
 - **`ResponseWriter`** — Writes formatted HTTP response to socket `OutputStream`
 
 ### Open Library Integration (V2)
@@ -158,7 +158,8 @@ Tests use JUnit 5 with `java.net.HttpClient`. The server starts on a random port
 
 Test classes:
 - **`BookApiTest`** — full HTTP integration tests covering CRUD, filtering, search, sorting, reading progress, partial updates, validation, and cover endpoints
-- **`OpenLibraryTest`** — tests for Open Library enrichment service
+- **`BookMetadataTest`** — unit tests for `BookMetadata` and Open Library response parsing
+- **`OpenLibraryTest`** — live integration tests for Open Library enrichment service (excluded from default `./gradlew test` via `@Tag("integration")`; run with `./gradlew integrationTest`)
 
 ## Database Column Mapping
 
@@ -194,11 +195,12 @@ Migrations run on startup via `DatabaseConfig.runMigrations()`. The schema uses 
 | `HttpRequest.java` | Request model (method, path, pathParams, queryParams, headers, body) |
 | `HttpResponse.java` | Response model + factory methods (`ok`, `created`, `notFound`, etc.) |
 | `Book.java` | Book entity with all fields and getters/setters |
-| `ReadStatus.java` | Enum: `WANT_TO_READ`, `READING`, `FINISHED` |
+| `ReadStatus.java` | Enum: `WANT_TO_READ`, `READING`, `FINISHED`, `DNF` |
 | `BookRepository.java` | Repository interface |
 | `InMemoryBookRepository.java` | `ConcurrentHashMap`-backed implementation (used in tests) |
 | `JdbcBookRepository.java` | PostgreSQL JDBC implementation |
 | `BookController.java` | HTTP handler methods; validation, JSON parsing, sorting |
+| `RequestTooLargeException.java` | Custom exception for oversized request bodies |
 | `DatabaseConfig.java` | HikariCP pool setup + schema migrations |
 | `OpenLibraryService.java` | Async Open Library metadata + cover fetching |
 | `BookMetadata.java` | DTO for Open Library response |
