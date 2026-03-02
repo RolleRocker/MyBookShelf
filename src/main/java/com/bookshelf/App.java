@@ -18,7 +18,7 @@ public class App {
         ShelfRepository shelfRepository = new JdbcShelfRepository(
             dbConfig.getDataSource()
         );
-        OpenLibraryService openLibraryService = new OpenLibraryService(
+        BookEnrichmentService openLibraryService = new BookEnrichmentService(
             repository
         );
         BookController controller = new BookController(

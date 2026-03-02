@@ -4,7 +4,6 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -19,20 +18,20 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-public class OpenLibraryService {
+public class BookEnrichmentService {
 
     private final BookRepository repository;
     private final ExecutorService executor;
     private final HttpClient httpClient;
     private final String userAgent;
 
-    public OpenLibraryService(BookRepository repository) {
+    public BookEnrichmentService(BookRepository repository) {
         this.repository = repository;
         this.executor = Executors.newSingleThreadExecutor();
         this.httpClient = HttpClient.newBuilder()
-                .version(HttpClient.Version.HTTP_1_1)
-                .followRedirects(HttpClient.Redirect.NORMAL)
-                .build();
+            .version(HttpClient.Version.HTTP_1_1)
+            .followRedirects(HttpClient.Redirect.NORMAL)
+            .build();
         this.userAgent = "MyBookShelf/1.0 (personal project)";
     }
 
@@ -43,26 +42,37 @@ public class OpenLibraryService {
                 byte[] coverData = downloadCover(isbn);
                 repository.updateFromOpenLibrary(bookId, metadata, coverData);
             } catch (Exception e) {
-                System.err.println("Enrichment failed for ISBN " + isbn + ": " + e.getMessage());
+                System.err.println(
+                    "Enrichment failed for ISBN " + isbn + ": " + e.getMessage()
+                );
             }
         });
     }
 
-    BookMetadata fetchMetadata(String isbn) throws IOException, InterruptedException {
-        String url = "https://openlibrary.org/api/books?bibkeys=ISBN:" + isbn + "&jscmd=data&format=json";
+    BookMetadata fetchMetadata(String isbn)
+        throws IOException, InterruptedException {
+        String url =
+            "https://openlibrary.org/api/books?bibkeys=ISBN:" +
+            isbn +
+            "&jscmd=data&format=json";
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .header("User-Agent", userAgent)
-                .timeout(Duration.ofSeconds(10))
-                .GET()
-                .build();
+            .uri(URI.create(url))
+            .header("User-Agent", userAgent)
+            .timeout(Duration.ofSeconds(10))
+            .GET()
+            .build();
 
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = httpClient.send(
+            request,
+            HttpResponse.BodyHandlers.ofString()
+        );
         if (response.statusCode() != 200) {
             return null;
         }
 
-        JsonObject root = JsonParser.parseString(response.body()).getAsJsonObject();
+        JsonObject root = JsonParser.parseString(
+            response.body()
+        ).getAsJsonObject();
         String key = "ISBN:" + isbn;
         if (!root.has(key)) {
             return null;
@@ -81,42 +91,63 @@ public class OpenLibraryService {
             JsonArray authors = bookData.getAsJsonArray("authors");
             if (!authors.isEmpty()) {
                 JsonElement first = authors.get(0);
-                if (first.isJsonObject() && first.getAsJsonObject().has("name")) {
-                    metadata.setAuthor(first.getAsJsonObject().get("name").getAsString());
+                if (
+                    first.isJsonObject() && first.getAsJsonObject().has("name")
+                ) {
+                    metadata.setAuthor(
+                        first.getAsJsonObject().get("name").getAsString()
+                    );
                 }
             }
         }
 
         // Publisher — first entry in publishers array
-        if (bookData.has("publishers") && bookData.get("publishers").isJsonArray()) {
+        if (
+            bookData.has("publishers") &&
+            bookData.get("publishers").isJsonArray()
+        ) {
             JsonArray publishers = bookData.getAsJsonArray("publishers");
             if (!publishers.isEmpty()) {
                 JsonElement first = publishers.get(0);
-                if (first.isJsonObject() && first.getAsJsonObject().has("name")) {
-                    metadata.setPublisher(first.getAsJsonObject().get("name").getAsString());
+                if (
+                    first.isJsonObject() && first.getAsJsonObject().has("name")
+                ) {
+                    metadata.setPublisher(
+                        first.getAsJsonObject().get("name").getAsString()
+                    );
                 }
             }
         }
 
         // Publish date
-        if (bookData.has("publish_date") && !bookData.get("publish_date").isJsonNull()) {
+        if (
+            bookData.has("publish_date") &&
+            !bookData.get("publish_date").isJsonNull()
+        ) {
             metadata.setPublishDate(bookData.get("publish_date").getAsString());
         }
 
         // Page count
-        if (bookData.has("number_of_pages") && !bookData.get("number_of_pages").isJsonNull()) {
+        if (
+            bookData.has("number_of_pages") &&
+            !bookData.get("number_of_pages").isJsonNull()
+        ) {
             metadata.setPageCount(bookData.get("number_of_pages").getAsInt());
         }
 
         // Subjects — extract name field from each object, limit to 10
-        if (bookData.has("subjects") && bookData.get("subjects").isJsonArray()) {
+        if (
+            bookData.has("subjects") && bookData.get("subjects").isJsonArray()
+        ) {
             JsonArray subjectsArray = bookData.getAsJsonArray("subjects");
             List<String> subjects = new ArrayList<>();
             int limit = Math.min(subjectsArray.size(), 10);
             for (int i = 0; i < limit; i++) {
                 JsonElement elem = subjectsArray.get(i);
                 if (elem.isJsonObject() && elem.getAsJsonObject().has("name")) {
-                    subjects.add(elem.getAsJsonObject().get("name").getAsString());
+                    subjects.add(
+                        elem.getAsJsonObject().get("name").getAsString()
+                    );
                 }
             }
             if (!subjects.isEmpty()) {
@@ -139,13 +170,16 @@ public class OpenLibraryService {
     byte[] downloadCover(String isbn) throws IOException, InterruptedException {
         String url = "https://covers.openlibrary.org/b/isbn/" + isbn + "-L.jpg";
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .header("User-Agent", userAgent)
-                .timeout(Duration.ofSeconds(10))
-                .GET()
-                .build();
+            .uri(URI.create(url))
+            .header("User-Agent", userAgent)
+            .timeout(Duration.ofSeconds(10))
+            .GET()
+            .build();
 
-        HttpResponse<byte[]> response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
+        HttpResponse<byte[]> response = httpClient.send(
+            request,
+            HttpResponse.BodyHandlers.ofByteArray()
+        );
         if (response.statusCode() != 200) {
             return null;
         }
@@ -163,9 +197,16 @@ public class OpenLibraryService {
     public int reEnrichAll(List<Book> books) {
         // Sort: null-title first (stuck books), then by createdAt
         List<Book> sorted = new ArrayList<>(books);
-        sorted.sort(Comparator
-                .comparing((Book b) -> b.getTitle() != null) // false (null) before true
-                .thenComparing(b -> b.getCreatedAt() != null ? b.getCreatedAt() : java.time.Instant.EPOCH));
+        sorted.sort(
+            Comparator.comparing(
+                (Book b) -> b.getTitle() != null
+            ).thenComparing(
+                b -> // false (null) before true
+                    b.getCreatedAt() != null
+                        ? b.getCreatedAt()
+                        : java.time.Instant.EPOCH
+            )
+        );
 
         int count = sorted.size();
         executor.submit(() -> {
@@ -174,10 +215,27 @@ public class OpenLibraryService {
                 try {
                     BookMetadata metadata = fetchMetadata(book.getIsbn());
                     byte[] coverData = downloadCover(book.getIsbn());
-                    repository.updateFromOpenLibrary(book.getId(), metadata, coverData);
-                    System.out.println("Re-enriched: " + book.getIsbn() + " (" + (i + 1) + "/" + sorted.size() + ")");
+                    repository.updateFromOpenLibrary(
+                        book.getId(),
+                        metadata,
+                        coverData
+                    );
+                    System.out.println(
+                        "Re-enriched: " +
+                            book.getIsbn() +
+                            " (" +
+                            (i + 1) +
+                            "/" +
+                            sorted.size() +
+                            ")"
+                    );
                 } catch (Exception e) {
-                    System.err.println("Re-enrichment failed for ISBN " + book.getIsbn() + ": " + e.getMessage());
+                    System.err.println(
+                        "Re-enrichment failed for ISBN " +
+                            book.getIsbn() +
+                            ": " +
+                            e.getMessage()
+                    );
                 }
                 // Rate-limit: wait 3 seconds between books (except after last)
                 if (i < sorted.size() - 1) {

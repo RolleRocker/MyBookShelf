@@ -475,7 +475,10 @@ async function addBook() {
     isbnInput.value = "";
     showToast("Book added! Fetching details...");
 
-    // Switch to "All" filter to see the new book
+    // Switch to "All Books" view to see the new book
+    if (activeShelfId) {
+      clearShelfFilter();
+    }
     if (currentFilter !== "all") {
       setFilter("all");
     }
@@ -1147,6 +1150,7 @@ async function doneBulkScan() {
 
   if (idsToScroll.length === 0) return;
 
+  if (activeShelfId) clearShelfFilter();
   if (currentFilter !== "all") setFilter("all");
   await loadBooks();
 

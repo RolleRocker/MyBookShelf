@@ -18,7 +18,7 @@ import java.util.UUID;
 public class BookController {
 
     private final BookRepository repository;
-    private final OpenLibraryService openLibraryService;
+    private final BookEnrichmentService openLibraryService;
     private final ShelfRepository shelfRepository;
     private final Gson gson;
 
@@ -28,14 +28,14 @@ public class BookController {
 
     public BookController(
         BookRepository repository,
-        OpenLibraryService openLibraryService
+        BookEnrichmentService openLibraryService
     ) {
         this(repository, openLibraryService, null);
     }
 
     public BookController(
         BookRepository repository,
-        OpenLibraryService openLibraryService,
+        BookEnrichmentService openLibraryService,
         ShelfRepository shelfRepository
     ) {
         this.repository = repository;

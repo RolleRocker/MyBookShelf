@@ -21,13 +21,13 @@ public class OpenLibraryTest {
     private static HttpServer server;
     private static HttpClient client;
     private static InMemoryBookRepository repository;
-    private static OpenLibraryService openLibraryService;
+    private static BookEnrichmentService openLibraryService;
     private static int port;
 
     @BeforeAll
     static void startServer() throws IOException, InterruptedException {
         repository = new InMemoryBookRepository();
-        openLibraryService = new OpenLibraryService(repository);
+        openLibraryService = new BookEnrichmentService(repository);
         InMemoryShelfRepository shelfRepository = new InMemoryShelfRepository(
             repository
         );
