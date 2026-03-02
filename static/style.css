@@ -4,43 +4,43 @@
 
 :root {
     /* Core palette */
-    --bg-deep:       #1a1410;
-    --bg-panel:      #231e18;
-    --bg-card:       #2c2519;
+    --bg-deep: #1a1410;
+    --bg-panel: #231e18;
+    --bg-card: #2c2519;
     --bg-card-hover: #342d20;
-    --bg-input:      #1e1914;
-    --bg-modal:      #28221a;
+    --bg-input: #1e1914;
+    --bg-modal: #28221a;
 
     /* Text */
-    --text-primary:  #e8dcc8;
-    --text-secondary:#a89a84;
-    --text-dim:      #7a6e5c;
-    --text-inverse:  #1a1410;
+    --text-primary: #e8dcc8;
+    --text-secondary: #a89a84;
+    --text-dim: #7a6e5c;
+    --text-inverse: #1a1410;
 
     /* Gold accents */
-    --gold:          #d4a04a;
-    --gold-dim:      #b8883a;
-    --gold-glow:     rgba(212, 160, 74, 0.15);
-    --gold-subtle:   rgba(212, 160, 74, 0.08);
+    --gold: #d4a04a;
+    --gold-dim: #b8883a;
+    --gold-glow: rgba(212, 160, 74, 0.15);
+    --gold-subtle: rgba(212, 160, 74, 0.08);
 
     /* Status colors */
-    --status-want:     #5b8fa8;
-    --status-want-bg:  rgba(91, 143, 168, 0.12);
-    --status-reading:  #c4933f;
+    --status-want: #5b8fa8;
+    --status-want-bg: rgba(91, 143, 168, 0.12);
+    --status-reading: #c4933f;
     --status-reading-bg: rgba(196, 147, 63, 0.12);
     --status-finished: #6a9a6e;
     --status-finished-bg: rgba(106, 154, 110, 0.12);
-    --status-dnf:      #a06060;
-    --status-dnf-bg:   rgba(160, 96, 96, 0.12);
+    --status-dnf: #a06060;
+    --status-dnf-bg: rgba(160, 96, 96, 0.12);
 
     /* Borders */
-    --border:        rgba(212, 160, 74, 0.1);
+    --border: rgba(212, 160, 74, 0.1);
     --border-strong: rgba(212, 160, 74, 0.2);
 
     /* Shadows */
-    --shadow-card:   0 2px 8px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.2);
-    --shadow-lift:   0 8px 24px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.3);
-    --shadow-modal:  0 24px 64px rgba(0,0,0,0.6);
+    --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.2);
+    --shadow-lift: 0 8px 24px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-modal: 0 24px 64px rgba(0, 0, 0, 0.6);
 
     /* Radius */
     --radius-sm: 4px;
@@ -54,7 +54,9 @@
 
 /* ---- Reset & Base ---- */
 
-*, *::before, *::after {
+*,
+*::before,
+*::after {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
@@ -67,7 +69,7 @@ html {
 }
 
 body {
-    font-family: 'DM Sans', sans-serif;
+    font-family: "DM Sans", sans-serif;
     background: var(--bg-deep);
     color: var(--text-primary);
     min-height: 100vh;
@@ -120,7 +122,7 @@ body {
 }
 
 .brand-name {
-    font-family: 'Libre Baskerville', Georgia, serif;
+    font-family: "Libre Baskerville", Georgia, serif;
     font-size: 1.35rem;
     font-weight: 700;
     color: var(--text-primary);
@@ -139,7 +141,9 @@ body {
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     padding: 0.25rem 0.25rem 0.25rem 0.85rem;
-    transition: border-color 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
+    transition:
+        border-color 0.2s var(--ease-out),
+        box-shadow 0.2s var(--ease-out);
 }
 
 .search-terminal:focus-within {
@@ -148,7 +152,7 @@ body {
 }
 
 .search-label {
-    font-family: 'DM Sans', sans-serif;
+    font-family: "DM Sans", sans-serif;
     font-size: 0.7rem;
     font-weight: 600;
     text-transform: uppercase;
@@ -165,7 +169,7 @@ body {
     border: none;
     outline: none;
     color: var(--text-primary);
-    font-family: 'DM Sans', sans-serif;
+    font-family: "DM Sans", sans-serif;
     font-size: 0.95rem;
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.04em;
@@ -185,11 +189,13 @@ body {
     border: none;
     border-radius: 6px;
     padding: 0.55rem 1rem;
-    font-family: 'DM Sans', sans-serif;
+    font-family: "DM Sans", sans-serif;
     font-size: 0.8rem;
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.15s, transform 0.15s var(--ease-spring);
+    transition:
+        background 0.15s,
+        transform 0.15s var(--ease-spring);
     white-space: nowrap;
     flex-shrink: 0;
 }
@@ -212,9 +218,16 @@ body {
 }
 
 @keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    25% { transform: translateX(-4px); }
-    75% { transform: translateX(4px); }
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+    25% {
+        transform: translateX(-4px);
+    }
+    75% {
+        transform: translateX(4px);
+    }
 }
 
 /* ---- Filter Bar ---- */
@@ -234,7 +247,9 @@ body {
     scrollbar-width: none;
 }
 
-.filter-inner::-webkit-scrollbar { display: none; }
+.filter-inner::-webkit-scrollbar {
+    display: none;
+}
 
 .filter-tab {
     display: flex;
@@ -244,12 +259,14 @@ body {
     border: none;
     border-bottom: 2px solid transparent;
     color: var(--text-dim);
-    font-family: 'DM Sans', sans-serif;
+    font-family: "DM Sans", sans-serif;
     font-size: 0.85rem;
     font-weight: 500;
     padding: 0.85rem 1.1rem;
     cursor: pointer;
-    transition: color 0.2s, border-color 0.2s;
+    transition:
+        color 0.2s,
+        border-color 0.2s;
     white-space: nowrap;
 }
 
@@ -269,13 +286,25 @@ body {
     flex-shrink: 0;
 }
 
-.dot-all       { background: var(--text-dim); }
-.dot-want      { background: var(--status-want); }
-.dot-reading   { background: var(--status-reading); }
-.dot-finished  { background: var(--status-finished); }
-.dot-dnf       { background: var(--status-dnf); }
+.dot-all {
+    background: var(--text-dim);
+}
+.dot-want {
+    background: var(--status-want);
+}
+.dot-reading {
+    background: var(--status-reading);
+}
+.dot-finished {
+    background: var(--status-finished);
+}
+.dot-dnf {
+    background: var(--status-dnf);
+}
 
-.filter-tab.active .dot-all { background: var(--gold); }
+.filter-tab.active .dot-all {
+    background: var(--gold);
+}
 
 .tab-count {
     font-size: 0.7rem;
@@ -305,13 +334,16 @@ body {
     background: none;
     border: 1px solid var(--border);
     color: var(--text-dim);
-    font-family: 'DM Sans', sans-serif;
+    font-family: "DM Sans", sans-serif;
     font-size: 0.8rem;
     font-weight: 500;
     padding: 0.45rem 0.9rem;
     border-radius: 20px;
     cursor: pointer;
-    transition: color 0.2s, border-color 0.2s, background 0.2s;
+    transition:
+        color 0.2s,
+        border-color 0.2s,
+        background 0.2s;
     white-space: nowrap;
     align-self: center;
 }
@@ -339,7 +371,7 @@ body {
 }
 
 .author-heading {
-    font-family: 'Libre Baskerville', Georgia, serif;
+    font-family: "Libre Baskerville", Georgia, serif;
     font-size: 1.1rem;
     font-weight: 700;
     color: var(--text-secondary);
@@ -352,7 +384,7 @@ body {
 }
 
 .author-count {
-    font-family: 'DM Sans', sans-serif;
+    font-family: "DM Sans", sans-serif;
     font-size: 0.68rem;
     font-weight: 600;
     background: var(--gold-subtle);
@@ -366,8 +398,8 @@ body {
 /* ---- Main Shelf ---- */
 
 .shelf-container {
-    max-width: 1280px;
-    margin: 0 auto;
+    flex: 1;
+    min-width: 0;
     padding: 2rem;
 }
 
@@ -388,7 +420,10 @@ body {
     padding: 1.1rem;
     display: flex;
     gap: 1rem;
-    transition: transform 0.25s var(--ease-out), box-shadow 0.25s var(--ease-out), border-color 0.25s;
+    transition:
+        transform 0.25s var(--ease-out),
+        box-shadow 0.25s var(--ease-out),
+        border-color 0.25s;
     animation: cardIn 0.4s var(--ease-out) both;
     position: relative;
 }
@@ -424,7 +459,7 @@ body {
     overflow: hidden;
     background: var(--bg-deep);
     position: relative;
-    box-shadow: 2px 2px 8px rgba(0,0,0,0.4);
+    box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.4);
 }
 
 .book-cover img {
@@ -457,7 +492,7 @@ body {
 }
 
 .book-title {
-    font-family: 'Libre Baskerville', Georgia, serif;
+    font-family: "Libre Baskerville", Georgia, serif;
     font-size: 1rem;
     font-weight: 700;
     color: var(--text-primary);
@@ -476,8 +511,13 @@ body {
 }
 
 @keyframes pulse {
-    0%, 100% { opacity: 0.5; }
-    50% { opacity: 1; }
+    0%,
+    100% {
+        opacity: 0.5;
+    }
+    50% {
+        opacity: 1;
+    }
 }
 
 .book-author {
@@ -501,7 +541,7 @@ body {
 }
 
 .subject-tag {
-    font-family: 'DM Sans', sans-serif;
+    font-family: "DM Sans", sans-serif;
     font-size: 0.65rem;
     color: var(--text-dim);
     background: rgba(212, 160, 74, 0.06);
@@ -513,7 +553,10 @@ body {
     text-overflow: ellipsis;
     max-width: 10rem;
     cursor: pointer;
-    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    transition:
+        background 0.15s,
+        border-color 0.15s,
+        color 0.15s;
 }
 
 .subject-tag:hover {
@@ -532,7 +575,7 @@ body {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    font-family: 'DM Sans', sans-serif;
+    font-family: "DM Sans", sans-serif;
     font-size: 0.8rem;
     color: var(--text-dim);
     padding: 0.4rem 1rem 0;
@@ -571,7 +614,7 @@ body {
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     color: var(--text-primary);
-    font-family: 'DM Sans', sans-serif;
+    font-family: "DM Sans", sans-serif;
     font-size: 0.85rem;
     padding: 0.45rem 0.75rem;
     outline: none;
@@ -590,7 +633,7 @@ body {
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     color: var(--text-secondary);
-    font-family: 'DM Sans', sans-serif;
+    font-family: "DM Sans", sans-serif;
     font-size: 0.8rem;
     padding: 0.35rem 0.6rem;
     cursor: pointer;
@@ -683,7 +726,9 @@ body {
     background: none;
     border: none;
     padding: 0;
-    transition: color 0.1s, transform 0.15s var(--ease-spring);
+    transition:
+        color 0.1s,
+        transform 0.15s var(--ease-spring);
     line-height: 1;
 }
 
@@ -705,13 +750,15 @@ body {
 
 .btn-edit,
 .btn-delete {
-    font-family: 'DM Sans', sans-serif;
+    font-family: "DM Sans", sans-serif;
     font-size: 0.73rem;
     font-weight: 500;
     padding: 0.35rem 0.7rem;
     border-radius: var(--radius-sm);
     cursor: pointer;
-    transition: background 0.15s, color 0.15s;
+    transition:
+        background 0.15s,
+        color 0.15s;
     border: 1px solid var(--border);
     background: none;
     color: var(--text-dim);
@@ -738,7 +785,10 @@ body {
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(8px); }
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
 }
 
 .empty-illustration {
@@ -747,7 +797,7 @@ body {
 }
 
 .empty-title {
-    font-family: 'Libre Baskerville', Georgia, serif;
+    font-family: "Libre Baskerville", Georgia, serif;
     font-size: 1.4rem;
     color: var(--text-secondary);
     margin-bottom: 0.6rem;
@@ -775,7 +825,9 @@ body {
 }
 
 @keyframes overlayIn {
-    from { opacity: 0; }
+    from {
+        opacity: 0;
+    }
 }
 
 .modal-overlay[hidden] {
@@ -808,7 +860,7 @@ body {
 }
 
 .modal-header h2 {
-    font-family: 'Libre Baskerville', Georgia, serif;
+    font-family: "Libre Baskerville", Georgia, serif;
     font-size: 1.1rem;
     font-weight: 700;
 }
@@ -820,7 +872,9 @@ body {
     cursor: pointer;
     padding: 0.3rem;
     border-radius: var(--radius-sm);
-    transition: color 0.15s, background 0.15s;
+    transition:
+        color 0.15s,
+        background 0.15s;
 }
 
 .modal-close:hover {
@@ -854,10 +908,12 @@ body {
     border-radius: var(--radius-sm);
     padding: 0.6rem 0.8rem;
     color: var(--text-primary);
-    font-family: 'DM Sans', sans-serif;
+    font-family: "DM Sans", sans-serif;
     font-size: 0.9rem;
     outline: none;
-    transition: border-color 0.2s, box-shadow 0.2s;
+    transition:
+        border-color 0.2s,
+        box-shadow 0.2s;
 }
 
 .form-group input:focus,
@@ -887,7 +943,9 @@ body {
     border: none;
     cursor: pointer;
     padding: 0.1rem;
-    transition: color 0.1s, transform 0.15s var(--ease-spring);
+    transition:
+        color 0.1s,
+        transform 0.15s var(--ease-spring);
     line-height: 1;
 }
 
@@ -914,11 +972,13 @@ body {
     color: var(--text-dim);
     padding: 0.55rem 1.1rem;
     border-radius: var(--radius-sm);
-    font-family: 'DM Sans', sans-serif;
+    font-family: "DM Sans", sans-serif;
     font-size: 0.85rem;
     font-weight: 500;
     cursor: pointer;
-    transition: color 0.15s, border-color 0.15s;
+    transition:
+        color 0.15s,
+        border-color 0.15s;
 }
 
 .btn-cancel:hover {
@@ -932,11 +992,13 @@ body {
     color: var(--text-inverse);
     padding: 0.55rem 1.3rem;
     border-radius: var(--radius-sm);
-    font-family: 'DM Sans', sans-serif;
+    font-family: "DM Sans", sans-serif;
     font-size: 0.85rem;
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.15s, transform 0.1s var(--ease-spring);
+    transition:
+        background 0.15s,
+        transform 0.1s var(--ease-spring);
 }
 
 .btn-save:hover {
@@ -1016,7 +1078,11 @@ body {
     padding: 0.5rem;
     color: var(--text-dim);
     cursor: pointer;
-    transition: color 0.15s, border-color 0.15s, background 0.15s, transform 0.15s var(--ease-spring);
+    transition:
+        color 0.15s,
+        border-color 0.15s,
+        background 0.15s,
+        transform 0.15s var(--ease-spring);
     flex-shrink: 0;
 }
 
@@ -1042,7 +1108,9 @@ body {
     border-radius: var(--radius-sm);
     color: var(--text-dim);
     cursor: pointer;
-    transition: color 0.15s, border-color 0.15s;
+    transition:
+        color 0.15s,
+        border-color 0.15s;
     flex-shrink: 0;
     position: relative;
 }
@@ -1107,7 +1175,7 @@ body {
     border-radius: var(--radius-sm);
     padding: 0.55rem 0.8rem;
     color: var(--text-primary);
-    font-family: 'DM Sans', sans-serif;
+    font-family: "DM Sans", sans-serif;
     font-size: 0.82rem;
     outline: none;
     cursor: pointer;
@@ -1117,7 +1185,9 @@ body {
     background-repeat: no-repeat;
     background-position: right 0.8rem center;
     padding-right: 2.2rem;
-    transition: border-color 0.2s, box-shadow 0.2s;
+    transition:
+        border-color 0.2s,
+        box-shadow 0.2s;
 }
 
 .camera-select:focus {
@@ -1135,8 +1205,15 @@ body {
 }
 
 @keyframes scanPulse {
-    0%, 100% { border-color: var(--gold-dim); box-shadow: 0 0 0 0 rgba(212, 160, 74, 0); }
-    50% { border-color: var(--gold); box-shadow: 0 0 12px 2px rgba(212, 160, 74, 0.25); }
+    0%,
+    100% {
+        border-color: var(--gold-dim);
+        box-shadow: 0 0 0 0 rgba(212, 160, 74, 0);
+    }
+    50% {
+        border-color: var(--gold);
+        box-shadow: 0 0 12px 2px rgba(212, 160, 74, 0.25);
+    }
 }
 
 /* Timeout hint */
@@ -1186,7 +1263,9 @@ body {
     font-size: 0.9rem;
     font-weight: 600;
     cursor: pointer;
-    transition: opacity 0.15s, transform 0.1s;
+    transition:
+        opacity 0.15s,
+        transform 0.1s;
 }
 
 .scanner-done-btn:hover {
@@ -1195,6 +1274,558 @@ body {
 
 .scanner-done-btn:active {
     transform: scale(0.97);
+}
+
+/* ---- App Layout (Sidebar + Main) ---- */
+
+.app-layout {
+    display: flex;
+    max-width: 1480px;
+    margin: 0 auto;
+    min-height: calc(100vh - 140px);
+}
+
+/* ---- Shelf Sidebar ---- */
+
+.shelf-sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    background: var(--bg-panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 0.75rem 0;
+    overflow-y: auto;
+    position: relative;
+    transition: width 0.25s var(--ease-out);
+}
+
+.shelf-sidebar.collapsed {
+    width: 40px;
+    overflow: hidden;
+}
+
+.shelf-sidebar.collapsed .sidebar-header,
+.shelf-sidebar.collapsed .shelf-list,
+.shelf-sidebar.collapsed .new-shelf-btn {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.sidebar-header {
+    padding: 0 0.75rem 0.5rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 0.5rem;
+    transition: opacity 0.2s;
+}
+
+.sidebar-all-btn {
+    width: 100%;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-family: "DM Sans", sans-serif;
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 0.5rem 0.6rem;
+    cursor: pointer;
+    text-align: left;
+    transition:
+        background 0.15s,
+        color 0.15s,
+        border-color 0.15s;
+}
+
+.sidebar-all-btn:hover {
+    background: var(--gold-subtle);
+    color: var(--text-primary);
+}
+
+.sidebar-all-btn.active {
+    background: var(--gold-glow);
+    color: var(--gold);
+    border-color: var(--gold-glow);
+}
+
+.shelf-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.25rem 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    transition: opacity 0.2s;
+}
+
+.new-shelf-btn {
+    margin: 0.5rem 0.75rem;
+    background: none;
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--radius-sm);
+    color: var(--text-dim);
+    font-family: "DM Sans", sans-serif;
+    font-size: 0.78rem;
+    font-weight: 500;
+    padding: 0.5rem;
+    cursor: pointer;
+    text-align: center;
+    transition:
+        color 0.15s,
+        border-color 0.15s,
+        background 0.15s,
+        opacity 0.2s;
+}
+
+.new-shelf-btn:hover {
+    color: var(--gold);
+    border-color: var(--gold-dim);
+    background: var(--gold-subtle);
+}
+
+.sidebar-toggle {
+    position: absolute;
+    bottom: 0.5rem;
+    right: 0.25rem;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 0.7rem;
+    cursor: pointer;
+    padding: 0.3rem 0.4rem;
+    border-radius: var(--radius-sm);
+    transition:
+        color 0.15s,
+        background 0.15s;
+}
+
+.sidebar-toggle:hover {
+    color: var(--gold);
+    background: var(--gold-subtle);
+}
+
+/* ---- Shelf Card (Sidebar) ---- */
+
+.shelf-card {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.5rem;
+    border-radius: var(--radius-sm);
+    border-left: 3px solid var(--text-dim);
+    cursor: pointer;
+    transition:
+        background 0.15s,
+        border-color 0.15s;
+    user-select: none;
+}
+
+.shelf-card:hover {
+    background: var(--gold-subtle);
+}
+
+.shelf-card.active {
+    background: var(--gold-glow);
+}
+
+.shelf-card.drop-target {
+    background: rgba(212, 160, 74, 0.15);
+    box-shadow: inset 0 0 0 1px var(--gold-dim);
+}
+
+.shelf-card.shelf-dragging {
+    opacity: 0.5;
+}
+
+.shelf-card.shelf-reorder-target {
+    border-top: 2px solid var(--gold);
+}
+
+/* Cover collage */
+.shelf-collage {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 1px;
+    border-radius: 3px;
+    overflow: hidden;
+    background: var(--bg-deep);
+}
+
+.shelf-collage .collage-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.shelf-collage .collage-empty {
+    width: 100%;
+    height: 100%;
+    opacity: 0.4;
+}
+
+.shelf-card-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.shelf-card-name {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.shelf-card-count {
+    font-size: 0.65rem;
+    color: var(--text-dim);
+}
+
+/* ---- Shelf Stats Bar ---- */
+
+.shelf-stats-bar {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 0.85rem 1rem;
+    margin-bottom: 1.25rem;
+    animation: cardIn 0.3s var(--ease-out);
+}
+
+.shelf-stats-bar[hidden] {
+    display: none;
+}
+
+.stats-top-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.stats-item {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.stats-divider {
+    color: var(--text-dim);
+    opacity: 0.4;
+}
+
+.stats-dismiss {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 0 0.3rem;
+    line-height: 1;
+    transition: color 0.15s;
+}
+
+.stats-dismiss:hover {
+    color: var(--text-primary);
+}
+
+.stats-genres {
+    margin-top: 0.6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.stats-genre-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.stats-genre-label {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    width: 80px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.stats-genre-bar {
+    flex: 1;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.stats-genre-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s var(--ease-out);
+}
+
+.stats-genre-count {
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    min-width: 1.2rem;
+    text-align: right;
+}
+
+.stats-notes {
+    margin-top: 0.5rem;
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    line-height: 1.5;
+}
+
+/* ---- Shelf Tags on Book Cards ---- */
+
+.shelf-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin-bottom: 0.5rem;
+}
+
+.shelf-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-family: "DM Sans", sans-serif;
+    font-size: 0.62rem;
+    font-weight: 500;
+    color: var(--text-dim);
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.12rem 0.45rem;
+    cursor: pointer;
+    transition:
+        background 0.15s,
+        color 0.15s,
+        border-color 0.15s;
+    white-space: nowrap;
+}
+
+.shelf-tag:hover {
+    color: var(--gold);
+    border-color: var(--gold-glow);
+    background: var(--gold-subtle);
+}
+
+.shelf-tag-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.shelf-tag-overflow {
+    font-size: 0.6rem;
+    color: var(--text-dim);
+    padding: 0.12rem 0.3rem;
+}
+
+/* ---- Shelf Modal ---- */
+
+.shelf-modal-dialog {
+    max-width: 420px;
+}
+
+.form-group textarea {
+    width: 100%;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.6rem 0.8rem;
+    color: var(--text-primary);
+    font-family: "DM Sans", sans-serif;
+    font-size: 0.9rem;
+    outline: none;
+    resize: vertical;
+    transition:
+        border-color 0.2s,
+        box-shadow 0.2s;
+}
+
+.form-group textarea:focus {
+    border-color: var(--gold-dim);
+    box-shadow: 0 0 0 3px var(--gold-glow);
+}
+
+/* ---- Color Picker ---- */
+
+.color-picker {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+}
+
+.color-swatch {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition:
+        transform 0.15s var(--ease-spring),
+        border-color 0.15s;
+    padding: 0;
+}
+
+.color-swatch:hover {
+    transform: scale(1.15);
+}
+
+.color-swatch.selected {
+    border-color: var(--text-primary);
+    box-shadow:
+        0 0 0 2px var(--bg-modal),
+        0 0 0 4px var(--text-dim);
+}
+
+.color-swatch-custom {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: default;
+}
+
+.color-swatch-custom-btn {
+    background: none;
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--radius-sm);
+    color: var(--text-dim);
+    font-family: "DM Sans", sans-serif;
+    font-size: 0.7rem;
+    padding: 0.3rem 0.5rem;
+    cursor: pointer;
+    transition:
+        color 0.15s,
+        border-color 0.15s;
+}
+
+.color-swatch-custom-btn:hover {
+    color: var(--gold);
+    border-color: var(--gold-dim);
+}
+
+.color-input-hidden {
+    width: 0;
+    height: 0;
+    padding: 0;
+    border: none;
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* ---- Delete Shelf Button ---- */
+
+.btn-delete-shelf {
+    background: none;
+    border: 1px solid rgba(180, 80, 60, 0.3);
+    color: #c97a5a;
+    padding: 0.55rem 1rem;
+    border-radius: var(--radius-sm);
+    font-family: "DM Sans", sans-serif;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition:
+        background 0.15s,
+        color 0.15s;
+    margin-right: auto;
+}
+
+.btn-delete-shelf:hover {
+    background: rgba(180, 80, 60, 0.1);
+    color: #d4927a;
+}
+
+/* ---- Shelf Checkboxes in Book Edit Modal ---- */
+
+.shelf-checkboxes {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    max-height: 150px;
+    overflow-y: auto;
+    padding: 0.3rem 0;
+}
+
+.shelf-cb-label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.2rem 0;
+    transition: color 0.15s;
+}
+
+.shelf-cb-label:hover {
+    color: var(--text-primary);
+}
+
+.shelf-cb {
+    accent-color: var(--gold);
+}
+
+.shelf-cb-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.shelf-cb-empty {
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    font-style: italic;
+}
+
+.shelf-cb-new {
+    background: none;
+    border: none;
+    color: var(--gold-dim);
+    font-family: "DM Sans", sans-serif;
+    font-size: 0.78rem;
+    cursor: pointer;
+    text-align: left;
+    padding: 0.2rem 0;
+    transition: color 0.15s;
+}
+
+.shelf-cb-new:hover {
+    color: var(--gold);
+}
+
+/* ---- Drag States for Book Cards ---- */
+
+.book-card.dragging {
+    opacity: 0.4;
+    transform: scale(0.97);
+}
+
+.book-card[draggable="true"] {
+    cursor: grab;
+}
+
+.book-card[draggable="true"]:active {
+    cursor: grabbing;
 }
 
 /* ---- Responsive ---- */
@@ -1215,6 +1846,64 @@ body {
 
     .filter-bar {
         padding: 0 1rem;
+    }
+
+    .app-layout {
+        flex-direction: column;
+    }
+
+    .shelf-sidebar {
+        width: 100%;
+        flex-direction: row;
+        overflow-x: auto;
+        overflow-y: hidden;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        padding: 0.5rem;
+        gap: 0.5rem;
+    }
+
+    .shelf-sidebar.collapsed {
+        width: 100%;
+        height: 40px;
+    }
+
+    .sidebar-header {
+        border-bottom: none;
+        margin-bottom: 0;
+        padding: 0 0.25rem;
+        flex-shrink: 0;
+    }
+
+    .shelf-list {
+        flex-direction: row;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding: 0;
+        gap: 0.35rem;
+    }
+
+    .shelf-card {
+        flex-shrink: 0;
+        border-left: none;
+        border-bottom: 3px solid var(--text-dim);
+    }
+
+    .shelf-collage {
+        width: 28px;
+        height: 28px;
+    }
+
+    .new-shelf-btn {
+        margin: 0;
+        flex-shrink: 0;
+        white-space: nowrap;
+        padding: 0.35rem 0.6rem;
+    }
+
+    .sidebar-toggle {
+        position: static;
+        flex-shrink: 0;
     }
 
     .shelf-container {
@@ -1255,7 +1944,9 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after {
+    *,
+    *::before,
+    *::after {
         animation-duration: 0.01ms !important;
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
