@@ -5,13 +5,14 @@ A personal bookshelf REST API built from scratch in Java 17 using only `java.net
 ## Features
 
 - **Framework-free HTTP server** — built on raw `ServerSocket` with a 10-thread pool
-- **Full CRUD REST API** for managing books with filtering by genre and read status
+- **Full CRUD REST API** for managing books with filtering by genre, read status, and full-text search
 - **Open Library integration** — add a book by ISBN and metadata (title, author, publisher, page count, subjects, cover image) is fetched automatically in the background
 - **Cover image storage** — covers downloaded from Open Library and stored as binary data in PostgreSQL
 - **ISBN barcode scanner** — scan a book's barcode with your device camera to add it instantly
-- **Vanilla JS frontend** — dark antiquarian-library-themed UI with ISBN input, filter tabs, inline editing, and star ratings
+- **Vanilla JS frontend** — dark antiquarian-library-themed UI with ISBN input, filter tabs, sort dropdown, search bar, inline editing, and star ratings
+- **Reading progress** — track a percentage (0-100) for books currently being read
 - **Dockerized** — single `docker compose up` to run the app and database together
-- **38 automated tests** covering the full API surface, validation, edge cases, and enrichment logic
+- **110 automated tests** covering the full API surface, validation, edge cases, and enrichment logic
 
 ## Tech Stack
 
@@ -59,7 +60,7 @@ This runs the server with an in-memory store (no database needed):
 ./gradlew test
 ```
 
-All 38 tests use an in-memory repository — no database or Docker required.
+All 99 unit tests use an in-memory repository — no database or Docker required. 11 integration tests (Open Library) are excluded from the default run.
 
 ## API Reference
 
@@ -67,14 +68,13 @@ All 38 tests use an in-memory repository — no database or Docker required.
 
 | Method | Path | Description | Status |
 |--------|------|-------------|--------|
-| `GET` | `/books` | List all books | `200` |
-| `GET` | `/books?genre=fiction` | Filter by genre (case-insensitive) | `200` |
-| `GET` | `/books?readStatus=READING` | Filter by read status | `200` |
+| `GET` | `/books` | List all books. Supports `?genre=`, `?readStatus=`, `?search=`, `?sort=` | `200` |
 | `POST` | `/books` | Add a new book | `201` |
 | `GET` | `/books/{id}` | Get a book by ID | `200` |
 | `PUT` | `/books/{id}` | Partial update (only sent fields change) | `200` |
 | `DELETE` | `/books/{id}` | Delete a book | `204` |
 | `GET` | `/books/isbn/{isbn}` | Look up a book by ISBN | `200` |
+| `POST` | `/books/re-enrich` | Re-enrich all ISBN books from Open Library | `202` |
 | `GET` | `/books/{id}/cover` | Serve cover image | `200` |
 
 ### Create a book
@@ -134,7 +134,8 @@ Only fields present in the request body are updated. Send `null` to clear a fiel
 | `genre` | String | Optional |
 | `rating` | Integer | 1-5 (0 = not rated) |
 | `isbn` | String | 10 or 13 digits |
-| `readStatus` | Enum | `WANT_TO_READ`, `READING`, `FINISHED` |
+| `readStatus` | Enum | `WANT_TO_READ`, `READING`, `FINISHED`, `DNF` |
+| `readingProgress` | Integer | 0-100, only for `READING` status |
 | `publisher` | String | Auto-filled from Open Library |
 | `publishDate` | String | Auto-filled from Open Library |
 | `pageCount` | Integer | Auto-filled from Open Library |
@@ -165,7 +166,8 @@ src/main/java/com/bookshelf/
 ├── Router.java                 # Route matching with path params
 ├── BookController.java         # API endpoint handlers
 ├── Book.java                   # Book model
-├── ReadStatus.java             # WANT_TO_READ / READING / FINISHED
+├── ReadStatus.java             # WANT_TO_READ / READING / FINISHED / DNF
+├── RequestTooLargeException.java # Custom exception for oversized requests
 ├── BookRepository.java         # Repository interface
 ├── InMemoryBookRepository.java # ConcurrentHashMap implementation
 ├── JdbcBookRepository.java     # PostgreSQL implementation
@@ -175,8 +177,9 @@ src/main/java/com/bookshelf/
 └── StaticFileHandler.java      # Static file serving
 
 src/test/java/com/bookshelf/
-├── BookApiTest.java            # 30 tests — CRUD, filtering, validation, edge cases
-└── OpenLibraryTest.java        # 8 tests — enrichment, covers, re-enrichment
+├── BookApiTest.java            # 64 tests — CRUD, filtering, search, sorting, validation, edge cases
+├── BookMetadataTest.java       # 35 tests — metadata parsing and enrichment logic
+└── OpenLibraryTest.java        # 11 integration tests — live Open Library API (excluded from default run)
 
 static/
 ├── index.html                  # Frontend page
@@ -209,8 +212,11 @@ static/
 ## Testing
 
 ```bash
-# Run all 38 tests
+# Run all unit tests (99 tests)
 ./gradlew test
+
+# Run integration tests (11 tests, requires network)
+./gradlew integrationTest
 
 # Run a single test class
 ./gradlew test --tests "com.bookshelf.BookApiTest"

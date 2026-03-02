@@ -62,7 +62,7 @@ The project is built in progressive versions (V1 → V4), each adding a layer:
 ### Frontend (V4)
 - Vanilla HTML/CSS/JS in `/static` directory, served by the same Java server
 - ISBN-only input flow: POST with just ISBN → placeholder card → polls until enrichment completes
-- **Barcode scanner**: zbar-wasm (WASM C decoder) in `static/lib/zbar-wasm.js` (inlined UMD, 326 KB). Multi-pass pipeline: raw grayscale → sharpen → global thresholds → adaptive threshold. Scans camera ROI via `getUserMedia`. See `isbn-scanner-plan.md` for details.
+- **Barcode scanner**: zbar-wasm (WASM C decoder) in `static/lib/zbar-wasm.js` (inlined UMD, 326 KB). Multi-pass pipeline: raw grayscale → sharpen → global thresholds → adaptive threshold. Scans camera ROI via `getUserMedia`.
 - **Client-side search bar**: filters `allBooks` in memory by title/author; no extra API call
 - **Sort dropdown**: sorts by title, author, rating, or date added (asc/desc); applied client-side after filters
 

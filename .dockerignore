@@ -1,7 +1,11 @@
 .git
 build
 .gradle
+bin
 *.md
 docs
 .env
 .claude
+.classpath
+.project
+.settings
