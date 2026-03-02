@@ -315,6 +315,12 @@ public class BookEnrichmentService {
             HttpResponse.BodyHandlers.ofString()
         );
         if (response.statusCode() != 200) {
+            System.err.println(
+                "Google Books API returned " +
+                    response.statusCode() +
+                    " for ISBN " +
+                    isbn
+            );
             return null;
         }
         return parseGoogleBooksResponse(response.body());

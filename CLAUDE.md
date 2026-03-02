@@ -51,7 +51,7 @@ The project is built in progressive versions (V1 → V4), each adding a layer:
 - **`ResponseWriter`** — Writes formatted HTTP response to socket `OutputStream`
 
 ### Open Library Integration (V2)
-- **`OpenLibraryService`** — Single-thread `ExecutorService` that asynchronously fetches metadata and cover images from Open Library by ISBN. Enrichment is best-effort; POST returns immediately. Sends `User-Agent: MyBookShelf/1.0` header for better rate limits. Also provides `reEnrichAll()` for batch re-enrichment with 3-second rate-limit delays.
+- **`BookEnrichmentService`** — Single-thread `ExecutorService` that asynchronously fetches metadata and cover images by ISBN. Tries Open Library first; falls back to Google Books API if Open Library returns no data. Enrichment is best-effort; POST returns immediately. Sends `User-Agent: MyBookShelf/1.0` header. Also provides `reEnrichAll()` for batch re-enrichment with rate-limit delays between requests.
 - **`BookMetadata`** — Model for parsed Open Library data (title, author, publisher, publishDate, pageCount, subjects, genre, coverUrl)
 - **`StaticFileHandler`** — Serves static frontend files from `/static` directory
 
@@ -158,7 +158,7 @@ Tests use JUnit 5 with `java.net.HttpClient`. The server starts on a random port
 
 Test classes:
 - **`BookApiTest`** — full HTTP integration tests covering CRUD, filtering, search, sorting, reading progress, partial updates, validation, and cover endpoints
-- **`BookMetadataTest`** — unit tests for `BookMetadata` and Open Library response parsing
+- **`BookMetadataTest`** — unit tests for `BookMetadata.deriveGenre()`, Google Books response parsing, and `mergeMetadata()`
 - **`OpenLibraryTest`** — live integration tests for Open Library enrichment service (excluded from default `./gradlew test` via `@Tag("integration")`; run with `./gradlew integrationTest`)
 
 ## Database Column Mapping
@@ -202,6 +202,6 @@ Migrations run on startup via `DatabaseConfig.runMigrations()`. The schema uses 
 | `BookController.java` | HTTP handler methods; validation, JSON parsing, sorting |
 | `RequestTooLargeException.java` | Custom exception for oversized request bodies |
 | `DatabaseConfig.java` | HikariCP pool setup + schema migrations |
-| `OpenLibraryService.java` | Async Open Library metadata + cover fetching |
+| `BookEnrichmentService.java` | Async enrichment: Open Library + Google Books fallback |
 | `BookMetadata.java` | DTO for Open Library response |
 | `StaticFileHandler.java` | Serves `static/` files |
