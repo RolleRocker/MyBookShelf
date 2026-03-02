@@ -1,14 +1,12 @@
 package com.bookshelf;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import org.junit.jupiter.api.*;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -21,8 +19,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.*;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 @TestMethodOrder(MethodOrderer.MethodName.class)
 public class BookApiTest {
@@ -30,18 +29,32 @@ public class BookApiTest {
     private static HttpServer server;
     private static HttpClient client;
     private static InMemoryBookRepository repository;
+    private static InMemoryShelfRepository shelfRepository;
     private static int port;
-    private static final Gson gson = new GsonBuilder().serializeNulls().create();
+    private static final Gson gson = new GsonBuilder()
+        .serializeNulls()
+        .create();
 
     @BeforeAll
     static void startServer() throws IOException, InterruptedException {
         repository = new InMemoryBookRepository();
-        BookController controller = new BookController(repository);
-        Router router = App.createRouter(controller);
+        shelfRepository = new InMemoryShelfRepository(repository);
+        BookController controller = new BookController(
+            repository,
+            null,
+            shelfRepository
+        );
+        ShelfController shelfController = new ShelfController(
+            shelfRepository,
+            repository
+        );
+        Router router = App.createRouter(controller, shelfController);
         server = new HttpServer(0, router);
         server.start();
         port = server.getPort();
-        client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
+        client = HttpClient.newBuilder()
+            .version(HttpClient.Version.HTTP_1_1)
+            .build();
         // Give the server a moment to start accepting
         Thread.sleep(100);
     }
@@ -54,6 +67,7 @@ public class BookApiTest {
     @BeforeEach
     void cleanRepository() {
         repository.clear();
+        shelfRepository.clear();
     }
 
     // --- Helper methods ---
@@ -62,58 +76,79 @@ public class BookApiTest {
         return "http://localhost:" + port;
     }
 
-    private HttpResponse<String> get(String path) throws IOException, InterruptedException {
+    private HttpResponse<String> get(String path)
+        throws IOException, InterruptedException {
         return client.send(
-                HttpRequest.newBuilder().uri(URI.create(baseUrl() + path)).GET().build(),
-                HttpResponse.BodyHandlers.ofString()
+            HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl() + path))
+                .GET()
+                .build(),
+            HttpResponse.BodyHandlers.ofString()
         );
     }
 
-    private HttpResponse<String> post(String path, String body) throws IOException, InterruptedException {
+    private HttpResponse<String> post(String path, String body)
+        throws IOException, InterruptedException {
         return client.send(
-                HttpRequest.newBuilder()
-                        .uri(URI.create(baseUrl() + path))
-                        .header("Content-Type", "application/json")
-                        .POST(HttpRequest.BodyPublishers.ofString(body))
-                        .build(),
-                HttpResponse.BodyHandlers.ofString()
+            HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl() + path))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .build(),
+            HttpResponse.BodyHandlers.ofString()
         );
     }
 
-    private HttpResponse<String> put(String path, String body) throws IOException, InterruptedException {
+    private HttpResponse<String> put(String path, String body)
+        throws IOException, InterruptedException {
         return client.send(
-                HttpRequest.newBuilder()
-                        .uri(URI.create(baseUrl() + path))
-                        .header("Content-Type", "application/json")
-                        .PUT(HttpRequest.BodyPublishers.ofString(body))
-                        .build(),
-                HttpResponse.BodyHandlers.ofString()
+            HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl() + path))
+                .header("Content-Type", "application/json")
+                .PUT(HttpRequest.BodyPublishers.ofString(body))
+                .build(),
+            HttpResponse.BodyHandlers.ofString()
         );
     }
 
-    private HttpResponse<String> delete(String path) throws IOException, InterruptedException {
+    private HttpResponse<String> delete(String path)
+        throws IOException, InterruptedException {
         return client.send(
-                HttpRequest.newBuilder().uri(URI.create(baseUrl() + path)).DELETE().build(),
-                HttpResponse.BodyHandlers.ofString()
+            HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl() + path))
+                .DELETE()
+                .build(),
+            HttpResponse.BodyHandlers.ofString()
         );
     }
 
-    private HttpResponse<String> sendMethod(String method, String path) throws IOException, InterruptedException {
+    private HttpResponse<String> sendMethod(String method, String path)
+        throws IOException, InterruptedException {
         return client.send(
-                HttpRequest.newBuilder()
-                        .uri(URI.create(baseUrl() + path))
-                        .method(method, HttpRequest.BodyPublishers.noBody())
-                        .build(),
-                HttpResponse.BodyHandlers.ofString()
+            HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl() + path))
+                .method(method, HttpRequest.BodyPublishers.noBody())
+                .build(),
+            HttpResponse.BodyHandlers.ofString()
         );
     }
 
-    private String createBookJson(String title, String author, String readStatus) {
+    private String createBookJson(
+        String title,
+        String author,
+        String readStatus
+    ) {
         return createBookJson(title, author, readStatus, null, null, null);
     }
 
-    private String createBookJson(String title, String author, String readStatus,
-                                  String genre, Integer rating, String isbn) {
+    private String createBookJson(
+        String title,
+        String author,
+        String readStatus,
+        String genre,
+        Integer rating,
+        String isbn
+    ) {
         JsonObject json = new JsonObject();
         if (title != null) json.addProperty("title", title);
         if (author != null) json.addProperty("author", author);
@@ -125,18 +160,29 @@ public class BookApiTest {
     }
 
     private String getIdFromResponse(HttpResponse<String> response) {
-        JsonObject json = JsonParser.parseString(response.body()).getAsJsonObject();
+        JsonObject json = JsonParser.parseString(
+            response.body()
+        ).getAsJsonObject();
         return json.get("id").getAsString();
     }
 
     // --- T1: Create and retrieve a book ---
     @Test
     void testT01_createAndRetrieveBook() throws Exception {
-        String body = createBookJson("Dune", "Frank Herbert", "READING", "sci-fi", 5, "9780441013593");
+        String body = createBookJson(
+            "Dune",
+            "Frank Herbert",
+            "READING",
+            "sci-fi",
+            5,
+            "9780441013593"
+        );
         HttpResponse<String> createResp = post("/books", body);
         assertEquals(201, createResp.statusCode());
 
-        JsonObject created = JsonParser.parseString(createResp.body()).getAsJsonObject();
+        JsonObject created = JsonParser.parseString(
+            createResp.body()
+        ).getAsJsonObject();
         String id = created.get("id").getAsString();
         assertDoesNotThrow(() -> UUID.fromString(id));
         assertEquals("Dune", created.get("title").getAsString());
@@ -149,7 +195,9 @@ public class BookApiTest {
         HttpResponse<String> getResp = get("/books/" + id);
         assertEquals(200, getResp.statusCode());
 
-        JsonObject fetched = JsonParser.parseString(getResp.body()).getAsJsonObject();
+        JsonObject fetched = JsonParser.parseString(
+            getResp.body()
+        ).getAsJsonObject();
         assertEquals("Dune", fetched.get("title").getAsString());
         assertEquals("Frank Herbert", fetched.get("author").getAsString());
         assertEquals(5, fetched.get("rating").getAsInt());
@@ -172,7 +220,10 @@ public class BookApiTest {
     // --- T3: Partial update a book ---
     @Test
     void testT03_partialUpdateBook() throws Exception {
-        HttpResponse<String> createResp = post("/books", createBookJson("Dune", "Frank Herbert", "WANT_TO_READ"));
+        HttpResponse<String> createResp = post(
+            "/books",
+            createBookJson("Dune", "Frank Herbert", "WANT_TO_READ")
+        );
         assertEquals(201, createResp.statusCode());
         String id = getIdFromResponse(createResp);
 
@@ -181,7 +232,9 @@ public class BookApiTest {
         assertEquals(200, updateResp.statusCode());
 
         HttpResponse<String> getResp = get("/books/" + id);
-        JsonObject book = JsonParser.parseString(getResp.body()).getAsJsonObject();
+        JsonObject book = JsonParser.parseString(
+            getResp.body()
+        ).getAsJsonObject();
         assertEquals("Dune", book.get("title").getAsString());
         assertEquals("FINISHED", book.get("readStatus").getAsString());
         assertEquals(5, book.get("rating").getAsInt());
@@ -190,7 +243,10 @@ public class BookApiTest {
     // --- T4: Delete a book ---
     @Test
     void testT04_deleteBook() throws Exception {
-        HttpResponse<String> createResp = post("/books", createBookJson("Dune", "Frank Herbert", "READING"));
+        HttpResponse<String> createResp = post(
+            "/books",
+            createBookJson("Dune", "Frank Herbert", "READING")
+        );
         String id = getIdFromResponse(createResp);
 
         HttpResponse<String> deleteResp = delete("/books/" + id);
@@ -200,14 +256,23 @@ public class BookApiTest {
         assertEquals(404, getResp.statusCode());
 
         HttpResponse<String> listResp = get("/books");
-        JsonArray books = JsonParser.parseString(listResp.body()).getAsJsonArray();
+        JsonArray books = JsonParser.parseString(
+            listResp.body()
+        ).getAsJsonArray();
         assertEquals(0, books.size());
     }
 
     // --- T5: Look up by ISBN ---
     @Test
     void testT05_lookUpByIsbn() throws Exception {
-        String body = createBookJson("Dune", "Frank Herbert", "READING", null, null, "9780441013593");
+        String body = createBookJson(
+            "Dune",
+            "Frank Herbert",
+            "READING",
+            null,
+            null,
+            "9780441013593"
+        );
         post("/books", body);
 
         HttpResponse<String> resp = get("/books/isbn/9780441013593");
@@ -245,7 +310,8 @@ public class BookApiTest {
     // --- T11: Invalid rating (too low) ---
     @Test
     void testT11_ratingTooLow() throws Exception {
-        String body = "{\"title\":\"Something\",\"author\":\"Someone\",\"readStatus\":\"READING\",\"rating\":0}";
+        String body =
+            "{\"title\":\"Something\",\"author\":\"Someone\",\"readStatus\":\"READING\",\"rating\":0}";
         HttpResponse<String> resp = post("/books", body);
         assertEquals(400, resp.statusCode());
     }
@@ -253,7 +319,8 @@ public class BookApiTest {
     // --- T12: Invalid rating (too high) ---
     @Test
     void testT12_ratingTooHigh() throws Exception {
-        String body = "{\"title\":\"Something\",\"author\":\"Someone\",\"readStatus\":\"READING\",\"rating\":6}";
+        String body =
+            "{\"title\":\"Something\",\"author\":\"Someone\",\"readStatus\":\"READING\",\"rating\":6}";
         HttpResponse<String> resp = post("/books", body);
         assertEquals(400, resp.statusCode());
     }
@@ -261,7 +328,8 @@ public class BookApiTest {
     // --- T13: Invalid ISBN format ---
     @Test
     void testT13_invalidIsbnFormat() throws Exception {
-        String body = "{\"title\":\"Something\",\"author\":\"Someone\",\"readStatus\":\"READING\",\"isbn\":\"123\"}";
+        String body =
+            "{\"title\":\"Something\",\"author\":\"Someone\",\"readStatus\":\"READING\",\"isbn\":\"123\"}";
         HttpResponse<String> resp = post("/books", body);
         assertEquals(400, resp.statusCode());
     }
@@ -276,7 +344,9 @@ public class BookApiTest {
     // --- T15: Book not found ---
     @Test
     void testT15_bookNotFound() throws Exception {
-        HttpResponse<String> resp = get("/books/00000000-0000-0000-0000-000000000000");
+        HttpResponse<String> resp = get(
+            "/books/00000000-0000-0000-0000-000000000000"
+        );
         assertEquals(404, resp.statusCode());
     }
 
@@ -297,7 +367,8 @@ public class BookApiTest {
     // --- T18: Create book with only required fields ---
     @Test
     void testT18_createWithOnlyRequiredFields() throws Exception {
-        String body = "{\"title\":\"Minimal\",\"author\":\"Author\",\"readStatus\":\"READING\"}";
+        String body =
+            "{\"title\":\"Minimal\",\"author\":\"Author\",\"readStatus\":\"READING\"}";
         HttpResponse<String> resp = post("/books", body);
         assertEquals(201, resp.statusCode());
 
@@ -310,10 +381,14 @@ public class BookApiTest {
     // --- T19: Update with no changes ---
     @Test
     void testT19_updateWithNoChanges() throws Exception {
-        HttpResponse<String> createResp = post("/books", createBookJson("Dune", "Frank Herbert", "READING"));
+        HttpResponse<String> createResp = post(
+            "/books",
+            createBookJson("Dune", "Frank Herbert", "READING")
+        );
         String id = getIdFromResponse(createResp);
 
-        String updateBody = "{\"title\":\"Dune\",\"author\":\"Frank Herbert\",\"readStatus\":\"READING\"}";
+        String updateBody =
+            "{\"title\":\"Dune\",\"author\":\"Frank Herbert\",\"readStatus\":\"READING\"}";
         HttpResponse<String> updateResp = put("/books/" + id, updateBody);
         assertEquals(200, updateResp.statusCode());
     }
@@ -321,7 +396,10 @@ public class BookApiTest {
     // --- T20: Delete already deleted book ---
     @Test
     void testT20_deleteAlreadyDeleted() throws Exception {
-        HttpResponse<String> createResp = post("/books", createBookJson("Dune", "Frank Herbert", "READING"));
+        HttpResponse<String> createResp = post(
+            "/books",
+            createBookJson("Dune", "Frank Herbert", "READING")
+        );
         String id = getIdFromResponse(createResp);
 
         delete("/books/" + id);
@@ -332,16 +410,26 @@ public class BookApiTest {
     // --- T21: Concurrent creates ---
     @Test
     void testT21_concurrentCreates() throws Exception {
-        List<CompletableFuture<HttpResponse<String>>> futures = new ArrayList<>();
+        List<CompletableFuture<HttpResponse<String>>> futures =
+            new ArrayList<>();
         for (int i = 0; i < 10; i++) {
             final int idx = i;
-            futures.add(CompletableFuture.supplyAsync(() -> {
-                try {
-                    return post("/books", createBookJson("Book " + idx, "Author " + idx, "READING"));
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
-            }));
+            futures.add(
+                CompletableFuture.supplyAsync(() -> {
+                    try {
+                        return post(
+                            "/books",
+                            createBookJson(
+                                "Book " + idx,
+                                "Author " + idx,
+                                "READING"
+                            )
+                        );
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                })
+            );
         }
 
         for (var future : futures) {
@@ -350,29 +438,50 @@ public class BookApiTest {
         }
 
         HttpResponse<String> listResp = get("/books");
-        JsonArray books = JsonParser.parseString(listResp.body()).getAsJsonArray();
+        JsonArray books = JsonParser.parseString(
+            listResp.body()
+        ).getAsJsonArray();
         assertEquals(10, books.size());
     }
 
     // --- T22: Partial update clears field with explicit null ---
     @Test
     void testT22_partialUpdateClearsField() throws Exception {
-        String body = createBookJson("Dune", "Frank Herbert", "READING", "sci-fi", null, null);
+        String body = createBookJson(
+            "Dune",
+            "Frank Herbert",
+            "READING",
+            "sci-fi",
+            null,
+            null
+        );
         HttpResponse<String> createResp = post("/books", body);
         String id = getIdFromResponse(createResp);
 
-        HttpResponse<String> updateResp = put("/books/" + id, "{\"genre\":null}");
+        HttpResponse<String> updateResp = put(
+            "/books/" + id,
+            "{\"genre\":null}"
+        );
         assertEquals(200, updateResp.statusCode());
 
         HttpResponse<String> getResp = get("/books/" + id);
-        JsonObject book = JsonParser.parseString(getResp.body()).getAsJsonObject();
+        JsonObject book = JsonParser.parseString(
+            getResp.body()
+        ).getAsJsonObject();
         assertTrue(book.get("genre").isJsonNull());
     }
 
     // --- T23: ISBN-10 with X check digit is accepted ---
     @Test
     void testT23_isbn10WithX() throws Exception {
-        String body = createBookJson("Book", "Author", "READING", null, null, "080442957X");
+        String body = createBookJson(
+            "Book",
+            "Author",
+            "READING",
+            null,
+            null,
+            "080442957X"
+        );
         HttpResponse<String> resp = post("/books", body);
         assertEquals(201, resp.statusCode());
 
@@ -383,8 +492,22 @@ public class BookApiTest {
     // --- T24: Duplicate ISBNs are allowed ---
     @Test
     void testT24_duplicateIsbnsAllowed() throws Exception {
-        String body1 = createBookJson("Dune 1", "Frank Herbert", "READING", null, null, "9780441013593");
-        String body2 = createBookJson("Dune 2", "Frank Herbert", "FINISHED", null, null, "9780441013593");
+        String body1 = createBookJson(
+            "Dune 1",
+            "Frank Herbert",
+            "READING",
+            null,
+            null,
+            "9780441013593"
+        );
+        String body2 = createBookJson(
+            "Dune 2",
+            "Frank Herbert",
+            "FINISHED",
+            null,
+            null,
+            "9780441013593"
+        );
 
         HttpResponse<String> resp1 = post("/books", body1);
         HttpResponse<String> resp2 = post("/books", body2);
@@ -392,7 +515,9 @@ public class BookApiTest {
         assertEquals(201, resp2.statusCode());
 
         HttpResponse<String> listResp = get("/books");
-        JsonArray books = JsonParser.parseString(listResp.body()).getAsJsonArray();
+        JsonArray books = JsonParser.parseString(
+            listResp.body()
+        ).getAsJsonArray();
         assertEquals(2, books.size());
     }
 
@@ -443,21 +568,50 @@ public class BookApiTest {
     // --- T46: Combined genre + readStatus filter ---
     @Test
     void testT46_combinedGenreAndReadStatus() throws Exception {
-        post("/books", createBookJson("Dune", "Frank Herbert", "READING", "sci-fi", null, null));
-        post("/books", createBookJson("Foundation", "Asimov", "FINISHED", "sci-fi", null, null));
-        post("/books", createBookJson("1984", "Orwell", "READING", "dystopia", null, null));
+        post(
+            "/books",
+            createBookJson(
+                "Dune",
+                "Frank Herbert",
+                "READING",
+                "sci-fi",
+                null,
+                null
+            )
+        );
+        post(
+            "/books",
+            createBookJson(
+                "Foundation",
+                "Asimov",
+                "FINISHED",
+                "sci-fi",
+                null,
+                null
+            )
+        );
+        post(
+            "/books",
+            createBookJson("1984", "Orwell", "READING", "dystopia", null, null)
+        );
 
-        HttpResponse<String> resp = get("/books?genre=sci-fi&readStatus=READING");
+        HttpResponse<String> resp = get(
+            "/books?genre=sci-fi&readStatus=READING"
+        );
         assertEquals(200, resp.statusCode());
         JsonArray books = JsonParser.parseString(resp.body()).getAsJsonArray();
         assertEquals(1, books.size());
-        assertEquals("Dune", books.get(0).getAsJsonObject().get("title").getAsString());
+        assertEquals(
+            "Dune",
+            books.get(0).getAsJsonObject().get("title").getAsString()
+        );
     }
 
     // --- T47: ISBN-only POST (no title/author) returns 201 ---
     @Test
     void testT47_isbnOnlyPost() throws Exception {
-        String body = "{\"isbn\":\"9780441013593\",\"readStatus\":\"WANT_TO_READ\"}";
+        String body =
+            "{\"isbn\":\"9780441013593\",\"readStatus\":\"WANT_TO_READ\"}";
         HttpResponse<String> resp = post("/books", body);
         assertEquals(201, resp.statusCode());
 
@@ -481,9 +635,39 @@ public class BookApiTest {
     // --- T6: Genre filtering (case-insensitive) ---
     @Test
     void testT06_genreFilter() throws Exception {
-        post("/books", createBookJson("Dune", "Frank Herbert", "READING", "sci-fi", null, null));
-        post("/books", createBookJson("Foundation", "Isaac Asimov", "FINISHED", "Sci-Fi", null, null));
-        post("/books", createBookJson("1984", "George Orwell", "WANT_TO_READ", "dystopia", null, null));
+        post(
+            "/books",
+            createBookJson(
+                "Dune",
+                "Frank Herbert",
+                "READING",
+                "sci-fi",
+                null,
+                null
+            )
+        );
+        post(
+            "/books",
+            createBookJson(
+                "Foundation",
+                "Isaac Asimov",
+                "FINISHED",
+                "Sci-Fi",
+                null,
+                null
+            )
+        );
+        post(
+            "/books",
+            createBookJson(
+                "1984",
+                "George Orwell",
+                "WANT_TO_READ",
+                "dystopia",
+                null,
+                null
+            )
+        );
 
         HttpResponse<String> resp = get("/books?genre=sci-fi");
         assertEquals(200, resp.statusCode());
@@ -495,7 +679,17 @@ public class BookApiTest {
     // --- T7: Genre filter with no matches ---
     @Test
     void testT07_genreFilterNoMatches() throws Exception {
-        post("/books", createBookJson("Dune", "Frank Herbert", "READING", "sci-fi", null, null));
+        post(
+            "/books",
+            createBookJson(
+                "Dune",
+                "Frank Herbert",
+                "READING",
+                "sci-fi",
+                null,
+                null
+            )
+        );
 
         HttpResponse<String> resp = get("/books?genre=romance");
         assertEquals(200, resp.statusCode());
@@ -509,76 +703,125 @@ public class BookApiTest {
     @Test
     void testSearchByTitle() throws Exception {
         post("/books", createBookJson("Dune", "Frank Herbert", "WANT_TO_READ"));
-        post("/books", createBookJson("Neuromancer", "William Gibson", "READING"));
+        post(
+            "/books",
+            createBookJson("Neuromancer", "William Gibson", "READING")
+        );
 
         HttpResponse<String> resp = client.send(
-            HttpRequest.newBuilder().uri(URI.create(baseUrl() + "/books?search=dune")).GET().build(),
-            HttpResponse.BodyHandlers.ofString());
+            HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl() + "/books?search=dune"))
+                .GET()
+                .build(),
+            HttpResponse.BodyHandlers.ofString()
+        );
 
         assertEquals(200, resp.statusCode());
         JsonArray books = JsonParser.parseString(resp.body()).getAsJsonArray();
         assertEquals(1, books.size());
-        assertEquals("Dune", books.get(0).getAsJsonObject().get("title").getAsString());
+        assertEquals(
+            "Dune",
+            books.get(0).getAsJsonObject().get("title").getAsString()
+        );
     }
 
     @Test
     void testSearchByAuthor() throws Exception {
         post("/books", createBookJson("Dune", "Frank Herbert", "WANT_TO_READ"));
-        post("/books", createBookJson("Neuromancer", "William Gibson", "READING"));
+        post(
+            "/books",
+            createBookJson("Neuromancer", "William Gibson", "READING")
+        );
 
         HttpResponse<String> resp = client.send(
-            HttpRequest.newBuilder().uri(URI.create(baseUrl() + "/books?search=gibson")).GET().build(),
-            HttpResponse.BodyHandlers.ofString());
+            HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl() + "/books?search=gibson"))
+                .GET()
+                .build(),
+            HttpResponse.BodyHandlers.ofString()
+        );
 
         assertEquals(200, resp.statusCode());
         JsonArray books = JsonParser.parseString(resp.body()).getAsJsonArray();
         assertEquals(1, books.size());
-        assertEquals("Neuromancer", books.get(0).getAsJsonObject().get("title").getAsString());
+        assertEquals(
+            "Neuromancer",
+            books.get(0).getAsJsonObject().get("title").getAsString()
+        );
     }
 
     @Test
     void testSortByTitleAsc() throws Exception {
-        post("/books", createBookJson("Zorro", "Johnston McCulley", "WANT_TO_READ"));
+        post(
+            "/books",
+            createBookJson("Zorro", "Johnston McCulley", "WANT_TO_READ")
+        );
         post("/books", createBookJson("Dune", "Frank Herbert", "WANT_TO_READ"));
 
         HttpResponse<String> resp = client.send(
-            HttpRequest.newBuilder().uri(URI.create(baseUrl() + "/books?sort=title,asc")).GET().build(),
-            HttpResponse.BodyHandlers.ofString());
+            HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl() + "/books?sort=title,asc"))
+                .GET()
+                .build(),
+            HttpResponse.BodyHandlers.ofString()
+        );
 
         assertEquals(200, resp.statusCode());
         JsonArray books = JsonParser.parseString(resp.body()).getAsJsonArray();
         assertEquals(2, books.size());
-        assertEquals("Dune", books.get(0).getAsJsonObject().get("title").getAsString());
-        assertEquals("Zorro", books.get(1).getAsJsonObject().get("title").getAsString());
+        assertEquals(
+            "Dune",
+            books.get(0).getAsJsonObject().get("title").getAsString()
+        );
+        assertEquals(
+            "Zorro",
+            books.get(1).getAsJsonObject().get("title").getAsString()
+        );
     }
 
     @Test
     void testSortByTitleDesc() throws Exception {
-        post("/books", createBookJson("Zorro", "Johnston McCulley", "WANT_TO_READ"));
+        post(
+            "/books",
+            createBookJson("Zorro", "Johnston McCulley", "WANT_TO_READ")
+        );
         post("/books", createBookJson("Dune", "Frank Herbert", "WANT_TO_READ"));
 
         HttpResponse<String> resp = client.send(
-            HttpRequest.newBuilder().uri(URI.create(baseUrl() + "/books?sort=title,desc")).GET().build(),
-            HttpResponse.BodyHandlers.ofString());
+            HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl() + "/books?sort=title,desc"))
+                .GET()
+                .build(),
+            HttpResponse.BodyHandlers.ofString()
+        );
 
         assertEquals(200, resp.statusCode());
         JsonArray books = JsonParser.parseString(resp.body()).getAsJsonArray();
         assertEquals(2, books.size());
-        assertEquals("Zorro", books.get(0).getAsJsonObject().get("title").getAsString());
-        assertEquals("Dune", books.get(1).getAsJsonObject().get("title").getAsString());
+        assertEquals(
+            "Zorro",
+            books.get(0).getAsJsonObject().get("title").getAsString()
+        );
+        assertEquals(
+            "Dune",
+            books.get(1).getAsJsonObject().get("title").getAsString()
+        );
     }
 
     // --- readingProgress tests ---
 
     @Test
     void testReadingProgressSetOnCreate() throws Exception {
-        String body = "{\"title\":\"Dune\",\"author\":\"Frank Herbert\",\"readStatus\":\"READING\",\"readingProgress\":42}";
+        String body =
+            "{\"title\":\"Dune\",\"author\":\"Frank Herbert\",\"readStatus\":\"READING\",\"readingProgress\":42}";
         HttpResponse<String> resp = client.send(
-            HttpRequest.newBuilder().uri(URI.create(baseUrl() + "/books"))
+            HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl() + "/books"))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body))
                 .build(),
-            HttpResponse.BodyHandlers.ofString());
+            HttpResponse.BodyHandlers.ofString()
+        );
 
         assertEquals(201, resp.statusCode());
         JsonObject book = JsonParser.parseString(resp.body()).getAsJsonObject();
@@ -587,77 +830,111 @@ public class BookApiTest {
 
     @Test
     void testReadingProgressUpdated() throws Exception {
-        String createBody = "{\"title\":\"Dune\",\"author\":\"Frank Herbert\",\"readStatus\":\"READING\"}";
+        String createBody =
+            "{\"title\":\"Dune\",\"author\":\"Frank Herbert\",\"readStatus\":\"READING\"}";
         HttpResponse<String> createResp = client.send(
-            HttpRequest.newBuilder().uri(URI.create(baseUrl() + "/books"))
+            HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl() + "/books"))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(createBody))
                 .build(),
-            HttpResponse.BodyHandlers.ofString());
+            HttpResponse.BodyHandlers.ofString()
+        );
 
-        String id = JsonParser.parseString(createResp.body()).getAsJsonObject().get("id").getAsString();
+        String id = JsonParser.parseString(createResp.body())
+            .getAsJsonObject()
+            .get("id")
+            .getAsString();
 
         String updateBody = "{\"readingProgress\":75}";
         HttpResponse<String> updateResp = client.send(
-            HttpRequest.newBuilder().uri(URI.create(baseUrl() + "/books/" + id))
+            HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl() + "/books/" + id))
                 .header("Content-Type", "application/json")
                 .method("PUT", HttpRequest.BodyPublishers.ofString(updateBody))
                 .build(),
-            HttpResponse.BodyHandlers.ofString());
+            HttpResponse.BodyHandlers.ofString()
+        );
 
         assertEquals(200, updateResp.statusCode());
-        JsonObject updated = JsonParser.parseString(updateResp.body()).getAsJsonObject();
+        JsonObject updated = JsonParser.parseString(
+            updateResp.body()
+        ).getAsJsonObject();
         assertEquals(75, updated.get("readingProgress").getAsInt());
     }
 
     @Test
     void testReadingProgressValidation() throws Exception {
-        String body = "{\"title\":\"Dune\",\"author\":\"Frank Herbert\",\"readStatus\":\"READING\",\"readingProgress\":150}";
+        String body =
+            "{\"title\":\"Dune\",\"author\":\"Frank Herbert\",\"readStatus\":\"READING\",\"readingProgress\":150}";
         HttpResponse<String> resp = client.send(
-            HttpRequest.newBuilder().uri(URI.create(baseUrl() + "/books"))
+            HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl() + "/books"))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body))
                 .build(),
-            HttpResponse.BodyHandlers.ofString());
+            HttpResponse.BodyHandlers.ofString()
+        );
 
         assertEquals(400, resp.statusCode());
     }
 
     @Test
     void testReadingProgressClearedByNull() throws Exception {
-        String createBody = "{\"title\":\"Dune\",\"author\":\"Frank Herbert\",\"readStatus\":\"READING\",\"readingProgress\":42}";
+        String createBody =
+            "{\"title\":\"Dune\",\"author\":\"Frank Herbert\",\"readStatus\":\"READING\",\"readingProgress\":42}";
         HttpResponse<String> createResp = client.send(
-            HttpRequest.newBuilder().uri(URI.create(baseUrl() + "/books"))
+            HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl() + "/books"))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(createBody))
                 .build(),
-            HttpResponse.BodyHandlers.ofString());
+            HttpResponse.BodyHandlers.ofString()
+        );
         assertEquals(201, createResp.statusCode());
-        String id = JsonParser.parseString(createResp.body()).getAsJsonObject().get("id").getAsString();
+        String id = JsonParser.parseString(createResp.body())
+            .getAsJsonObject()
+            .get("id")
+            .getAsString();
 
         HttpResponse<String> updateResp = client.send(
-            HttpRequest.newBuilder().uri(URI.create(baseUrl() + "/books/" + id))
+            HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl() + "/books/" + id))
                 .header("Content-Type", "application/json")
-                .PUT(HttpRequest.BodyPublishers.ofString("{\"readingProgress\":null}"))
+                .PUT(
+                    HttpRequest.BodyPublishers.ofString(
+                        "{\"readingProgress\":null}"
+                    )
+                )
                 .build(),
-            HttpResponse.BodyHandlers.ofString());
+            HttpResponse.BodyHandlers.ofString()
+        );
         assertEquals(200, updateResp.statusCode());
-        assertTrue(JsonParser.parseString(updateResp.body()).getAsJsonObject().get("readingProgress").isJsonNull());
+        assertTrue(
+            JsonParser.parseString(updateResp.body())
+                .getAsJsonObject()
+                .get("readingProgress")
+                .isJsonNull()
+        );
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"rating", "pageCount", "readingProgress"})
+    @ValueSource(strings = { "rating", "pageCount", "readingProgress" })
     void testInvalidIntegerFieldReturns400(String field) throws Exception {
         String body = String.format(
-                "{\"title\":\"Dune\",\"author\":\"Frank Herbert\",\"readStatus\":\"READING\",\"%s\":\"not-a-number\"}", field);
+            "{\"title\":\"Dune\",\"author\":\"Frank Herbert\",\"readStatus\":\"READING\",\"%s\":\"not-a-number\"}",
+            field
+        );
         HttpResponse<String> resp = post("/books", body);
         assertEquals(400, resp.statusCode());
     }
 
     @Test
     void testReadingProgressZeroIsAccepted() throws Exception {
-        HttpResponse<String> resp = post("/books",
-                "{\"title\":\"Dune\",\"author\":\"Frank Herbert\",\"readStatus\":\"READING\",\"readingProgress\":0}");
+        HttpResponse<String> resp = post(
+            "/books",
+            "{\"title\":\"Dune\",\"author\":\"Frank Herbert\",\"readStatus\":\"READING\",\"readingProgress\":0}"
+        );
         assertEquals(201, resp.statusCode());
         JsonObject body = JsonParser.parseString(resp.body()).getAsJsonObject();
         assertEquals(0, body.get("readingProgress").getAsInt());
@@ -665,37 +942,61 @@ public class BookApiTest {
 
     @Test
     void testSearchLiteralUnderscore() throws Exception {
-        post("/books", "{\"title\":\"Test_Book\",\"author\":\"Author A\",\"readStatus\":\"WANT_TO_READ\"}");
-        post("/books", "{\"title\":\"TestXBook\",\"author\":\"Author B\",\"readStatus\":\"WANT_TO_READ\"}");
+        post(
+            "/books",
+            "{\"title\":\"Test_Book\",\"author\":\"Author A\",\"readStatus\":\"WANT_TO_READ\"}"
+        );
+        post(
+            "/books",
+            "{\"title\":\"TestXBook\",\"author\":\"Author B\",\"readStatus\":\"WANT_TO_READ\"}"
+        );
 
         HttpResponse<String> resp = get("/books?search=Test_Book");
         assertEquals(200, resp.statusCode());
-        JsonArray results = JsonParser.parseString(resp.body()).getAsJsonArray();
+        JsonArray results = JsonParser.parseString(
+            resp.body()
+        ).getAsJsonArray();
         assertEquals(1, results.size());
-        assertEquals("Test_Book", results.get(0).getAsJsonObject().get("title").getAsString());
+        assertEquals(
+            "Test_Book",
+            results.get(0).getAsJsonObject().get("title").getAsString()
+        );
     }
-
 
     @Test
     void testInvalidReadStatusOnCreate() throws Exception {
-        String body = "{\"title\":\"Something\",\"author\":\"Someone\",\"readStatus\":\"DID_NOT_FINISH\"}";
+        String body =
+            "{\"title\":\"Something\",\"author\":\"Someone\",\"readStatus\":\"DID_NOT_FINISH\"}";
         HttpResponse<String> resp = post("/books", body);
         assertEquals(400, resp.statusCode());
     }
 
     @Test
     void testInvalidReadStatusOnUpdate() throws Exception {
-        HttpResponse<String> create = post("/books", createBookJson("Dune", "Frank Herbert", "READING"));
+        HttpResponse<String> create = post(
+            "/books",
+            createBookJson("Dune", "Frank Herbert", "READING")
+        );
         assertEquals(201, create.statusCode());
-        String id = gson.fromJson(create.body(), JsonObject.class).get("id").getAsString();
+        String id = gson
+            .fromJson(create.body(), JsonObject.class)
+            .get("id")
+            .getAsString();
 
-        HttpResponse<String> update = put("/books/" + id, "{\"readStatus\":\"DID_NOT_FINISH\"}");
+        HttpResponse<String> update = put(
+            "/books/" + id,
+            "{\"readStatus\":\"DID_NOT_FINISH\"}"
+        );
         assertEquals(400, update.statusCode());
     }
 
     @Test
     void testCreateBookWithDnfStatus() throws Exception {
-        String body = createBookJson("Flowers for Algernon", "Daniel Keyes", "DNF");
+        String body = createBookJson(
+            "Flowers for Algernon",
+            "Daniel Keyes",
+            "DNF"
+        );
         HttpResponse<String> resp = post("/books", body);
         assertEquals(201, resp.statusCode());
         JsonObject book = gson.fromJson(resp.body(), JsonObject.class);
@@ -704,10 +1005,19 @@ public class BookApiTest {
 
     @Test
     void testUpdateBookToDnfStatus() throws Exception {
-        HttpResponse<String> create = post("/books", createBookJson("Dune", "Frank Herbert", "READING"));
-        String id = gson.fromJson(create.body(), JsonObject.class).get("id").getAsString();
+        HttpResponse<String> create = post(
+            "/books",
+            createBookJson("Dune", "Frank Herbert", "READING")
+        );
+        String id = gson
+            .fromJson(create.body(), JsonObject.class)
+            .get("id")
+            .getAsString();
 
-        HttpResponse<String> update = put("/books/" + id, "{\"readStatus\":\"DNF\"}");
+        HttpResponse<String> update = put(
+            "/books/" + id,
+            "{\"readStatus\":\"DNF\"}"
+        );
         assertEquals(200, update.statusCode());
         JsonObject book = gson.fromJson(update.body(), JsonObject.class);
         assertEquals("DNF", book.get("readStatus").getAsString());
@@ -717,7 +1027,10 @@ public class BookApiTest {
 
     @Test
     void testRatingZeroRejectedOnPut() throws Exception {
-        HttpResponse<String> create = post("/books", createBookJson("Dune", "Frank Herbert", "READING"));
+        HttpResponse<String> create = post(
+            "/books",
+            createBookJson("Dune", "Frank Herbert", "READING")
+        );
         String id = getIdFromResponse(create);
 
         HttpResponse<String> update = put("/books/" + id, "{\"rating\":0}");
@@ -726,14 +1039,27 @@ public class BookApiTest {
 
     @Test
     void testRatingNullClearsOnPut() throws Exception {
-        HttpResponse<String> create = post("/books",
-                createBookJson("Dune", "Frank Herbert", "READING", null, 4, null));
+        HttpResponse<String> create = post(
+            "/books",
+            createBookJson("Dune", "Frank Herbert", "READING", null, 4, null)
+        );
         String id = getIdFromResponse(create);
-        assertEquals(4, gson.fromJson(create.body(), JsonObject.class).get("rating").getAsInt());
+        assertEquals(
+            4,
+            gson
+                .fromJson(create.body(), JsonObject.class)
+                .get("rating")
+                .getAsInt()
+        );
 
         HttpResponse<String> update = put("/books/" + id, "{\"rating\":null}");
         assertEquals(200, update.statusCode());
-        assertTrue(gson.fromJson(update.body(), JsonObject.class).get("rating").isJsonNull());
+        assertTrue(
+            gson
+                .fromJson(update.body(), JsonObject.class)
+                .get("rating")
+                .isJsonNull()
+        );
     }
 
     // --- Sort: unknown field is silently ignored ---
@@ -741,7 +1067,10 @@ public class BookApiTest {
     @Test
     void testUnknownSortFieldIgnored() throws Exception {
         post("/books", createBookJson("Dune", "Frank Herbert", "WANT_TO_READ"));
-        post("/books", createBookJson("Neuromancer", "William Gibson", "WANT_TO_READ"));
+        post(
+            "/books",
+            createBookJson("Neuromancer", "William Gibson", "WANT_TO_READ")
+        );
 
         HttpResponse<String> resp = get("/books?sort=invalid,asc");
         assertEquals(200, resp.statusCode());
@@ -754,14 +1083,25 @@ public class BookApiTest {
     @Test
     void testSearchCombinedWithReadStatusFilter() throws Exception {
         post("/books", createBookJson("Dune", "Frank Herbert", "READING"));
-        post("/books", createBookJson("Dune Messiah", "Frank Herbert", "FINISHED"));
-        post("/books", createBookJson("Neuromancer", "William Gibson", "READING"));
+        post(
+            "/books",
+            createBookJson("Dune Messiah", "Frank Herbert", "FINISHED")
+        );
+        post(
+            "/books",
+            createBookJson("Neuromancer", "William Gibson", "READING")
+        );
 
-        HttpResponse<String> resp = get("/books?search=dune&readStatus=READING");
+        HttpResponse<String> resp = get(
+            "/books?search=dune&readStatus=READING"
+        );
         assertEquals(200, resp.statusCode());
         JsonArray books = JsonParser.parseString(resp.body()).getAsJsonArray();
         assertEquals(1, books.size());
-        assertEquals("Dune", books.get(0).getAsJsonObject().get("title").getAsString());
+        assertEquals(
+            "Dune",
+            books.get(0).getAsJsonObject().get("title").getAsString()
+        );
     }
 
     // --- POST /books/re-enrich ---
@@ -788,7 +1128,17 @@ public class BookApiTest {
     @Test
     void testReEnrichReturns500WhenServiceUnavailable() throws Exception {
         // BookApiTest has no OpenLibraryService — re-enrich with ISBN books should be 500
-        post("/books", createBookJson("Dune", "Frank Herbert", "READING", null, null, "9780441013593"));
+        post(
+            "/books",
+            createBookJson(
+                "Dune",
+                "Frank Herbert",
+                "READING",
+                null,
+                null,
+                "9780441013593"
+            )
+        );
 
         HttpResponse<String> resp = post("/books/re-enrich", "");
         assertEquals(500, resp.statusCode());
@@ -797,11 +1147,16 @@ public class BookApiTest {
     @Test
     void testBadRequestBodyWithControlCharsIsValidJson() {
         // Directly test HttpResponse.badRequest() with control characters in the message
-        com.bookshelf.HttpResponse resp = com.bookshelf.HttpResponse.badRequest("line1\nline2\ttab\r");
+        com.bookshelf.HttpResponse resp = com.bookshelf.HttpResponse.badRequest(
+            "line1\nline2\ttab\r"
+        );
         String body = resp.getBody();
         // Raw control characters must NOT appear in the JSON body — they must be escaped
         assertFalse(body.contains("\n"), "Body must not contain raw newline");
-        assertFalse(body.contains("\r"), "Body must not contain raw carriage return");
+        assertFalse(
+            body.contains("\r"),
+            "Body must not contain raw carriage return"
+        );
         assertFalse(body.contains("\t"), "Body must not contain raw tab");
         // The escaped sequences must be present
         assertTrue(body.contains("\\n"), "Body must contain escaped newline");
@@ -813,50 +1168,102 @@ public class BookApiTest {
 
     @Test
     void testSubjectsNotArrayReturns400() throws Exception {
-        HttpResponse<String> create = post("/books", createBookJson("Dune", "Frank Herbert", "READING"));
+        HttpResponse<String> create = post(
+            "/books",
+            createBookJson("Dune", "Frank Herbert", "READING")
+        );
         String id = getIdFromResponse(create);
 
         // "subjects" is a string, not an array — should be 400, not 500
-        HttpResponse<String> update = put("/books/" + id, "{\"subjects\": \"not-an-array\"}");
+        HttpResponse<String> update = put(
+            "/books/" + id,
+            "{\"subjects\": \"not-an-array\"}"
+        );
         assertEquals(400, update.statusCode());
     }
 
     @Test
     void testGenreFilterWhitespaceOnlyReturnsAllBooks() throws Exception {
-        post("/books", createBookJson("Dune", "Frank Herbert", "READING", "sci-fi", null, null));
-        post("/books", createBookJson("1984", "George Orwell", "WANT_TO_READ", "dystopia", null, null));
+        post(
+            "/books",
+            createBookJson(
+                "Dune",
+                "Frank Herbert",
+                "READING",
+                "sci-fi",
+                null,
+                null
+            )
+        );
+        post(
+            "/books",
+            createBookJson(
+                "1984",
+                "George Orwell",
+                "WANT_TO_READ",
+                "dystopia",
+                null,
+                null
+            )
+        );
 
         // ?genre=%20%20 decodes to "  " (two spaces); should be treated as "no genre filter"
         HttpResponse<String> resp = get("/books?genre=%20%20");
         assertEquals(200, resp.statusCode());
         JsonArray books = JsonParser.parseString(resp.body()).getAsJsonArray();
-        assertEquals(2, books.size(), "Whitespace-only genre param should not filter out books");
+        assertEquals(
+            2,
+            books.size(),
+            "Whitespace-only genre param should not filter out books"
+        );
     }
 
     @Test
     void testUpdateReadStatusToNullReturns400() throws Exception {
-        HttpResponse<String> create = post("/books", createBookJson("Dune", "Frank Herbert", "READING"));
+        HttpResponse<String> create = post(
+            "/books",
+            createBookJson("Dune", "Frank Herbert", "READING")
+        );
         String id = getIdFromResponse(create);
 
-        HttpResponse<String> update = put("/books/" + id, "{\"readStatus\": null}");
+        HttpResponse<String> update = put(
+            "/books/" + id,
+            "{\"readStatus\": null}"
+        );
         assertEquals(400, update.statusCode());
     }
 
     @Test
     void testIsbnChangePreservesUserProvidedFields() throws Exception {
-        String body = createBookJson("Dune", "Frank Herbert", "READING", null, null, "9780261103573");
+        String body = createBookJson(
+            "Dune",
+            "Frank Herbert",
+            "READING",
+            null,
+            null,
+            "9780261103573"
+        );
         HttpResponse<String> create = post("/books", body);
         String id = getIdFromResponse(create);
 
-        HttpResponse<String> update = put("/books/" + id, "{\"isbn\": \"9780140328721\", \"publisher\": \"Custom Publisher\"}");
+        HttpResponse<String> update = put(
+            "/books/" + id,
+            "{\"isbn\": \"9780140328721\", \"publisher\": \"Custom Publisher\"}"
+        );
         assertEquals(200, update.statusCode());
-        JsonObject updated = JsonParser.parseString(update.body()).getAsJsonObject();
-        assertEquals("Custom Publisher", updated.get("publisher").getAsString());
+        JsonObject updated = JsonParser.parseString(
+            update.body()
+        ).getAsJsonObject();
+        assertEquals(
+            "Custom Publisher",
+            updated.get("publisher").getAsString()
+        );
     }
 
     @Test
     void testCreateBookWithNonArraySubjectsReturns400() throws Exception {
-        String body = "{\"title\":\"Test\",\"author\":\"Test\",\"readStatus\":\"WANT_TO_READ\",\"subjects\":\"not-an-array\"}";
+        String body =
+            "{\"title\":\"Test\",\"author\":\"Test\",\"readStatus\":\"WANT_TO_READ\",\"subjects\":\"not-an-array\"}";
         HttpResponse<String> resp = post("/books", body);
         assertEquals(400, resp.statusCode());
     }
@@ -869,17 +1276,24 @@ public class BookApiTest {
 
     @Test
     void testNegativeReadingProgressOnCreateReturns400() throws Exception {
-        String body = "{\"title\":\"Test\",\"author\":\"Test\",\"readStatus\":\"READING\",\"readingProgress\":-1}";
+        String body =
+            "{\"title\":\"Test\",\"author\":\"Test\",\"readStatus\":\"READING\",\"readingProgress\":-1}";
         HttpResponse<String> resp = post("/books", body);
         assertEquals(400, resp.statusCode());
     }
 
     @Test
     void testNegativeReadingProgressOnUpdateReturns400() throws Exception {
-        HttpResponse<String> create = post("/books", createBookJson("Test", "Author", "READING"));
+        HttpResponse<String> create = post(
+            "/books",
+            createBookJson("Test", "Author", "READING")
+        );
         String id = getIdFromResponse(create);
 
-        HttpResponse<String> update = put("/books/" + id, "{\"readingProgress\": -1}");
+        HttpResponse<String> update = put(
+            "/books/" + id,
+            "{\"readingProgress\": -1}"
+        );
         assertEquals(400, update.statusCode());
     }
 
@@ -892,13 +1306,22 @@ public class BookApiTest {
         assertEquals(200, resp.statusCode());
         JsonArray books = JsonParser.parseString(resp.body()).getAsJsonArray();
         assertEquals(2, books.size());
-        assertEquals("Alpha", books.get(0).getAsJsonObject().get("title").getAsString());
-        assertEquals("Bravo", books.get(1).getAsJsonObject().get("title").getAsString());
+        assertEquals(
+            "Alpha",
+            books.get(0).getAsJsonObject().get("title").getAsString()
+        );
+        assertEquals(
+            "Bravo",
+            books.get(1).getAsJsonObject().get("title").getAsString()
+        );
     }
 
     @Test
     void testEmptyPutBodyReturns400() throws Exception {
-        HttpResponse<String> create = post("/books", createBookJson("Test", "Author", "READING"));
+        HttpResponse<String> create = post(
+            "/books",
+            createBookJson("Test", "Author", "READING")
+        );
         String id = getIdFromResponse(create);
 
         HttpResponse<String> update = put("/books/" + id, "");
@@ -913,20 +1336,31 @@ public class BookApiTest {
             OutputStream out = socket.getOutputStream();
             // "X-Test: " (8 chars) + 8193 'a' chars = 8201-char line, exceeds the 8 KB cap
             String bigHeader = "X-Test: " + "a".repeat(8193);
-            String request = "GET /books HTTP/1.1\r\n" +
-                    "Host: localhost\r\n" +
-                    bigHeader + "\r\n" +
-                    "\r\n";
-            out.write(request.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            String request =
+                "GET /books HTTP/1.1\r\n" +
+                "Host: localhost\r\n" +
+                bigHeader +
+                "\r\n" +
+                "\r\n";
+            out.write(
+                request.getBytes(java.nio.charset.StandardCharsets.UTF_8)
+            );
             out.flush();
 
             // Read the first chunk of the response
             byte[] buf = new byte[256];
             int n = socket.getInputStream().read(buf);
             assertTrue(n > 0, "Server must respond");
-            String responseStart = new String(buf, 0, n, java.nio.charset.StandardCharsets.UTF_8);
-            assertTrue(responseStart.startsWith("HTTP/1.1 400"),
-                    "Expected 400 for oversized header, got: " + responseStart);
+            String responseStart = new String(
+                buf,
+                0,
+                n,
+                java.nio.charset.StandardCharsets.UTF_8
+            );
+            assertTrue(
+                responseStart.startsWith("HTTP/1.1 400"),
+                "Expected 400 for oversized header, got: " + responseStart
+            );
         }
     }
 }

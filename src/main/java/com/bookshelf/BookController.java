@@ -2,13 +2,13 @@ package com.bookshelf;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
 import com.google.gson.JsonSerializer;
 import com.google.gson.JsonSyntaxException;
-
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -19,20 +19,36 @@ public class BookController {
 
     private final BookRepository repository;
     private final OpenLibraryService openLibraryService;
+    private final ShelfRepository shelfRepository;
     private final Gson gson;
 
     public BookController(BookRepository repository) {
-        this(repository, null);
+        this(repository, null, null);
     }
 
-    public BookController(BookRepository repository, OpenLibraryService openLibraryService) {
+    public BookController(
+        BookRepository repository,
+        OpenLibraryService openLibraryService
+    ) {
+        this(repository, openLibraryService, null);
+    }
+
+    public BookController(
+        BookRepository repository,
+        OpenLibraryService openLibraryService,
+        ShelfRepository shelfRepository
+    ) {
         this.repository = repository;
         this.openLibraryService = openLibraryService;
+        this.shelfRepository = shelfRepository;
         this.gson = new GsonBuilder()
-                .serializeNulls()
-                .registerTypeAdapter(Instant.class,
-                        (JsonSerializer<Instant>) (src, type, ctx) -> new JsonPrimitive(src.toString()))
-                .create();
+            .serializeNulls()
+            .registerTypeAdapter(
+                Instant.class,
+                (JsonSerializer<Instant>) (src, type, ctx) ->
+                    new JsonPrimitive(src.toString())
+            )
+            .create();
     }
 
     public HttpResponse handleGetBooks(HttpRequest request) {
@@ -62,23 +78,42 @@ public class BookController {
             }
 
             // Apply readStatus filter on top of search or genre result
-            if (readStatus != null && (search != null && !search.isBlank() || (genre != null && !genre.isBlank()))) {
+            if (
+                readStatus != null &&
+                ((search != null && !search.isBlank()) ||
+                    (genre != null && !genre.isBlank()))
+            ) {
                 ReadStatus finalReadStatus = readStatus;
-                books = books.stream().filter(b -> b.getReadStatus() == finalReadStatus).toList();
+                books = books
+                    .stream()
+                    .filter(b -> b.getReadStatus() == finalReadStatus)
+                    .toList();
             }
 
             String sortParam = request.getQueryParams().get("sort"); // e.g. "title,asc"
             if (sortParam != null && !sortParam.isBlank()) {
                 String[] parts = sortParam.split(",", 2);
                 String field = parts[0].trim();
-                boolean desc = parts.length > 1 && "desc".equalsIgnoreCase(parts[1].trim());
+                boolean desc =
+                    parts.length > 1 &&
+                    "desc".equalsIgnoreCase(parts[1].trim());
 
                 Comparator<Book> comparator = switch (field) {
-                    case "title"   -> Comparator.comparing(b -> b.getTitle() != null ? b.getTitle().toLowerCase() : "");
-                    case "author"  -> Comparator.comparing(b -> b.getAuthor() != null ? b.getAuthor().toLowerCase() : "");
-                    case "rating"  -> Comparator.comparing(b -> b.getRating() != null ? b.getRating() : 0);
-                    case "created" -> Comparator.comparing(b -> b.getCreatedAt() != null ? b.getCreatedAt() : Instant.EPOCH);
-                    default        -> null;
+                    case "title" -> Comparator.comparing(b ->
+                        b.getTitle() != null ? b.getTitle().toLowerCase() : ""
+                    );
+                    case "author" -> Comparator.comparing(b ->
+                        b.getAuthor() != null ? b.getAuthor().toLowerCase() : ""
+                    );
+                    case "rating" -> Comparator.comparing(b ->
+                        b.getRating() != null ? b.getRating() : 0
+                    );
+                    case "created" -> Comparator.comparing(b ->
+                        b.getCreatedAt() != null
+                            ? b.getCreatedAt()
+                            : Instant.EPOCH
+                    );
+                    default -> null;
                 };
 
                 if (comparator != null) {
@@ -87,7 +122,11 @@ public class BookController {
                 }
             }
 
-            return HttpResponse.ok(gson.toJson(books));
+            JsonArray booksArray = new JsonArray();
+            for (Book book : books) {
+                booksArray.add(enrichBookJson(book));
+            }
+            return HttpResponse.ok(booksArray.toString());
         } catch (RuntimeException e) {
             System.err.println("Error in handleGetBooks: " + e.getMessage());
             e.printStackTrace();
@@ -104,9 +143,10 @@ public class BookController {
                 return HttpResponse.notFound("Book not found");
             }
 
-            return repository.findById(id)
-                    .map(book -> HttpResponse.ok(gson.toJson(book)))
-                    .orElse(HttpResponse.notFound("Book not found"));
+            return repository
+                .findById(id)
+                .map(book -> HttpResponse.ok(enrichBookJson(book).toString()))
+                .orElse(HttpResponse.notFound("Book not found"));
         } catch (RuntimeException e) {
             System.err.println("Error in handleGetBook: " + e.getMessage());
             e.printStackTrace();
@@ -117,11 +157,14 @@ public class BookController {
     public HttpResponse handleGetBookByIsbn(HttpRequest request) {
         try {
             String isbn = request.getPathParams().get("isbn");
-            return repository.findByIsbn(isbn)
-                    .map(book -> HttpResponse.ok(gson.toJson(book)))
-                    .orElse(HttpResponse.notFound("Book not found"));
+            return repository
+                .findByIsbn(isbn)
+                .map(book -> HttpResponse.ok(enrichBookJson(book).toString()))
+                .orElse(HttpResponse.notFound("Book not found"));
         } catch (RuntimeException e) {
-            System.err.println("Error in handleGetBookByIsbn: " + e.getMessage());
+            System.err.println(
+                "Error in handleGetBookByIsbn: " + e.getMessage()
+            );
             e.printStackTrace();
             return HttpResponse.internalServerError("Internal server error");
         }
@@ -159,7 +202,9 @@ public class BookController {
 
         ReadStatus readStatus;
         try {
-            readStatus = ReadStatus.valueOf(json.get("readStatus").getAsString());
+            readStatus = ReadStatus.valueOf(
+                json.get("readStatus").getAsString()
+            );
         } catch (IllegalArgumentException e) {
             return HttpResponse.badRequest("Invalid readStatus");
         }
@@ -169,10 +214,14 @@ public class BookController {
             try {
                 int rating = json.get("rating").getAsInt();
                 if (rating < 1 || rating > 5) {
-                    return HttpResponse.badRequest("Rating must be between 1 and 5");
+                    return HttpResponse.badRequest(
+                        "Rating must be between 1 and 5"
+                    );
                 }
             } catch (NumberFormatException | UnsupportedOperationException e) {
-                return HttpResponse.badRequest("'rating' must be a valid integer");
+                return HttpResponse.badRequest(
+                    "'rating' must be a valid integer"
+                );
             }
         }
 
@@ -203,15 +252,25 @@ public class BookController {
                 book.setPageCount(safeGetInt(json, "pageCount"));
             }
 
-            if (json.has("readingProgress") && !json.get("readingProgress").isJsonNull()) {
+            if (
+                json.has("readingProgress") &&
+                !json.get("readingProgress").isJsonNull()
+            ) {
                 try {
                     int progress = json.get("readingProgress").getAsInt();
                     if (progress < 0 || progress > 100) {
-                        return HttpResponse.badRequest("readingProgress must be between 0 and 100");
+                        return HttpResponse.badRequest(
+                            "readingProgress must be between 0 and 100"
+                        );
                     }
                     book.setReadingProgress(progress);
-                } catch (NumberFormatException | UnsupportedOperationException e) {
-                    return HttpResponse.badRequest("'readingProgress' must be a valid integer");
+                } catch (
+                    NumberFormatException
+                    | UnsupportedOperationException e
+                ) {
+                    return HttpResponse.badRequest(
+                        "'readingProgress' must be a valid integer"
+                    );
                 }
             }
 
@@ -234,10 +293,13 @@ public class BookController {
 
             // Fire async enrichment if ISBN is present
             if (book.getIsbn() != null && openLibraryService != null) {
-                openLibraryService.enrichBookAsync(book.getId(), book.getIsbn());
+                openLibraryService.enrichBookAsync(
+                    book.getId(),
+                    book.getIsbn()
+                );
             }
 
-            return HttpResponse.created(gson.toJson(book));
+            return HttpResponse.created(enrichBookJson(book).toString());
         } catch (IllegalArgumentException e) {
             return HttpResponse.badRequest(e.getMessage());
         } catch (RuntimeException e) {
@@ -278,10 +340,14 @@ public class BookController {
             try {
                 int rating = json.get("rating").getAsInt();
                 if (rating < 1 || rating > 5) {
-                    return HttpResponse.badRequest("Rating must be between 1 and 5");
+                    return HttpResponse.badRequest(
+                        "Rating must be between 1 and 5"
+                    );
                 }
             } catch (NumberFormatException | UnsupportedOperationException e) {
-                return HttpResponse.badRequest("'rating' must be a valid integer");
+                return HttpResponse.badRequest(
+                    "'rating' must be a valid integer"
+                );
             }
         }
 
@@ -308,35 +374,69 @@ public class BookController {
 
             // Apply partial updates — only fields present in the JSON
             if (json.has("title")) {
-                book.setTitle(json.get("title").isJsonNull() ? null : json.get("title").getAsString());
+                book.setTitle(
+                    json.get("title").isJsonNull()
+                        ? null
+                        : json.get("title").getAsString()
+                );
             }
             if (json.has("author")) {
-                book.setAuthor(json.get("author").isJsonNull() ? null : json.get("author").getAsString());
+                book.setAuthor(
+                    json.get("author").isJsonNull()
+                        ? null
+                        : json.get("author").getAsString()
+                );
             }
             if (json.has("genre")) {
-                book.setGenre(json.get("genre").isJsonNull() ? null : json.get("genre").getAsString());
+                book.setGenre(
+                    json.get("genre").isJsonNull()
+                        ? null
+                        : json.get("genre").getAsString()
+                );
             }
             if (json.has("isbn")) {
-                book.setIsbn(json.get("isbn").isJsonNull() ? null : json.get("isbn").getAsString());
+                book.setIsbn(
+                    json.get("isbn").isJsonNull()
+                        ? null
+                        : json.get("isbn").getAsString()
+                );
             }
             if (json.has("publisher")) {
-                book.setPublisher(json.get("publisher").isJsonNull() ? null : json.get("publisher").getAsString());
+                book.setPublisher(
+                    json.get("publisher").isJsonNull()
+                        ? null
+                        : json.get("publisher").getAsString()
+                );
             }
             if (json.has("publishDate")) {
-                book.setPublishDate(json.get("publishDate").isJsonNull() ? null : json.get("publishDate").getAsString());
+                book.setPublishDate(
+                    json.get("publishDate").isJsonNull()
+                        ? null
+                        : json.get("publishDate").getAsString()
+                );
             }
             if (json.has("rating")) {
-                book.setRating(json.get("rating").isJsonNull() ? null : safeGetInt(json, "rating"));
+                book.setRating(
+                    json.get("rating").isJsonNull()
+                        ? null
+                        : safeGetInt(json, "rating")
+                );
             }
             if (json.has("pageCount")) {
-                book.setPageCount(json.get("pageCount").isJsonNull() ? null : safeGetInt(json, "pageCount"));
+                book.setPageCount(
+                    json.get("pageCount").isJsonNull()
+                        ? null
+                        : safeGetInt(json, "pageCount")
+                );
             }
             if (json.has("readStatus")) {
                 if (json.get("readStatus").isJsonNull()) {
                     return HttpResponse.badRequest("readStatus cannot be null");
                 }
                 try {
-                    book.setReadStatus(ReadStatus.valueOf(json.get("readStatus").getAsString()));
+                    book.setReadStatus(
+                        ReadStatus.valueOf(json.get("readStatus").getAsString())
+                    );
                 } catch (IllegalArgumentException e) {
                     return HttpResponse.badRequest("Invalid readStatus");
                 }
@@ -347,9 +447,17 @@ public class BookController {
                 } else {
                     List<String> subjects = new ArrayList<>();
                     try {
-                        json.get("subjects").getAsJsonArray().forEach(e -> subjects.add(e.getAsString()));
-                    } catch (IllegalStateException | UnsupportedOperationException e) {
-                        return HttpResponse.badRequest("'subjects' must be an array of strings");
+                        json
+                            .get("subjects")
+                            .getAsJsonArray()
+                            .forEach(e -> subjects.add(e.getAsString()));
+                    } catch (
+                        IllegalStateException
+                        | UnsupportedOperationException e
+                    ) {
+                        return HttpResponse.badRequest(
+                            "'subjects' must be an array of strings"
+                        );
                     }
                     book.setSubjects(subjects);
                 }
@@ -361,19 +469,29 @@ public class BookController {
                     try {
                         int progress = json.get("readingProgress").getAsInt();
                         if (progress < 0 || progress > 100) {
-                            return HttpResponse.badRequest("readingProgress must be between 0 and 100");
+                            return HttpResponse.badRequest(
+                                "readingProgress must be between 0 and 100"
+                            );
                         }
                         book.setReadingProgress(progress);
-                    } catch (NumberFormatException | UnsupportedOperationException e) {
-                        return HttpResponse.badRequest("'readingProgress' must be a valid integer");
+                    } catch (
+                        NumberFormatException
+                        | UnsupportedOperationException e
+                    ) {
+                        return HttpResponse.badRequest(
+                            "'readingProgress' must be a valid integer"
+                        );
                     }
                 }
             }
 
             // Check if ISBN changed — trigger re-enrichment
             String newIsbn = book.getIsbn();
-            boolean isbnChanged = openLibraryService != null && json.has("isbn")
-                    && ((newIsbn == null && oldIsbn != null) || (newIsbn != null && !newIsbn.equals(oldIsbn)));
+            boolean isbnChanged =
+                openLibraryService != null &&
+                json.has("isbn") &&
+                ((newIsbn == null && oldIsbn != null) ||
+                    (newIsbn != null && !newIsbn.equals(oldIsbn)));
 
             if (isbnChanged && newIsbn != null) {
                 // Clear previously-enriched fields before re-enrichment
@@ -393,7 +511,7 @@ public class BookController {
                 openLibraryService.enrichBookAsync(id, newIsbn);
             }
 
-            return HttpResponse.ok(gson.toJson(book));
+            return HttpResponse.ok(enrichBookJson(book).toString());
         } catch (IllegalArgumentException e) {
             return HttpResponse.badRequest(e.getMessage());
         } catch (RuntimeException e) {
@@ -413,6 +531,9 @@ public class BookController {
             }
 
             if (repository.delete(id)) {
+                if (shelfRepository != null) {
+                    shelfRepository.removeBookFromAllShelves(id);
+                }
                 return HttpResponse.noContent();
             }
             return HttpResponse.notFound("Book not found");
@@ -425,16 +546,20 @@ public class BookController {
 
     public HttpResponse handleReEnrich(HttpRequest request) {
         try {
-            List<Book> booksWithIsbn = repository.findAll().stream()
-                    .filter(b -> b.getIsbn() != null && !b.getIsbn().isEmpty())
-                    .toList();
+            List<Book> booksWithIsbn = repository
+                .findAll()
+                .stream()
+                .filter(b -> b.getIsbn() != null && !b.getIsbn().isEmpty())
+                .toList();
 
             if (booksWithIsbn.isEmpty()) {
                 return HttpResponse.accepted("{\"queued\":0}");
             }
 
             if (openLibraryService == null) {
-                return HttpResponse.internalServerError("Open Library service not available");
+                return HttpResponse.internalServerError(
+                    "Open Library service not available"
+                );
             }
 
             int queued = openLibraryService.reEnrichAll(booksWithIsbn);
@@ -460,7 +585,10 @@ public class BookController {
                 return HttpResponse.notFound("Cover not available");
             }
 
-            return HttpResponse.binary(bookOpt.get().getCoverData(), "image/jpeg");
+            return HttpResponse.binary(
+                bookOpt.get().getCoverData(),
+                "image/jpeg"
+            );
         } catch (RuntimeException e) {
             System.err.println("Error in handleGetCover: " + e.getMessage());
             e.printStackTrace();
@@ -480,7 +608,9 @@ public class BookController {
         try {
             return json.get(field).getAsInt();
         } catch (NumberFormatException | UnsupportedOperationException e) {
-            throw new IllegalArgumentException("'" + field + "' must be a valid integer");
+            throw new IllegalArgumentException(
+                "'" + field + "' must be a valid integer"
+            );
         }
     }
 
@@ -489,5 +619,26 @@ public class BookController {
         if (isbn.length() == 13) return isbn.matches("\\d{13}");
         if (isbn.length() == 10) return isbn.matches("\\d{9}[\\dX]");
         return false;
+    }
+
+    private JsonObject enrichBookJson(Book book) {
+        JsonObject obj = JsonParser.parseString(
+            gson.toJson(book)
+        ).getAsJsonObject();
+        JsonArray shelvesArr = new JsonArray();
+        if (shelfRepository != null) {
+            List<Shelf> bookShelves = shelfRepository.findShelvesForBook(
+                book.getId()
+            );
+            for (Shelf s : bookShelves) {
+                JsonObject shelfObj = new JsonObject();
+                shelfObj.addProperty("id", s.getId().toString());
+                shelfObj.addProperty("name", s.getName());
+                shelfObj.addProperty("color", s.getColor());
+                shelvesArr.add(shelfObj);
+            }
+        }
+        obj.add("shelves", shelvesArr);
+        return obj;
     }
 }

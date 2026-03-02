@@ -4,17 +4,29 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class HttpResponse {
+
     private final int statusCode;
     private final String statusText;
     private final Map<String, String> headers;
     private final String body;
     private final byte[] rawBody;
 
-    public HttpResponse(int statusCode, String statusText, Map<String, String> headers, String body) {
+    public HttpResponse(
+        int statusCode,
+        String statusText,
+        Map<String, String> headers,
+        String body
+    ) {
         this(statusCode, statusText, headers, body, null);
     }
 
-    public HttpResponse(int statusCode, String statusText, Map<String, String> headers, String body, byte[] rawBody) {
+    public HttpResponse(
+        int statusCode,
+        String statusText,
+        Map<String, String> headers,
+        String body,
+        byte[] rawBody
+    ) {
         this.statusCode = statusCode;
         this.statusText = statusText;
         this.headers = headers != null ? headers : new HashMap<>();
@@ -22,11 +34,25 @@ public class HttpResponse {
         this.rawBody = rawBody;
     }
 
-    public int getStatusCode() { return statusCode; }
-    public String getStatusText() { return statusText; }
-    public Map<String, String> getHeaders() { return headers; }
-    public String getBody() { return body; }
-    public byte[] getRawBody() { return rawBody; }
+    public int getStatusCode() {
+        return statusCode;
+    }
+
+    public String getStatusText() {
+        return statusText;
+    }
+
+    public Map<String, String> getHeaders() {
+        return headers;
+    }
+
+    public String getBody() {
+        return body;
+    }
+
+    public byte[] getRawBody() {
+        return rawBody;
+    }
 
     public static HttpResponse ok(String body) {
         return new HttpResponse(200, "OK", new HashMap<>(), body);
@@ -45,11 +71,21 @@ public class HttpResponse {
     }
 
     public static HttpResponse badRequest(String error) {
-        return new HttpResponse(400, "Bad Request", new HashMap<>(), "{\"error\":\"" + escapeJson(error) + "\"}");
+        return new HttpResponse(
+            400,
+            "Bad Request",
+            new HashMap<>(),
+            "{\"error\":\"" + escapeJson(error) + "\"}"
+        );
     }
 
     public static HttpResponse notFound(String error) {
-        return new HttpResponse(404, "Not Found", new HashMap<>(), "{\"error\":\"" + escapeJson(error) + "\"}");
+        return new HttpResponse(
+            404,
+            "Not Found",
+            new HashMap<>(),
+            "{\"error\":\"" + escapeJson(error) + "\"}"
+        );
     }
 
     public static HttpResponse binary(byte[] data, String contentType) {
@@ -59,22 +95,47 @@ public class HttpResponse {
     }
 
     public static HttpResponse internalServerError(String error) {
-        return new HttpResponse(500, "Internal Server Error", new HashMap<>(), "{\"error\":\"" + escapeJson(error) + "\"}");
+        return new HttpResponse(
+            500,
+            "Internal Server Error",
+            new HashMap<>(),
+            "{\"error\":\"" + escapeJson(error) + "\"}"
+        );
     }
 
     public static HttpResponse payloadTooLarge(String error) {
-        return new HttpResponse(413, "Payload Too Large", new HashMap<>(), "{\"error\":\"" + escapeJson(error) + "\"}");
+        return new HttpResponse(
+            413,
+            "Payload Too Large",
+            new HashMap<>(),
+            "{\"error\":\"" + escapeJson(error) + "\"}"
+        );
+    }
+
+    public static HttpResponse conflict(String error) {
+        return new HttpResponse(
+            409,
+            "Conflict",
+            new HashMap<>(),
+            "{\"error\":\"" + escapeJson(error) + "\"}"
+        );
     }
 
     public static HttpResponse methodNotAllowed() {
-        return new HttpResponse(405, "Method Not Allowed", new HashMap<>(), "{\"error\":\"Method not allowed\"}");
+        return new HttpResponse(
+            405,
+            "Method Not Allowed",
+            new HashMap<>(),
+            "{\"error\":\"Method not allowed\"}"
+        );
     }
 
     private static String escapeJson(String s) {
-        return s.replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\n", "\\n")
-                .replace("\r", "\\r")
-                .replace("\t", "\\t");
+        return s
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+            .replace("\t", "\\t");
     }
 }
