@@ -24,6 +24,7 @@ public class BookEnrichmentService {
     private final ExecutorService executor;
     private final HttpClient httpClient;
     private final String userAgent;
+    private final String googleBooksApiKey;
 
     public BookEnrichmentService(BookRepository repository) {
         this.repository = repository;
@@ -33,6 +34,8 @@ public class BookEnrichmentService {
             .followRedirects(HttpClient.Redirect.NORMAL)
             .build();
         this.userAgent = "MyBookShelf/1.0 (personal project)";
+        String key = System.getenv("GOOGLE_BOOKS_API_KEY");
+        this.googleBooksApiKey = (key != null && !key.isEmpty()) ? key : null;
     }
 
     public void enrichBookAsync(UUID bookId, String isbn) {
@@ -302,7 +305,9 @@ public class BookEnrichmentService {
     BookMetadata fetchGoogleBooksMetadata(String isbn)
         throws IOException, InterruptedException {
         String url =
-            "https://www.googleapis.com/books/v1/volumes?q=isbn:" + isbn;
+            "https://www.googleapis.com/books/v1/volumes?q=isbn:" +
+            isbn +
+            (googleBooksApiKey != null ? "&key=" + googleBooksApiKey : "");
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(url))
             .header("User-Agent", userAgent)
