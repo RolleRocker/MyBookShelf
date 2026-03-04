@@ -99,6 +99,7 @@ The project is built in progressive versions (V1 → V4), each adding a layer:
 | `DELETE` | `/books/{id}`         | Delete a book                            | `204 No Content` |
 | `POST`   | `/books/re-enrich`    | Re-enrich all books with ISBNs from Open Library | `202 Accepted` |
 | `GET`    | `/books/{id}/cover`   | Serve cover image from DB (V2+)          | `200 OK`         |
+| `POST`   | `/mcp`                | MCP Streamable HTTP endpoint (JSON-RPC)  | `200 OK`         |
 
 ### `GET /books` Query Parameters
 
@@ -141,6 +142,16 @@ Parameters can be combined: `?search=frank&readStatus=FINISHED&sort=rating,desc`
 - **Sorting is in-memory in `BookController`** — a `Comparator` is applied to the result list after repository fetch. No `ORDER BY` is added to SQL queries
 - **`readingProgress`** is validated as 0–100 on both create and update. Setting it to `null` via PUT clears it. Only displayed in the UI for `READING` books
 
+## MCP (Model Context Protocol) Integration
+
+The server exposes an MCP endpoint at `POST /mcp` using the Streamable HTTP transport (stateless mode). This lets Claude Code query the bookshelf via natural language. Configured via `.mcp.json` in the project root.
+
+**Tools:** `check_book`, `search_books`, `list_books`, `get_book_by_isbn`, `get_bookshelf_stats`
+
+**Protocol:** JSON-RPC 2.0 over HTTP POST. Supports `initialize`, `notifications/initialized`, `tools/list`, `tools/call`, and `ping` methods. No SDK dependencies — implemented directly with Gson on the existing ServerSocket/Router.
+
+**Requirement:** The bookshelf server must be running (`docker compose up --build -d`) for MCP tools to work.
+
 ## Environment Variables (V3+)
 
 | Variable    | Default     | Description        |
@@ -159,6 +170,7 @@ Tests use JUnit 5 with `java.net.HttpClient`. The server starts on a random port
 Test classes:
 - **`BookApiTest`** — full HTTP integration tests covering CRUD, filtering, search, sorting, reading progress, partial updates, validation, and cover endpoints
 - **`BookMetadataTest`** — unit tests for `BookMetadata.deriveGenre()`, Google Books response parsing, and `mergeMetadata()`
+- **`McpTest`** — MCP endpoint tests covering JSON-RPC protocol (initialize, tools/list, tools/call, ping, errors) and all 5 tool implementations
 - **`OpenLibraryTest`** — live integration tests for Open Library enrichment service (excluded from default `./gradlew test` via `@Tag("integration")`; run with `./gradlew integrationTest`)
 
 ## Database Column Mapping
@@ -205,3 +217,5 @@ Migrations run on startup via `DatabaseConfig.runMigrations()`. The schema uses 
 | `BookEnrichmentService.java` | Async enrichment: Open Library + Google Books fallback |
 | `BookMetadata.java` | DTO for Open Library response |
 | `StaticFileHandler.java` | Serves `static/` files |
+| `mcp/McpController.java` | MCP Streamable HTTP endpoint — JSON-RPC dispatch |
+| `mcp/McpToolHandler.java` | MCP tool implementations (check_book, search_books, list_books, get_book_by_isbn, get_bookshelf_stats) |
