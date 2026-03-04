@@ -237,6 +237,63 @@ Tests start the server on a random port using `new ServerSocket(0)` and use `InM
 - Open Library enrichment (metadata, covers, re-enrichment on ISBN change)
 - User-provided fields preserved during enrichment
 
+## Claude MCP Integration
+
+MyBookShelf ships with an MCP (Model Context Protocol) server so you can ask Claude questions about your shelf in natural language — "Do I have Dune?", "What am I currently reading?", "Show me all my sci-fi books."
+
+### Prerequisites
+
+- The bookshelf server must be running (`./gradlew run` or `docker compose up`)
+- Java 17+ (same requirement as the main app)
+
+### 1. Build the MCP server JAR
+
+```bash
+./gradlew mcpJar
+```
+
+This produces `build/libs/MyBookShelf-1.0-mcp.jar`.
+
+### 2. Configure Claude Code
+
+Create `.mcp.json` in the project root:
+
+```json
+{
+  "mcpServers": {
+    "bookshelf": {
+      "command": "java",
+      "args": ["-jar", "build/libs/MyBookShelf-1.0-mcp.jar"],
+      "env": {
+        "BOOKSHELF_URL": "http://localhost:8080"
+      }
+    }
+  }
+}
+```
+
+Claude Code reads this file automatically on startup and launches the MCP server as a subprocess.
+
+### 3. Start asking Claude
+
+Once connected, Claude has access to these tools:
+
+| Tool | What you can ask |
+|------|-----------------|
+| `check_book` | "Do I have Dune?" / "Do I own anything by Le Guin?" |
+| `search_books` | "Which Herbert books are on my shelf?" |
+| `list_books` | "What am I currently reading?" / "Show me my fantasy books" |
+| `get_book_by_isbn` | "What's the book with ISBN 9780441013593?" |
+| `get_bookshelf_stats` | "How many books do I have?" / "Give me a summary of my shelf" |
+
+### Changing the server URL
+
+If your bookshelf runs on a different port or host, update `BOOKSHELF_URL` in `.mcp.json`:
+
+```json
+"env": { "BOOKSHELF_URL": "http://localhost:9090" }
+```
+
 ## License
 
 This project is for personal use and learning purposes.
