@@ -2,6 +2,7 @@ package com.bookshelf;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.bookshelf.mcp.McpController;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
@@ -40,7 +41,15 @@ public class ShelfApiTest {
             shelfRepository,
             bookRepository
         );
-        Router router = App.createRouter(bookController, shelfController);
+        McpController mcpController = new McpController(
+            bookRepository,
+            shelfRepository
+        );
+        Router router = App.createRouter(
+            bookController,
+            shelfController,
+            mcpController
+        );
         server = new HttpServer(0, router);
         server.start();
         port = server.getPort();

@@ -1,5 +1,6 @@
 package com.bookshelf;
 
+import com.bookshelf.mcp.McpController;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -30,7 +31,15 @@ public class App {
             shelfRepository,
             repository
         );
-        Router router = createRouter(controller, shelfController);
+        McpController mcpController = new McpController(
+            repository,
+            shelfRepository
+        );
+        Router router = createRouter(
+            controller,
+            shelfController,
+            mcpController
+        );
 
         StaticFileHandler staticHandler = new StaticFileHandler(staticDir);
         router.setFallbackHandler(staticHandler::handle);
@@ -78,7 +87,8 @@ public class App {
 
     public static Router createRouter(
         BookController controller,
-        ShelfController shelfController
+        ShelfController shelfController,
+        McpController mcpController
     ) {
         Router router = new Router();
         router.addRoute("GET", "/books", controller::handleGetBooks);
@@ -132,6 +142,9 @@ public class App {
             "/shelves/{id}/books/{bookId}",
             shelfController::handleRemoveBook
         );
+
+        // MCP endpoint
+        router.addRoute("POST", "/mcp", mcpController::handleMcp);
 
         return router;
     }
