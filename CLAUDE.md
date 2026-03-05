@@ -87,6 +87,25 @@ The project is built in progressive versions (V1 → V4), each adding a layer:
 | `createdAt`      | Instant                                     | auto     | Serialized as ISO-8601 string in JSON responses |
 | `updatedAt`      | Instant (transient)                         | auto     | Not serialized to JSON |
 
+## Data Model — Shelf
+
+| Field            | Type           | Required | Notes |
+|------------------|----------------|----------|-------|
+| `id`             | UUID           | auto     | Server-generated |
+| `name`           | String         | yes      | Must be unique |
+| `description`    | String         | no       | |
+| `notes`          | String         | no       | |
+| `color`          | String         | no       | Hex color for UI |
+| `sortField`      | String         | no       | Default sort for books in shelf |
+| `sortDirection`  | String         | no       | `asc` or `desc` |
+| `position`       | int            | auto     | Order in sidebar |
+| `createdAt`      | Instant        | auto     | |
+| `updatedAt`      | Instant (transient) | auto | Not serialized to JSON |
+| `bookCount`      | int (transient)| computed | Number of books on shelf |
+| `coverBookIds`   | List\<UUID\> (transient) | computed | Up to 4 book IDs for cover thumbnails |
+| `books`          | List\<Book\> (transient) | computed | Populated on GET `/shelves/{id}` |
+| `stats`          | Map (transient)| computed | Per-shelf statistics |
+
 ## API Endpoints
 
 | Method   | Path                  | Description                              | Success Code     |
@@ -99,6 +118,15 @@ The project is built in progressive versions (V1 → V4), each adding a layer:
 | `DELETE` | `/books/{id}`         | Delete a book                            | `204 No Content` |
 | `POST`   | `/books/re-enrich`    | Re-enrich all books with ISBNs from Open Library | `202 Accepted` |
 | `GET`    | `/books/{id}/cover`   | Serve cover image from DB (V2+)          | `200 OK`         |
+| `GET`    | `/shelves`            | List all shelves (with book counts)      | `200 OK`         |
+| `POST`   | `/shelves`            | Create a new shelf                       | `201 Created`    |
+| `GET`    | `/shelves/{id}`       | Get shelf with books and stats           | `200 OK`         |
+| `PUT`    | `/shelves/{id}`       | Update a shelf                           | `200 OK`         |
+| `DELETE` | `/shelves/{id}`       | Delete a shelf                           | `204 No Content` |
+| `PUT`    | `/shelves/reorder`    | Reorder shelves by position              | `200 OK`         |
+| `POST`   | `/shelves/{id}/books` | Add a book to a shelf                    | `201 Created`    |
+| `PUT`    | `/shelves/{id}/books/reorder` | Reorder books within a shelf     | `200 OK`         |
+| `DELETE` | `/shelves/{id}/books/{bookId}` | Remove a book from a shelf      | `204 No Content` |
 | `POST`   | `/mcp`                | MCP Streamable HTTP endpoint (JSON-RPC)  | `200 OK`         |
 
 ### `GET /books` Query Parameters
@@ -162,16 +190,18 @@ The server exposes an MCP endpoint at `POST /mcp` using the Streamable HTTP tran
 | `DB_USER`   | `bookshelf` | Database user      |
 | `DB_PASS`   | `bookshelf` | Database password  |
 | `APP_PORT`  | `8080`      | Server listen port |
+| `GOOGLE_BOOKS_API_KEY` | *(none)* | Optional — raises Google Books API quota |
 
 ## Testing
 
 Tests use JUnit 5 with `java.net.HttpClient`. The server starts on a random port (`new ServerSocket(0)`) before each test class and shuts down after. Repository is cleaned between tests for isolation. Tests run against `InMemoryBookRepository` only (no DB required for `./gradlew test`).
 
 Test classes:
-- **`BookApiTest`** — full HTTP integration tests covering CRUD, filtering, search, sorting, reading progress, partial updates, validation, and cover endpoints
-- **`BookMetadataTest`** — unit tests for `BookMetadata.deriveGenre()`, Google Books response parsing, and `mergeMetadata()`
-- **`McpTest`** — MCP endpoint tests covering JSON-RPC protocol (initialize, tools/list, tools/call, ping, errors) and all 5 tool implementations
-- **`OpenLibraryTest`** — live integration tests for Open Library enrichment service (excluded from default `./gradlew test` via `@Tag("integration")`; run with `./gradlew integrationTest`)
+- **`BookApiTest`** (66 tests) — full HTTP integration tests covering CRUD, filtering, search, sorting, reading progress, partial updates, validation, and cover endpoints
+- **`BookMetadataTest`** (43 tests) — unit tests for `BookMetadata.deriveGenre()`, Google Books response parsing, and `mergeMetadata()`
+- **`ShelfApiTest`** (56 tests) — shelf CRUD, book assignment, reordering, stats, validation, and edge cases
+- **`McpTest`** (21 tests) — MCP endpoint tests covering JSON-RPC protocol (initialize, tools/list, tools/call, ping, errors) and all 5 tool implementations
+- **`OpenLibraryTest`** (11 tests) — live integration tests for Open Library enrichment service (excluded from default `./gradlew test` via `@Tag("integration")`; run with `./gradlew integrationTest`)
 
 ## Database Column Mapping
 
@@ -212,6 +242,11 @@ Migrations run on startup via `DatabaseConfig.runMigrations()`. The schema uses 
 | `InMemoryBookRepository.java` | `ConcurrentHashMap`-backed implementation (used in tests) |
 | `JdbcBookRepository.java` | PostgreSQL JDBC implementation |
 | `BookController.java` | HTTP handler methods; validation, JSON parsing, sorting |
+| `ShelfController.java` | Shelf API endpoint handlers |
+| `Shelf.java` | Shelf entity with computed transient fields |
+| `ShelfRepository.java` | Shelf repository interface |
+| `InMemoryShelfRepository.java` | In-memory shelf store (used in tests) |
+| `JdbcShelfRepository.java` | PostgreSQL shelf implementation |
 | `RequestTooLargeException.java` | Custom exception for oversized request bodies |
 | `DatabaseConfig.java` | HikariCP pool setup + schema migrations |
 | `BookEnrichmentService.java` | Async enrichment: Open Library + Google Books fallback |

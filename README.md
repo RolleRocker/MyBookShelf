@@ -6,13 +6,15 @@ A personal bookshelf REST API built from scratch in Java 17 using only `java.net
 
 - **Framework-free HTTP server** — built on raw `ServerSocket` with a 10-thread pool
 - **Full CRUD REST API** for managing books with filtering by genre, read status, and full-text search
-- **Open Library integration** — add a book by ISBN and metadata (title, author, publisher, page count, subjects, cover image) is fetched automatically in the background
+- **Open Library + Google Books integration** — add a book by ISBN and metadata (title, author, publisher, page count, subjects, cover image) is fetched automatically in the background. Falls back to Google Books API if Open Library returns no data
 - **Cover image storage** — covers downloaded from Open Library and stored as binary data in PostgreSQL
 - **ISBN barcode scanner** — scan a book's barcode with your device camera to add it instantly
-- **Vanilla JS frontend** — dark antiquarian-library-themed UI with ISBN input, filter tabs, sort dropdown, search bar, inline editing, and star ratings
+- **Custom shelves / collections** — create named shelves with colors, descriptions, and notes; drag-and-drop books between shelves; per-shelf sorting and stats
+- **Vanilla JS frontend** — dark antiquarian-library-themed UI with ISBN input, filter tabs, sort dropdown, search bar, inline editing, star ratings, and a sidebar for shelf management
 - **Reading progress** — track a percentage (0-100) for books currently being read
+- **MCP integration** — query your bookshelf from Claude Code via natural language ("Do I have Dune?", "What am I reading?")
 - **Dockerized** — single `docker compose up` to run the app and database together
-- **110 automated tests** covering the full API surface, validation, edge cases, and enrichment logic
+- **186 automated tests** covering the full API surface, shelves, MCP protocol, validation, edge cases, and enrichment logic
 
 ## Tech Stack
 
@@ -27,6 +29,7 @@ A personal bookshelf REST API built from scratch in Java 17 using only `java.net
 | Container | Docker + Docker Compose |
 | Frontend | Vanilla HTML / CSS / JS |
 | Barcode Scanning | zbar-wasm (WebAssembly) |
+| Book Enrichment | Open Library API + Google Books API (fallback) |
 | Tests | JUnit 5 + `java.net.HttpClient` |
 
 ## Getting Started
@@ -60,7 +63,7 @@ This runs the server with an in-memory store (no database needed):
 ./gradlew test
 ```
 
-All 99 unit tests use an in-memory repository — no database or Docker required. 11 integration tests (Open Library) are excluded from the default run.
+All 186 unit tests use an in-memory repository — no database or Docker required. 11 integration tests (Open Library) are excluded from the default run.
 
 ## API Reference
 
@@ -76,6 +79,16 @@ All 99 unit tests use an in-memory repository — no database or Docker required
 | `GET` | `/books/isbn/{isbn}` | Look up a book by ISBN | `200` |
 | `POST` | `/books/re-enrich` | Re-enrich all ISBN books from Open Library | `202` |
 | `GET` | `/books/{id}/cover` | Serve cover image | `200` |
+| `GET` | `/shelves` | List all shelves (with book counts and cover IDs) | `200` |
+| `POST` | `/shelves` | Create a new shelf | `201` |
+| `GET` | `/shelves/{id}` | Get a shelf with its books and stats | `200` |
+| `PUT` | `/shelves/{id}` | Update a shelf | `200` |
+| `DELETE` | `/shelves/{id}` | Delete a shelf | `204` |
+| `PUT` | `/shelves/reorder` | Reorder shelves by position | `200` |
+| `POST` | `/shelves/{id}/books` | Add a book to a shelf | `201` |
+| `PUT` | `/shelves/{id}/books/reorder` | Reorder books within a shelf | `200` |
+| `DELETE` | `/shelves/{id}/books/{bookId}` | Remove a book from a shelf | `204` |
+| `POST` | `/mcp` | MCP Streamable HTTP endpoint (JSON-RPC) | `200` |
 
 ### Create a book
 
@@ -148,43 +161,53 @@ The project is built in four progressive versions, each adding a layer:
 
 ```
 V1  Core HTTP server + REST API + in-memory storage
-V2  Open Library integration (async enrichment + cover downloads)
+V2  Open Library + Google Books integration (async enrichment + cover downloads)
 V3  PostgreSQL persistence + Docker Compose
-V4  Vanilla HTML/CSS/JS frontend
+V4  Vanilla HTML/CSS/JS frontend + custom shelves + MCP integration
 ```
 
 ### Project Structure
 
 ```
 src/main/java/com/bookshelf/
-├── App.java                    # Entry point
+├── App.java                    # Entry point; wires all components
 ├── HttpServer.java             # ServerSocket listener + thread pool
 ├── RequestParser.java          # Raw HTTP request parsing
 ├── HttpRequest.java            # Request model
-├── HttpResponse.java           # Response model
+├── HttpResponse.java           # Response model + factory methods
 ├── ResponseWriter.java         # HTTP response writing
 ├── Router.java                 # Route matching with path params
-├── BookController.java         # API endpoint handlers
-├── Book.java                   # Book model
+├── BookController.java         # Book API endpoint handlers
+├── Book.java                   # Book entity
 ├── ReadStatus.java             # WANT_TO_READ / READING / FINISHED / DNF
-├── RequestTooLargeException.java # Custom exception for oversized requests
-├── BookRepository.java         # Repository interface
-├── InMemoryBookRepository.java # ConcurrentHashMap implementation
+├── BookRepository.java         # Book repository interface
+├── InMemoryBookRepository.java # ConcurrentHashMap implementation (tests)
 ├── JdbcBookRepository.java     # PostgreSQL implementation
+├── ShelfController.java        # Shelf API endpoint handlers
+├── Shelf.java                  # Shelf entity
+├── ShelfRepository.java        # Shelf repository interface
+├── InMemoryShelfRepository.java # In-memory shelf store (tests)
+├── JdbcShelfRepository.java    # PostgreSQL shelf implementation
 ├── DatabaseConfig.java         # HikariCP pool + schema migration
-├── OpenLibraryService.java     # Async ISBN enrichment
+├── BookEnrichmentService.java  # Async enrichment: Open Library + Google Books fallback
 ├── BookMetadata.java           # Enrichment data model
-└── StaticFileHandler.java      # Static file serving
+├── StaticFileHandler.java      # Static file serving
+├── RequestTooLargeException.java # Custom exception for oversized requests
+└── mcp/
+    ├── McpController.java      # MCP Streamable HTTP endpoint — JSON-RPC dispatch
+    └── McpToolHandler.java     # MCP tool implementations
 
 src/test/java/com/bookshelf/
-├── BookApiTest.java            # 64 tests — CRUD, filtering, search, sorting, validation, edge cases
-├── BookMetadataTest.java       # 35 tests — metadata parsing and enrichment logic
+├── BookApiTest.java            # 66 tests — CRUD, filtering, search, sorting, validation, edge cases
+├── BookMetadataTest.java       # 43 tests — metadata parsing, Google Books, enrichment logic
+├── ShelfApiTest.java           # 56 tests — shelf CRUD, book assignment, reordering, stats
+├── McpTest.java                # 21 tests — MCP JSON-RPC protocol and tool implementations
 └── OpenLibraryTest.java        # 11 integration tests — live Open Library API (excluded from default run)
 
 static/
 ├── index.html                  # Frontend page
 ├── style.css                   # Dark antiquarian theme
-├── app.js                      # ISBN input, polling, inline editing, barcode scanner
+├── app.js                      # ISBN input, polling, inline editing, barcode scanner, shelves
 └── lib/
     └── zbar-wasm.js            # Vendored barcode scanning library (WebAssembly)
 ```
@@ -208,11 +231,12 @@ static/
 | `DB_USER` | `bookshelf` | Database user |
 | `DB_PASS` | `bookshelf` | Database password |
 | `APP_PORT` | `8080` | Server listen port |
+| `GOOGLE_BOOKS_API_KEY` | *(none)* | Optional — raises Google Books API quota |
 
 ## Testing
 
 ```bash
-# Run all unit tests (99 tests)
+# Run all unit tests (186 tests)
 ./gradlew test
 
 # Run integration tests (11 tests, requires network)
@@ -228,55 +252,44 @@ static/
 Tests start the server on a random port using `new ServerSocket(0)` and use `InMemoryBookRepository` — no database or Docker required.
 
 **Test coverage includes:**
-- CRUD operations (create, read, update, delete)
+- CRUD operations (create, read, update, delete) for books and shelves
 - ISBN lookup and duplicate handling
-- Genre and read status filtering
+- Genre and read status filtering, search, sorting
+- Custom shelves — CRUD, book assignment, reordering, stats, edge cases
+- MCP JSON-RPC protocol and all 5 tool implementations
 - Input validation (missing fields, bad JSON, invalid rating/ISBN)
 - HTTP method restrictions (405)
 - Edge cases (concurrent creates, null field clearing, ISBN-10 with trailing X)
 - Open Library enrichment (metadata, covers, re-enrichment on ISBN change)
+- Google Books fallback enrichment and response parsing
 - User-provided fields preserved during enrichment
 
 ## Claude MCP Integration
 
-MyBookShelf ships with an MCP (Model Context Protocol) server so you can ask Claude questions about your shelf in natural language — "Do I have Dune?", "What am I currently reading?", "Show me all my sci-fi books."
+MyBookShelf exposes an MCP (Model Context Protocol) endpoint at `POST /mcp` using the Streamable HTTP transport. This lets Claude Code query your bookshelf via natural language — "Do I have Dune?", "What am I currently reading?", "Show me all my sci-fi books."
 
 ### Prerequisites
 
-- The bookshelf server must be running (`./gradlew run` or `docker compose up`)
-- Java 17+ (same requirement as the main app)
+- The bookshelf server must be running (`./gradlew run` or `docker compose up --build -d`)
 
-### 1. Build the MCP server JAR
+### Configuration
 
-```bash
-./gradlew mcpJar
-```
-
-This produces `build/libs/MyBookShelf-1.0-mcp.jar`.
-
-### 2. Configure Claude Code
-
-Create `.mcp.json` in the project root:
+The project includes a `.mcp.json` that Claude Code reads automatically:
 
 ```json
 {
   "mcpServers": {
     "bookshelf": {
-      "command": "java",
-      "args": ["-jar", "build/libs/MyBookShelf-1.0-mcp.jar"],
-      "env": {
-        "BOOKSHELF_URL": "http://localhost:8080"
-      }
+      "type": "http",
+      "url": "http://localhost:8080/mcp"
     }
   }
 }
 ```
 
-Claude Code reads this file automatically on startup and launches the MCP server as a subprocess.
+If your server runs on a different port or host, update the URL accordingly.
 
-### 3. Start asking Claude
-
-Once connected, Claude has access to these tools:
+### Available Tools
 
 | Tool | What you can ask |
 |------|-----------------|
@@ -285,14 +298,6 @@ Once connected, Claude has access to these tools:
 | `list_books` | "What am I currently reading?" / "Show me my fantasy books" |
 | `get_book_by_isbn` | "What's the book with ISBN 9780441013593?" |
 | `get_bookshelf_stats` | "How many books do I have?" / "Give me a summary of my shelf" |
-
-### Changing the server URL
-
-If your bookshelf runs on a different port or host, update `BOOKSHELF_URL` in `.mcp.json`:
-
-```json
-"env": { "BOOKSHELF_URL": "http://localhost:9090" }
-```
 
 ## License
 
