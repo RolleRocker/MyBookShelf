@@ -43,6 +43,7 @@ const editGenre = document.getElementById("edit-genre");
 const editRating = document.getElementById("edit-rating");
 const editStatus = document.getElementById("edit-status");
 const editProgress = document.getElementById("edit-progress");
+const editReview = document.getElementById("edit-review");
 const progressGroup = document.getElementById("progress-group");
 const modalClose = document.getElementById("modal-close");
 const modalCancel = document.getElementById("modal-cancel");
@@ -250,6 +251,7 @@ function createBookCard(book) {
                 : ""
             }
             ${renderShelfTags(book)}
+            ${book.review ? `<button class="review-toggle" data-id="${book.id}" type="button" title="Show notes/review">&#128221; Notes</button><div class="book-review" id="review-${book.id}" hidden><p class="review-text">${escapeHtml(book.review)}</p></div>` : ""}
             <div class="book-actions">
                 <button class="btn-edit" data-id="${book.id}">Edit</button>
                 <button class="btn-delete" data-id="${book.id}">Delete</button>
@@ -577,6 +579,8 @@ function openEditModal(bookId) {
   });
   editRating.dataset.currentValue = rating;
 
+  editReview.value = book.review || "";
+
   // Populate shelf checkboxes
   populateBookShelfCheckboxes(book);
 
@@ -620,6 +624,9 @@ async function submitEdit(e) {
   if (ratingVal >= 1 && ratingVal <= 5) {
     updates.rating = ratingVal;
   }
+
+  const reviewVal = editReview.value.trim();
+  updates.review = reviewVal || null;
 
   try {
     const updated = await apiPut(`/books/${id}`, updates);
@@ -1968,6 +1975,16 @@ bookGrid.addEventListener("click", (e) => {
   const deleteBtn = e.target.closest(".btn-delete");
   if (deleteBtn) {
     deleteBook(deleteBtn.dataset.id);
+    return;
+  }
+
+  const reviewToggle = e.target.closest(".review-toggle");
+  if (reviewToggle) {
+    const reviewDiv = document.getElementById(`review-${reviewToggle.dataset.id}`);
+    if (reviewDiv) {
+      reviewDiv.hidden = !reviewDiv.hidden;
+      reviewToggle.classList.toggle("expanded", !reviewDiv.hidden);
+    }
     return;
   }
 

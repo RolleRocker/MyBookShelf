@@ -134,8 +134,8 @@ public class JdbcBookRepository implements BookRepository {
         String sql = """
                 INSERT INTO books (id, title, author, genre, rating, isbn, publisher, publish_date,
                     page_count, subjects, read_status, cover_data, cover_url, reading_progress,
-                    created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    review, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """;
         try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -153,8 +153,9 @@ public class JdbcBookRepository implements BookRepository {
             stmt.setBytes(12, book.getCoverData());
             stmt.setString(13, book.getCoverUrl());
             setNullableInt(stmt, 14, book.getReadingProgress());
-            stmt.setTimestamp(15, Timestamp.from(book.getCreatedAt()));
-            stmt.setTimestamp(16, Timestamp.from(book.getUpdatedAt()));
+            stmt.setString(15, book.getReview());
+            stmt.setTimestamp(16, Timestamp.from(book.getCreatedAt()));
+            stmt.setTimestamp(17, Timestamp.from(book.getUpdatedAt()));
             stmt.executeUpdate();
             return book;
         } catch (SQLException e) {
@@ -168,7 +169,7 @@ public class JdbcBookRepository implements BookRepository {
                 UPDATE books SET title = ?, author = ?, genre = ?, rating = ?, isbn = ?,
                     publisher = ?, publish_date = ?, page_count = ?, subjects = ?,
                     read_status = ?, cover_data = ?, cover_url = ?, reading_progress = ?,
-                    updated_at = ?
+                    review = ?, updated_at = ?
                 WHERE id = ?
                 """;
         try (Connection conn = dataSource.getConnection();
@@ -186,8 +187,9 @@ public class JdbcBookRepository implements BookRepository {
             stmt.setBytes(11, book.getCoverData());
             stmt.setString(12, book.getCoverUrl());
             setNullableInt(stmt, 13, book.getReadingProgress());
-            stmt.setTimestamp(14, Timestamp.from(book.getUpdatedAt()));
-            stmt.setObject(15, id);
+            stmt.setString(14, book.getReview());
+            stmt.setTimestamp(15, Timestamp.from(book.getUpdatedAt()));
+            stmt.setObject(16, id);
             int rows = stmt.executeUpdate();
             return rows > 0 ? Optional.of(book) : Optional.empty();
         } catch (SQLException e) {
@@ -286,6 +288,7 @@ public class JdbcBookRepository implements BookRepository {
         book.setCoverUrl(rs.getString("cover_url"));
         int readingProgress = rs.getInt("reading_progress");
         book.setReadingProgress(rs.wasNull() ? null : readingProgress);
+        book.setReview(rs.getString("review"));
         Timestamp createdAt = rs.getTimestamp("created_at");
         if (createdAt != null) book.setCreatedAt(createdAt.toInstant());
         Timestamp updatedAt = rs.getTimestamp("updated_at");

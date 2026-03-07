@@ -1372,4 +1372,109 @@ public class BookApiTest {
             );
         }
     }
+
+    // --- Review / Notes tests ---
+
+    @Test
+    void testCreateBookWithReview() throws Exception {
+        JsonObject json = new JsonObject();
+        json.addProperty("title", "Dune");
+        json.addProperty("author", "Frank Herbert");
+        json.addProperty("readStatus", "FINISHED");
+        json.addProperty("review", "Great book!");
+        var res = post("/books", json.toString());
+        assertEquals(201, res.statusCode());
+        JsonObject body = JsonParser.parseString(res.body()).getAsJsonObject();
+        assertEquals("Great book!", body.get("review").getAsString());
+
+        String id = body.get("id").getAsString();
+        var getRes = get("/books/" + id);
+        JsonObject getBody = JsonParser.parseString(getRes.body()).getAsJsonObject();
+        assertEquals("Great book!", getBody.get("review").getAsString());
+    }
+
+    @Test
+    void testCreateBookWithoutReview() throws Exception {
+        var res = post("/books", createBookJson("Test", "Author", "READING"));
+        assertEquals(201, res.statusCode());
+        JsonObject body = JsonParser.parseString(res.body()).getAsJsonObject();
+        assertTrue(body.get("review").isJsonNull());
+    }
+
+    @Test
+    void testUpdateReviewViaPut() throws Exception {
+        var createRes = post("/books", createBookJson("Test", "Author", "READING"));
+        String id = getIdFromResponse(createRes);
+
+        var updateRes = put("/books/" + id, "{\"review\": \"Added my thoughts\"}");
+        assertEquals(200, updateRes.statusCode());
+        JsonObject body = JsonParser.parseString(updateRes.body()).getAsJsonObject();
+        assertEquals("Added my thoughts", body.get("review").getAsString());
+        assertEquals("Test", body.get("title").getAsString());
+    }
+
+    @Test
+    void testClearReviewWithNull() throws Exception {
+        JsonObject json = new JsonObject();
+        json.addProperty("title", "Test");
+        json.addProperty("author", "Author");
+        json.addProperty("readStatus", "FINISHED");
+        json.addProperty("review", "Initial review");
+        var createRes = post("/books", json.toString());
+        String id = getIdFromResponse(createRes);
+
+        var updateRes = put("/books/" + id, "{\"review\": null}");
+        assertEquals(200, updateRes.statusCode());
+        JsonObject body = JsonParser.parseString(updateRes.body()).getAsJsonObject();
+        assertTrue(body.get("review").isJsonNull());
+    }
+
+    @Test
+    void testLongReviewAccepted() throws Exception {
+        String longReview = "x".repeat(5000);
+        JsonObject json = new JsonObject();
+        json.addProperty("title", "Test");
+        json.addProperty("author", "Author");
+        json.addProperty("readStatus", "READING");
+        json.addProperty("review", longReview);
+        var res = post("/books", json.toString());
+        assertEquals(201, res.statusCode());
+
+        String id = getIdFromResponse(res);
+        var getRes = get("/books/" + id);
+        JsonObject body = JsonParser.parseString(getRes.body()).getAsJsonObject();
+        assertEquals(5000, body.get("review").getAsString().length());
+    }
+
+    @Test
+    void testReviewInListEndpoint() throws Exception {
+        JsonObject json = new JsonObject();
+        json.addProperty("title", "Test");
+        json.addProperty("author", "Author");
+        json.addProperty("readStatus", "READING");
+        json.addProperty("review", "My review");
+        post("/books", json.toString());
+
+        var listRes = get("/books");
+        JsonArray arr = JsonParser.parseString(listRes.body()).getAsJsonArray();
+        assertEquals(1, arr.size());
+        assertEquals("My review", arr.get(0).getAsJsonObject().get("review").getAsString());
+    }
+
+    @Test
+    void testReviewWithSpecialCharacters() throws Exception {
+        String specialReview = "Contains \"quotes\", newlines\nand unicode: \u00e9\u00e0\u00fc \u2014 em dash";
+        JsonObject json = new JsonObject();
+        json.addProperty("title", "Test");
+        json.addProperty("author", "Author");
+        json.addProperty("readStatus", "READING");
+        json.addProperty("review", specialReview);
+        var res = post("/books", json.toString());
+        assertEquals(201, res.statusCode());
+
+        String id = getIdFromResponse(res);
+        var getRes = get("/books/" + id);
+        JsonObject body = JsonParser.parseString(getRes.body()).getAsJsonObject();
+        assertEquals(specialReview, body.get("review").getAsString());
+    }
 }

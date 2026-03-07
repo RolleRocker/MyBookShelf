@@ -62,7 +62,11 @@ public class Book {
     public String getCoverUrl() { return coverUrl; }
     public void setCoverUrl(String coverUrl) { this.coverUrl = coverUrl; }
 
+    private String review;
     private Integer readingProgress;
+
+    public String getReview() { return review; }
+    public void setReview(String review) { this.review = review; }
 
     public Integer getReadingProgress() { return readingProgress; }
     public void setReadingProgress(Integer readingProgress) { this.readingProgress = readingProgress; }

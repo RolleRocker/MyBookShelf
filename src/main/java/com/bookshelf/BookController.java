@@ -285,6 +285,8 @@ public class BookController {
                 book.setSubjects(subjects);
             }
 
+            book.setReview(getStringField(json, "review"));
+
             Instant now = Instant.now();
             book.setCreatedAt(now);
             book.setUpdatedAt(now);
@@ -483,6 +485,14 @@ public class BookController {
                         );
                     }
                 }
+            }
+
+            if (json.has("review")) {
+                book.setReview(
+                    json.get("review").isJsonNull()
+                        ? null
+                        : json.get("review").getAsString()
+                );
             }
 
             // Check if ISBN changed — trigger re-enrichment
