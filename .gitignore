@@ -8,3 +8,4 @@ covers/
 .settings/
 .env
 bin/
+.worktrees/
