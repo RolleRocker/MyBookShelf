@@ -22,7 +22,7 @@ public class JdbcBookRepository implements BookRepository {
 
     @Override
     public List<Book> findAll() {
-        String sql = "SELECT * FROM books";
+        String sql = "SELECT * FROM books ORDER BY created_at ASC";
         try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql);
              ResultSet rs = stmt.executeQuery()) {
@@ -38,7 +38,7 @@ public class JdbcBookRepository implements BookRepository {
 
     @Override
     public List<Book> findByGenre(String genre) {
-        String sql = "SELECT * FROM books WHERE LOWER(genre) = LOWER(?)";
+        String sql = "SELECT * FROM books WHERE LOWER(genre) = LOWER(?) ORDER BY created_at ASC";
         try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, genre);
@@ -56,7 +56,7 @@ public class JdbcBookRepository implements BookRepository {
 
     @Override
     public List<Book> findByReadStatus(ReadStatus readStatus) {
-        String sql = "SELECT * FROM books WHERE read_status = ?";
+        String sql = "SELECT * FROM books WHERE read_status = ? ORDER BY created_at ASC";
         try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, readStatus.name());

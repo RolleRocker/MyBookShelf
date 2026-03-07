@@ -8,10 +8,10 @@ import java.util.Map;
 public class StaticFileHandler {
 
     private static final Map<String, String> CONTENT_TYPES = Map.of(
-            ".html", "text/html",
-            ".css", "text/css",
-            ".js", "application/javascript",
-            ".json", "application/json",
+            ".html", "text/html; charset=utf-8",
+            ".css", "text/css; charset=utf-8",
+            ".js", "application/javascript; charset=utf-8",
+            ".json", "application/json; charset=utf-8",
             ".wasm", "application/wasm",
             ".png", "image/png",
             ".jpg", "image/jpeg",

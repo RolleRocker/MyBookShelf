@@ -23,7 +23,7 @@ public class ResponseWriter {
 
         // Auto-set headers
         if (bodyBytes != null && !response.getHeaders().containsKey("Content-Type")) {
-            response.getHeaders().put("Content-Type", "application/json");
+            response.getHeaders().put("Content-Type", "application/json; charset=utf-8");
         }
         if (bodyBytes != null) {
             response.getHeaders().put("Content-Length", String.valueOf(bodyBytes.length));
