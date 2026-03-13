@@ -10,6 +10,8 @@ import com.google.gson.JsonPrimitive;
 import com.google.gson.JsonSerializer;
 import com.google.gson.JsonSyntaxException;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -287,6 +289,35 @@ public class BookController {
 
             book.setReview(getStringField(json, "review"));
 
+            // Parse and validate dates
+            String startedAt = getStringField(json, "startedAt");
+            String finishedAt = getStringField(json, "finishedAt");
+            if (startedAt != null) {
+                if (!isValidDate(startedAt)) return HttpResponse.badRequest("Invalid startedAt date format (must be YYYY-MM-DD)");
+                if (isFutureDate(startedAt)) return HttpResponse.badRequest("startedAt cannot be in the future");
+            }
+            if (finishedAt != null) {
+                if (!isValidDate(finishedAt)) return HttpResponse.badRequest("Invalid finishedAt date format (must be YYYY-MM-DD)");
+                if (isFutureDate(finishedAt)) return HttpResponse.badRequest("finishedAt cannot be in the future");
+            }
+            if (startedAt != null && finishedAt != null && finishedAt.compareTo(startedAt) < 0) {
+                return HttpResponse.badRequest("finishedAt cannot be before startedAt");
+            }
+
+            book.setStartedAt(startedAt);
+            book.setFinishedAt(finishedAt);
+
+            // Auto-set dates based on readStatus
+            String today = LocalDate.now().toString();
+            if (readStatus == ReadStatus.READING) {
+                if (book.getStartedAt() == null) book.setStartedAt(today);
+            } else if (readStatus == ReadStatus.FINISHED) {
+                if (book.getStartedAt() == null) book.setStartedAt(today);
+                if (book.getFinishedAt() == null) book.setFinishedAt(today);
+            } else if (readStatus == ReadStatus.DNF) {
+                if (book.getFinishedAt() == null) book.setFinishedAt(today);
+            }
+
             Instant now = Instant.now();
             book.setCreatedAt(now);
             book.setUpdatedAt(now);
@@ -495,6 +526,52 @@ public class BookController {
                 );
             }
 
+            // Handle startedAt / finishedAt
+            if (json.has("startedAt")) {
+                if (json.get("startedAt").isJsonNull()) {
+                    book.setStartedAt(null);
+                } else {
+                    String val = json.get("startedAt").getAsString();
+                    if (!isValidDate(val)) return HttpResponse.badRequest("Invalid startedAt date format (must be YYYY-MM-DD)");
+                    if (isFutureDate(val)) return HttpResponse.badRequest("startedAt cannot be in the future");
+                    book.setStartedAt(val);
+                }
+            }
+            if (json.has("finishedAt")) {
+                if (json.get("finishedAt").isJsonNull()) {
+                    book.setFinishedAt(null);
+                } else {
+                    String val = json.get("finishedAt").getAsString();
+                    if (!isValidDate(val)) return HttpResponse.badRequest("Invalid finishedAt date format (must be YYYY-MM-DD)");
+                    if (isFutureDate(val)) return HttpResponse.badRequest("finishedAt cannot be in the future");
+                    book.setFinishedAt(val);
+                }
+            }
+
+            // Auto-set dates on status change
+            if (json.has("readStatus")) {
+                String today = LocalDate.now().toString();
+                ReadStatus newStatus = book.getReadStatus();
+                if (newStatus == ReadStatus.READING) {
+                    if (!json.has("startedAt") && book.getStartedAt() == null) book.setStartedAt(today);
+                    if (!json.has("finishedAt")) book.setFinishedAt(null);
+                } else if (newStatus == ReadStatus.FINISHED) {
+                    if (!json.has("finishedAt") && book.getFinishedAt() == null) book.setFinishedAt(today);
+                    if (!json.has("startedAt") && book.getStartedAt() == null) book.setStartedAt(today);
+                } else if (newStatus == ReadStatus.DNF) {
+                    if (!json.has("finishedAt") && book.getFinishedAt() == null) book.setFinishedAt(today);
+                } else if (newStatus == ReadStatus.WANT_TO_READ) {
+                    if (!json.has("startedAt")) book.setStartedAt(null);
+                    if (!json.has("finishedAt")) book.setFinishedAt(null);
+                }
+            }
+
+            // Validate date ordering after all changes applied
+            if (book.getStartedAt() != null && book.getFinishedAt() != null
+                    && book.getFinishedAt().compareTo(book.getStartedAt()) < 0) {
+                return HttpResponse.badRequest("finishedAt cannot be before startedAt");
+            }
+
             // Check if ISBN changed — trigger re-enrichment
             String newIsbn = book.getIsbn();
             boolean isbnChanged =
@@ -622,6 +699,21 @@ public class BookController {
                 "'" + field + "' must be a valid integer"
             );
         }
+    }
+
+    private boolean isValidDate(String date) {
+        if (date == null) return false;
+        if (!date.matches("\\d{4}-\\d{2}-\\d{2}")) return false;
+        try {
+            LocalDate.parse(date);
+            return true;
+        } catch (DateTimeParseException e) {
+            return false;
+        }
+    }
+
+    private boolean isFutureDate(String date) {
+        return LocalDate.parse(date).isAfter(LocalDate.now());
     }
 
     private boolean isValidIsbn(String isbn) {

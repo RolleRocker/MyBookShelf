@@ -1477,4 +1477,175 @@ public class BookApiTest {
         JsonObject body = JsonParser.parseString(getRes.body()).getAsJsonObject();
         assertEquals(specialReview, body.get("review").getAsString());
     }
+
+    // --- Start / Finish Dates Tests ---
+
+    @Test
+    void testAutoSetStartedAtOnReading() throws Exception {
+        JsonObject json = new JsonObject();
+        json.addProperty("title", "Test");
+        json.addProperty("author", "Author");
+        json.addProperty("readStatus", "READING");
+        var res = post("/books", json.toString());
+        assertEquals(201, res.statusCode());
+        JsonObject body = JsonParser.parseString(res.body()).getAsJsonObject();
+        assertEquals(java.time.LocalDate.now().toString(), body.get("startedAt").getAsString());
+        assertTrue(body.get("finishedAt").isJsonNull());
+    }
+
+    @Test
+    void testAutoSetFinishedAtOnFinished() throws Exception {
+        JsonObject json = new JsonObject();
+        json.addProperty("title", "Test");
+        json.addProperty("author", "Author");
+        json.addProperty("readStatus", "FINISHED");
+        var res = post("/books", json.toString());
+        assertEquals(201, res.statusCode());
+        JsonObject body = JsonParser.parseString(res.body()).getAsJsonObject();
+        String today = java.time.LocalDate.now().toString();
+        assertEquals(today, body.get("startedAt").getAsString());
+        assertEquals(today, body.get("finishedAt").getAsString());
+    }
+
+    @Test
+    void testUserProvidedDatesPreserved() throws Exception {
+        JsonObject json = new JsonObject();
+        json.addProperty("title", "Test");
+        json.addProperty("author", "Author");
+        json.addProperty("readStatus", "READING");
+        json.addProperty("startedAt", "2026-01-15");
+        var res = post("/books", json.toString());
+        assertEquals(201, res.statusCode());
+        JsonObject body = JsonParser.parseString(res.body()).getAsJsonObject();
+        assertEquals("2026-01-15", body.get("startedAt").getAsString());
+    }
+
+    @Test
+    void testStatusChangeToFinishedAutoSetsFinishedAt() throws Exception {
+        JsonObject json = new JsonObject();
+        json.addProperty("title", "Test");
+        json.addProperty("author", "Author");
+        json.addProperty("readStatus", "READING");
+        json.addProperty("startedAt", "2026-02-01");
+        var res = post("/books", json.toString());
+        assertEquals(201, res.statusCode());
+        String id = getIdFromResponse(res);
+
+        JsonObject update = new JsonObject();
+        update.addProperty("readStatus", "FINISHED");
+        var putRes = put("/books/" + id, update.toString());
+        assertEquals(200, putRes.statusCode());
+        JsonObject body = JsonParser.parseString(putRes.body()).getAsJsonObject();
+        assertEquals("2026-02-01", body.get("startedAt").getAsString());
+        assertEquals(java.time.LocalDate.now().toString(), body.get("finishedAt").getAsString());
+    }
+
+    @Test
+    void testStatusChangeToWantToReadClearsDates() throws Exception {
+        JsonObject json = new JsonObject();
+        json.addProperty("title", "Test");
+        json.addProperty("author", "Author");
+        json.addProperty("readStatus", "FINISHED");
+        json.addProperty("startedAt", "2026-01-01");
+        json.addProperty("finishedAt", "2026-02-01");
+        var res = post("/books", json.toString());
+        assertEquals(201, res.statusCode());
+        String id = getIdFromResponse(res);
+
+        JsonObject update = new JsonObject();
+        update.addProperty("readStatus", "WANT_TO_READ");
+        var putRes = put("/books/" + id, update.toString());
+        assertEquals(200, putRes.statusCode());
+        JsonObject body = JsonParser.parseString(putRes.body()).getAsJsonObject();
+        assertTrue(body.get("startedAt").isJsonNull());
+        assertTrue(body.get("finishedAt").isJsonNull());
+    }
+
+    @Test
+    void testFinishedAtBeforeStartedAtRejected() throws Exception {
+        JsonObject json = new JsonObject();
+        json.addProperty("title", "Test");
+        json.addProperty("author", "Author");
+        json.addProperty("readStatus", "FINISHED");
+        json.addProperty("startedAt", "2026-03-15");
+        json.addProperty("finishedAt", "2026-03-01");
+        var res = post("/books", json.toString());
+        assertEquals(400, res.statusCode());
+    }
+
+    @Test
+    void testFutureDateRejected() throws Exception {
+        JsonObject json = new JsonObject();
+        json.addProperty("title", "Test");
+        json.addProperty("author", "Author");
+        json.addProperty("readStatus", "READING");
+        json.addProperty("startedAt", "2099-01-01");
+        var res = post("/books", json.toString());
+        assertEquals(400, res.statusCode());
+    }
+
+    @Test
+    void testInvalidDateFormatRejected() throws Exception {
+        JsonObject json = new JsonObject();
+        json.addProperty("title", "Test");
+        json.addProperty("author", "Author");
+        json.addProperty("readStatus", "READING");
+        json.addProperty("startedAt", "March 1, 2026");
+        var res = post("/books", json.toString());
+        assertEquals(400, res.statusCode());
+    }
+
+    @Test
+    void testExplicitNullClearsDates() throws Exception {
+        JsonObject json = new JsonObject();
+        json.addProperty("title", "Test");
+        json.addProperty("author", "Author");
+        json.addProperty("readStatus", "READING");
+        json.addProperty("startedAt", "2026-01-15");
+        json.addProperty("finishedAt", "2026-02-15");
+        var res = post("/books", json.toString());
+        assertEquals(201, res.statusCode());
+        String id = getIdFromResponse(res);
+
+        // Clear only startedAt
+        String updateBody = "{\"startedAt\": null}";
+        var putRes = put("/books/" + id, updateBody);
+        assertEquals(200, putRes.statusCode());
+        JsonObject body = JsonParser.parseString(putRes.body()).getAsJsonObject();
+        assertTrue(body.get("startedAt").isJsonNull());
+        assertEquals("2026-02-15", body.get("finishedAt").getAsString());
+    }
+
+    @Test
+    void testWantToReadGetsNoAutoDates() throws Exception {
+        JsonObject json = new JsonObject();
+        json.addProperty("title", "Test");
+        json.addProperty("author", "Author");
+        json.addProperty("readStatus", "WANT_TO_READ");
+        var res = post("/books", json.toString());
+        assertEquals(201, res.statusCode());
+        JsonObject body = JsonParser.parseString(res.body()).getAsJsonObject();
+        assertTrue(body.get("startedAt").isJsonNull());
+        assertTrue(body.get("finishedAt").isJsonNull());
+    }
+
+    @Test
+    void testDnfAutoSetsFinishedAt() throws Exception {
+        JsonObject json = new JsonObject();
+        json.addProperty("title", "Test");
+        json.addProperty("author", "Author");
+        json.addProperty("readStatus", "READING");
+        json.addProperty("startedAt", "2026-02-01");
+        var res = post("/books", json.toString());
+        assertEquals(201, res.statusCode());
+        String id = getIdFromResponse(res);
+
+        JsonObject update = new JsonObject();
+        update.addProperty("readStatus", "DNF");
+        var putRes = put("/books/" + id, update.toString());
+        assertEquals(200, putRes.statusCode());
+        JsonObject body = JsonParser.parseString(putRes.body()).getAsJsonObject();
+        assertEquals("2026-02-01", body.get("startedAt").getAsString());
+        assertEquals(java.time.LocalDate.now().toString(), body.get("finishedAt").getAsString());
+    }
 }

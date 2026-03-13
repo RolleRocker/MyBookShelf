@@ -526,6 +526,12 @@ body {
     margin-bottom: 0.5rem;
 }
 
+.book-dates {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    margin-bottom: 0.25rem;
+}
+
 .book-meta {
     font-size: 0.73rem;
     color: var(--text-dim);
@@ -962,6 +968,26 @@ body {
 .form-group select:focus {
     border-color: var(--gold-dim);
     box-shadow: 0 0 0 3px var(--gold-glow);
+}
+
+.date-row {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.date-field {
+    flex: 1;
+}
+
+.date-field label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.4rem;
+}
+
+.date-field input[type="date"] {
+    color-scheme: dark;
 }
 
 .form-group select {

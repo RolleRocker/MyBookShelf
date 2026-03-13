@@ -64,12 +64,20 @@ public class Book {
 
     private String review;
     private Integer readingProgress;
+    private String startedAt;
+    private String finishedAt;
 
     public String getReview() { return review; }
     public void setReview(String review) { this.review = review; }
 
     public Integer getReadingProgress() { return readingProgress; }
     public void setReadingProgress(Integer readingProgress) { this.readingProgress = readingProgress; }
+
+    public String getStartedAt() { return startedAt; }
+    public void setStartedAt(String startedAt) { this.startedAt = startedAt; }
+
+    public String getFinishedAt() { return finishedAt; }
+    public void setFinishedAt(String finishedAt) { this.finishedAt = finishedAt; }
 
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }

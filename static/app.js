@@ -229,6 +229,7 @@ function createBookCard(book) {
                 ${book.genre ? `<span class="badge badge-genre">${escapeHtml(book.genre)}</span>` : ""}
                 <span class="badge badge-status ${statusClass(book.readStatus)}">${statusLabel(book.readStatus)}</span>
             </div>
+            ${book.startedAt || book.finishedAt ? `<div class="book-dates">${book.startedAt ? `Started ${formatDate(book.startedAt)}` : ""}${book.startedAt && book.finishedAt ? " · " : ""}${book.finishedAt ? `Finished ${formatDate(book.finishedAt)}` : ""}</div>` : ""}
             <div class="book-stars">${renderStars(rating, book.id)}</div>
             ${
               (book.readStatus === "READING" || book.readStatus === "DNF") &&
@@ -281,6 +282,12 @@ function loadCover(book) {
   };
   img.onerror = () => {}; // Keep placeholder on error
   img.src = `/books/${book.id}/cover`;
+}
+
+function formatDate(dateStr) {
+  const [y, m, d] = dateStr.split("-");
+  const date = new Date(+y, +m - 1, +d);
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 function escapeHtml(str) {
@@ -581,6 +588,10 @@ function openEditModal(bookId) {
 
   editReview.value = book.review || "";
 
+  // Set date fields
+  document.getElementById("edit-started").value = book.startedAt || "";
+  document.getElementById("edit-finished").value = book.finishedAt || "";
+
   // Populate shelf checkboxes
   populateBookShelfCheckboxes(book);
 
@@ -627,6 +638,11 @@ async function submitEdit(e) {
 
   const reviewVal = editReview.value.trim();
   updates.review = reviewVal || null;
+
+  const startedVal = document.getElementById("edit-started").value;
+  const finishedVal = document.getElementById("edit-finished").value;
+  updates.startedAt = startedVal || null;
+  updates.finishedAt = finishedVal || null;
 
   try {
     const updated = await apiPut(`/books/${id}`, updates);

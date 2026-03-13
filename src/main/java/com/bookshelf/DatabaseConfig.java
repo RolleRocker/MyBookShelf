@@ -86,6 +86,14 @@ public class DatabaseConfig {
             throw new RuntimeException("Failed to run migrations", e);
         }
 
+        try (Connection conn = dataSource.getConnection();
+             Statement stmt = conn.createStatement()) {
+            stmt.execute("ALTER TABLE books ADD COLUMN IF NOT EXISTS started_at DATE DEFAULT NULL");
+            stmt.execute("ALTER TABLE books ADD COLUMN IF NOT EXISTS finished_at DATE DEFAULT NULL");
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to run migrations", e);
+        }
+
         // Shelves tables
         try (
             Connection conn = dataSource.getConnection();
