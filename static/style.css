@@ -230,6 +230,120 @@ body {
     }
 }
 
+/* ---- Goal Widget ---- */
+
+.goal-widget {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0.75rem 1.5rem;
+}
+
+.goal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.4rem;
+}
+
+.goal-header span {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.goal-edit-btn {
+    background: none;
+    border: none;
+    color: var(--gold-dim);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.78rem;
+    padding: 0.2rem 0.4rem;
+    border-radius: var(--radius-sm);
+}
+
+.goal-edit-btn:hover {
+    color: var(--gold);
+    background: var(--gold-glow);
+}
+
+.goal-progress-bar {
+    width: 100%;
+    height: 6px;
+    background: var(--bg-input);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 0.35rem;
+}
+
+.goal-fill {
+    height: 100%;
+    background: var(--gold);
+    border-radius: 3px;
+    transition: width 0.5s ease;
+    min-width: 0;
+}
+
+.goal-stats {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.78rem;
+    color: var(--text-dim);
+}
+
+.goal-pace.on-pace {
+    color: #6aab6a;
+}
+
+.goal-pace.behind {
+    color: #c47a4a;
+}
+
+.goal-prompt {
+    text-align: center;
+    padding: 0.5rem 1rem;
+}
+
+.goal-set-btn {
+    background: none;
+    border: 1px dashed var(--border);
+    color: var(--text-dim);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.82rem;
+    padding: 0.4rem 1rem;
+    border-radius: var(--radius);
+    transition: all 0.2s;
+}
+
+.goal-set-btn:hover {
+    color: var(--gold);
+    border-color: var(--gold-dim);
+}
+
+.goal-modal {
+    max-width: 360px;
+}
+
+.goal-delete-wrap {
+    text-align: center;
+    margin-top: 0.5rem;
+}
+
+.btn-danger {
+    background: none;
+    border: none;
+    color: #c44a4a;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.8rem;
+    padding: 0.3rem 0.6rem;
+}
+
+.btn-danger:hover {
+    text-decoration: underline;
+}
+
 /* ---- Filter Bar ---- */
 
 .filter-bar {

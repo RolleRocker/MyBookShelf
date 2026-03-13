@@ -45,10 +45,15 @@ public class OpenLibraryTest {
             repository,
             shelfRepository
         );
+        GoalController goalController = new GoalController(
+            new InMemoryGoalRepository(),
+            repository
+        );
         Router router = App.createRouter(
             controller,
             shelfController,
-            mcpController
+            mcpController,
+            goalController
         );
         server = new HttpServer(0, router);
         server.start();

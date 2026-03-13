@@ -174,6 +174,24 @@
             </div>
         </header>
 
+        <!-- Reading Goal Widget -->
+        <div id="goal-widget" class="goal-widget" hidden>
+            <div class="goal-header">
+                <span id="goal-label">2026 Reading Goal</span>
+                <button id="goal-edit-btn" class="goal-edit-btn" type="button" title="Edit goal">Edit</button>
+            </div>
+            <div class="goal-progress-bar">
+                <div id="goal-fill" class="goal-fill"></div>
+            </div>
+            <div class="goal-stats">
+                <span id="goal-count">0 / 0 books</span>
+                <span id="goal-pace" class="goal-pace"></span>
+            </div>
+        </div>
+        <div id="goal-prompt" class="goal-prompt" hidden>
+            <button id="goal-set-btn" class="goal-set-btn" type="button">Set a reading goal for <span id="goal-prompt-year"></span></button>
+        </div>
+
         <nav class="filter-bar">
             <div class="filter-inner" role="tablist">
                 <button class="filter-tab active" data-status="all" role="tab">
@@ -469,6 +487,37 @@
                         <button type="submit" class="btn-save">
                             Save Changes
                         </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Goal Modal -->
+        <div id="goal-modal" class="modal-overlay" hidden>
+            <div class="modal goal-modal">
+                <div class="modal-header">
+                    <h2 id="goal-modal-title">Reading Goal</h2>
+                    <button class="modal-close" id="goal-close" type="button" aria-label="Close">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M4 4l12 12M16 4L4 16" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                        </svg>
+                    </button>
+                </div>
+                <form id="goal-form" class="modal-form">
+                    <div class="form-group">
+                        <label for="goal-year">Year</label>
+                        <input type="number" id="goal-year" min="2000" max="2100" />
+                    </div>
+                    <div class="form-group">
+                        <label for="goal-target">Books to finish</label>
+                        <input type="number" id="goal-target" min="1" placeholder="e.g. 24" />
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn-cancel" id="goal-cancel">Cancel</button>
+                        <button type="submit" class="btn-save">Save Goal</button>
+                    </div>
+                    <div class="goal-delete-wrap">
+                        <button type="button" id="goal-delete-btn" class="btn-danger" hidden>Delete Goal</button>
                     </div>
                 </form>
             </div>

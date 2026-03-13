@@ -31,6 +31,13 @@ public class App {
             shelfRepository,
             repository
         );
+        GoalRepository goalRepository = new JdbcGoalRepository(
+            dbConfig.getDataSource()
+        );
+        GoalController goalController = new GoalController(
+            goalRepository,
+            repository
+        );
         McpController mcpController = new McpController(
             repository,
             shelfRepository
@@ -38,7 +45,8 @@ public class App {
         Router router = createRouter(
             controller,
             shelfController,
-            mcpController
+            mcpController,
+            goalController
         );
 
         StaticFileHandler staticHandler = new StaticFileHandler(staticDir);
@@ -88,7 +96,8 @@ public class App {
     public static Router createRouter(
         BookController controller,
         ShelfController shelfController,
-        McpController mcpController
+        McpController mcpController,
+        GoalController goalController
     ) {
         Router router = new Router();
         router.addRoute("GET", "/books", controller::handleGetBooks);
@@ -142,6 +151,13 @@ public class App {
             "/shelves/{id}/books/{bookId}",
             shelfController::handleRemoveBook
         );
+
+        // Goal routes
+        router.addRoute("GET", "/goals", goalController::handleGetGoals);
+        router.addRoute("POST", "/goals", goalController::handleCreateGoal);
+        router.addRoute("GET", "/goals/{year}", goalController::handleGetGoal);
+        router.addRoute("PUT", "/goals/{year}", goalController::handleUpdateGoal);
+        router.addRoute("DELETE", "/goals/{year}", goalController::handleDeleteGoal);
 
         // MCP endpoint
         router.addRoute("POST", "/mcp", mcpController::handleMcp);

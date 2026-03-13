@@ -493,6 +493,7 @@ async function addBook() {
     }
 
     await loadBooks();
+    loadCurrentGoal();
 
     // Start polling for enrichment if title is missing
     if (!book.title) {
@@ -649,6 +650,7 @@ async function submitEdit(e) {
     closeEditModal();
     showToast("Book updated");
     await loadBooks();
+    loadCurrentGoal();
   } catch (e) {
     showToast(e.message || "Failed to update", "error");
   }
@@ -670,6 +672,7 @@ async function deleteBook(bookId) {
       pollingTimers.delete(bookId);
     }
     await loadBooks();
+    loadCurrentGoal();
   } catch (e) {
     showToast("Failed to delete", "error");
   }
@@ -2097,6 +2100,112 @@ bookGrid.addEventListener("click", (e) => {
   }
 });
 
+// ---- Reading Goals ----
+
+let currentGoal = null;
+
+async function loadCurrentGoal() {
+  const year = new Date().getFullYear();
+  try {
+    const res = await fetch(`${API}/goals/${year}`);
+    if (res.ok) {
+      currentGoal = await res.json();
+      renderGoalWidget(currentGoal);
+    } else {
+      currentGoal = null;
+      document.getElementById("goal-widget").hidden = true;
+      const prompt = document.getElementById("goal-prompt");
+      prompt.hidden = false;
+      document.getElementById("goal-prompt-year").textContent = year;
+    }
+  } catch {
+    currentGoal = null;
+  }
+}
+
+function renderGoalWidget(goal) {
+  const widget = document.getElementById("goal-widget");
+  const prompt = document.getElementById("goal-prompt");
+  widget.hidden = false;
+  prompt.hidden = true;
+  document.getElementById("goal-label").textContent = `${goal.year} Reading Goal`;
+  document.getElementById("goal-fill").style.width = goal.percentage + "%";
+  document.getElementById("goal-count").textContent = `${goal.progress} / ${goal.target} books`;
+  const paceEl = document.getElementById("goal-pace");
+  if (goal.onPace) {
+    const delta = goal.paceDelta;
+    paceEl.textContent = delta > 0 ? `${delta} ahead` : "On pace";
+    paceEl.className = "goal-pace on-pace";
+  } else {
+    paceEl.textContent = `${Math.abs(goal.paceDelta)} behind`;
+    paceEl.className = "goal-pace behind";
+  }
+}
+
+function openGoalModal(isEdit) {
+  const year = new Date().getFullYear();
+  document.getElementById("goal-year").value = isEdit && currentGoal ? currentGoal.year : year;
+  document.getElementById("goal-target").value = isEdit && currentGoal ? currentGoal.target : "";
+  document.getElementById("goal-year").disabled = isEdit;
+  document.getElementById("goal-delete-btn").hidden = !isEdit;
+  document.getElementById("goal-modal-title").textContent = isEdit ? "Edit Goal" : "Set Reading Goal";
+  document.getElementById("goal-modal").hidden = false;
+}
+
+function closeGoalModal() {
+  document.getElementById("goal-modal").hidden = true;
+}
+
+document.getElementById("goal-edit-btn").addEventListener("click", () => openGoalModal(true));
+document.getElementById("goal-set-btn").addEventListener("click", () => openGoalModal(false));
+document.getElementById("goal-close").addEventListener("click", closeGoalModal);
+document.getElementById("goal-cancel").addEventListener("click", closeGoalModal);
+
+document.getElementById("goal-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const year = parseInt(document.getElementById("goal-year").value);
+  const target = parseInt(document.getElementById("goal-target").value);
+  if (!year || !target || target < 1) {
+    showToast("Please enter a valid target", "error");
+    return;
+  }
+  try {
+    const isEdit = currentGoal && currentGoal.year === year;
+    const url = isEdit ? `${API}/goals/${year}` : `${API}/goals`;
+    const method = isEdit ? "PUT" : "POST";
+    const body = isEdit ? { target } : { year, target };
+    const res = await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      showToast(err || "Failed to save goal", "error");
+      return;
+    }
+    closeGoalModal();
+    showToast(isEdit ? "Goal updated" : "Goal set!");
+    await loadCurrentGoal();
+  } catch {
+    showToast("Failed to save goal", "error");
+  }
+});
+
+document.getElementById("goal-delete-btn").addEventListener("click", async () => {
+  if (!currentGoal) return;
+  if (!confirm("Delete this reading goal?")) return;
+  try {
+    await fetch(`${API}/goals/${currentGoal.year}`, { method: "DELETE" });
+    closeGoalModal();
+    showToast("Goal deleted");
+    await loadCurrentGoal();
+  } catch {
+    showToast("Failed to delete goal", "error");
+  }
+});
+
 // ---- Init ----
 restoreSidebarState();
 loadBooks();
+loadCurrentGoal();

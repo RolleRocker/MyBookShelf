@@ -126,6 +126,22 @@ public class DatabaseConfig {
         } catch (SQLException e) {
             throw new RuntimeException("Failed to run shelves migration", e);
         }
+
+        // Reading goals table
+        try (Connection conn = dataSource.getConnection();
+             Statement stmt = conn.createStatement()) {
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS reading_goals (
+                    id UUID PRIMARY KEY,
+                    year INTEGER NOT NULL UNIQUE CHECK (year BETWEEN 2000 AND 2100),
+                    target INTEGER NOT NULL CHECK (target >= 1),
+                    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+                )
+                """);
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to run reading goals migration", e);
+        }
     }
 
     public void close() {

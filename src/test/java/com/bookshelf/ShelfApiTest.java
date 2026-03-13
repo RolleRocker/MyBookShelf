@@ -45,10 +45,15 @@ public class ShelfApiTest {
             bookRepository,
             shelfRepository
         );
+        GoalController goalController = new GoalController(
+            new InMemoryGoalRepository(),
+            bookRepository
+        );
         Router router = App.createRouter(
             bookController,
             shelfController,
-            mcpController
+            mcpController,
+            goalController
         );
         server = new HttpServer(0, router);
         server.start();
