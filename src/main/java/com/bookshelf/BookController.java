@@ -214,16 +214,9 @@ public class BookController {
         // Validate rating if provided
         if (json.has("rating") && !json.get("rating").isJsonNull()) {
             try {
-                int rating = json.get("rating").getAsInt();
-                if (rating < 1 || rating > 5) {
-                    return HttpResponse.badRequest(
-                        "Rating must be between 1 and 5"
-                    );
-                }
-            } catch (NumberFormatException | UnsupportedOperationException e) {
-                return HttpResponse.badRequest(
-                    "'rating' must be a valid integer"
-                );
+                safeGetRating(json);
+            } catch (IllegalArgumentException e) {
+                return HttpResponse.badRequest(e.getMessage());
             }
         }
 
@@ -245,7 +238,7 @@ public class BookController {
             book.setPublishDate(getStringField(json, "publishDate"));
 
             if (json.has("rating") && !json.get("rating").isJsonNull()) {
-                book.setRating(safeGetInt(json, "rating"));
+                book.setRating(safeGetRating(json));
             } else {
                 book.setRating(0);
             }
@@ -371,16 +364,9 @@ public class BookController {
         // Validate rating if provided
         if (json.has("rating") && !json.get("rating").isJsonNull()) {
             try {
-                int rating = json.get("rating").getAsInt();
-                if (rating < 1 || rating > 5) {
-                    return HttpResponse.badRequest(
-                        "Rating must be between 1 and 5"
-                    );
-                }
-            } catch (NumberFormatException | UnsupportedOperationException e) {
-                return HttpResponse.badRequest(
-                    "'rating' must be a valid integer"
-                );
+                safeGetRating(json);
+            } catch (IllegalArgumentException e) {
+                return HttpResponse.badRequest(e.getMessage());
             }
         }
 
@@ -452,7 +438,7 @@ public class BookController {
                 book.setRating(
                     json.get("rating").isJsonNull()
                         ? null
-                        : safeGetInt(json, "rating")
+                        : safeGetRating(json)
                 );
             }
             if (json.has("pageCount")) {
@@ -701,6 +687,28 @@ public class BookController {
         }
     }
 
+    /**
+     * Parses a rating from JSON (accepts decimals like 3.5), validates it as a 0.5-increment
+     * between 0.5 and 5.0, and returns the internal representation (value * 2, so 1-10).
+     */
+    private Integer safeGetRating(JsonObject json) {
+        if (!json.has("rating") || json.get("rating").isJsonNull()) return null;
+        try {
+            double val = json.get("rating").getAsNumber().doubleValue();
+            int internal = (int) Math.round(val * 2);
+            if (internal < 1 || internal > 10 || Math.abs(val * 2 - internal) > 0.01) {
+                throw new IllegalArgumentException(
+                    "Rating must be between 0.5 and 5 in 0.5 increments"
+                );
+            }
+            return internal;
+        } catch (NumberFormatException | UnsupportedOperationException e) {
+            throw new IllegalArgumentException(
+                "Rating must be between 0.5 and 5 in 0.5 increments"
+            );
+        }
+    }
+
     private boolean isValidDate(String date) {
         if (date == null) return false;
         if (!date.matches("\\d{4}-\\d{2}-\\d{2}")) return false;
@@ -727,6 +735,19 @@ public class BookController {
         JsonObject obj = JsonParser.parseString(
             gson.toJson(book)
         ).getAsJsonObject();
+        // Convert internal rating (0-10) to display rating (0-5, half-star increments)
+        if (book.getRating() == null) {
+            // Keep null as-is (Gson already serialized it as null)
+        } else if (book.getRating() > 0) {
+            int internal = book.getRating();
+            if (internal % 2 == 0) {
+                obj.addProperty("rating", internal / 2);
+            } else {
+                obj.addProperty("rating", internal / 2.0);
+            }
+        } else {
+            obj.addProperty("rating", 0);
+        }
         JsonArray shelvesArr = new JsonArray();
         if (shelfRepository != null) {
             List<Shelf> bookShelves = shelfRepository.findShelvesForBook(

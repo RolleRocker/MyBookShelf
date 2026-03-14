@@ -127,6 +127,22 @@ public class DatabaseConfig {
             throw new RuntimeException("Failed to run shelves migration", e);
         }
 
+        // Half-star ratings migration: double existing ratings from 1-5 to 2-10 scale
+        try (Connection conn = dataSource.getConnection();
+             Statement stmt = conn.createStatement()) {
+            var rs = stmt.executeQuery(
+                "SELECT COALESCE(MAX(rating), 0) FROM books WHERE rating > 0"
+            );
+            rs.next();
+            int maxRating = rs.getInt(1);
+            // Only migrate if there are rated books still on old scale (max <= 5)
+            if (maxRating >= 1 && maxRating <= 5) {
+                stmt.execute("UPDATE books SET rating = rating * 2 WHERE rating > 0");
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to run half-star rating migration", e);
+        }
+
         // Reading goals table
         try (Connection conn = dataSource.getConnection();
              Statement stmt = conn.createStatement()) {

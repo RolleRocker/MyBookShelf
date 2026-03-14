@@ -174,7 +174,7 @@ public class McpToolHandler {
         sb.append("- DNF: ").append(dnf).append("\n");
         if (ratedCount > 0) {
             sb.append("- Average rating: ")
-                    .append(String.format("%.1f", ratingSum / ratedCount))
+                    .append(String.format("%.1f", ratingSum / ratedCount / 2.0))
                     .append("/5 (").append(ratedCount).append(" rated)");
         } else {
             sb.append("- No books rated yet");
@@ -213,7 +213,7 @@ public class McpToolHandler {
         sb.append("Author: ").append(valueOrUnknown(b.getAuthor())).append("\n");
         sb.append("Status: ").append(b.getReadStatus() != null ? b.getReadStatus().name() : "unknown").append("\n");
         if (b.getRating() != null && b.getRating() > 0) {
-            sb.append("Rating: ").append(b.getRating()).append("/5\n");
+            sb.append("Rating: ").append(displayRating(b.getRating())).append("/5\n");
         }
         if (b.getGenre() != null) sb.append("Genre: ").append(b.getGenre()).append("\n");
         if (b.getIsbn() != null) sb.append("ISBN: ").append(b.getIsbn()).append("\n");
@@ -232,7 +232,7 @@ public class McpToolHandler {
         if (b.getAuthor() != null) sb.append(" by ").append(b.getAuthor());
         sb.append(" — ").append(b.getReadStatus() != null ? b.getReadStatus().name() : "unknown");
         if (b.getRating() != null && b.getRating() > 0) {
-            sb.append(", rated ").append(b.getRating()).append("/5");
+            sb.append(", rated ").append(displayRating(b.getRating())).append("/5");
         }
         if (b.getReadingProgress() != null && b.getReadStatus() == ReadStatus.READING) {
             sb.append(" (").append(b.getReadingProgress()).append("% progress)");
@@ -242,6 +242,14 @@ public class McpToolHandler {
 
     private String valueOrUnknown(String value) {
         return value != null ? value : "(unknown)";
+    }
+
+    /** Converts internal rating (0-10) to display string (e.g. "3.5" or "4"). */
+    private String displayRating(int internal) {
+        if (internal % 2 == 0) {
+            return String.valueOf(internal / 2);
+        }
+        return String.format("%.1f", internal / 2.0);
     }
 
     // --- JSON Schema helpers ---

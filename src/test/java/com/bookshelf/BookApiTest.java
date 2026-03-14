@@ -1653,4 +1653,119 @@ public class BookApiTest {
         assertEquals("2026-02-01", body.get("startedAt").getAsString());
         assertEquals(java.time.LocalDate.now().toString(), body.get("finishedAt").getAsString());
     }
+
+    // --- Half-star rating tests ---
+
+    @Test
+    void testHalfStar_createWithHalfStarRating() throws Exception {
+        JsonObject json = new JsonObject();
+        json.addProperty("title", "Half Star Book");
+        json.addProperty("author", "Author");
+        json.addProperty("readStatus", "READING");
+        json.addProperty("rating", 3.5);
+        var res = post("/books", json.toString());
+        assertEquals(201, res.statusCode());
+        JsonObject body = JsonParser.parseString(res.body()).getAsJsonObject();
+        assertEquals(3.5, body.get("rating").getAsDouble(), 0.001);
+
+        // Verify on GET
+        String id = body.get("id").getAsString();
+        var getRes = get("/books/" + id);
+        assertEquals(200, getRes.statusCode());
+        JsonObject fetched = JsonParser.parseString(getRes.body()).getAsJsonObject();
+        assertEquals(3.5, fetched.get("rating").getAsDouble(), 0.001);
+    }
+
+    @Test
+    void testHalfStar_createWithIntegerRatingStillWorks() throws Exception {
+        JsonObject json = new JsonObject();
+        json.addProperty("title", "Integer Rating Book");
+        json.addProperty("author", "Author");
+        json.addProperty("readStatus", "READING");
+        json.addProperty("rating", 4);
+        var res = post("/books", json.toString());
+        assertEquals(201, res.statusCode());
+        JsonObject body = JsonParser.parseString(res.body()).getAsJsonObject();
+        // Whole-number ratings should come back as integers
+        assertEquals(4, body.get("rating").getAsInt());
+    }
+
+    @Test
+    void testHalfStar_updateToHalfStarRating() throws Exception {
+        JsonObject json = new JsonObject();
+        json.addProperty("title", "Update Test");
+        json.addProperty("author", "Author");
+        json.addProperty("readStatus", "READING");
+        json.addProperty("rating", 3);
+        var res = post("/books", json.toString());
+        assertEquals(201, res.statusCode());
+        String id = getIdFromResponse(res);
+
+        JsonObject update = new JsonObject();
+        update.addProperty("rating", 4.5);
+        var putRes = put("/books/" + id, update.toString());
+        assertEquals(200, putRes.statusCode());
+        JsonObject body = JsonParser.parseString(putRes.body()).getAsJsonObject();
+        assertEquals(4.5, body.get("rating").getAsDouble(), 0.001);
+    }
+
+    @Test
+    void testHalfStar_invalidValuesRejected() throws Exception {
+        // 2.7 is not a valid 0.5 increment
+        var res1 = post("/books",
+            "{\"title\":\"T\",\"author\":\"A\",\"readStatus\":\"READING\",\"rating\":2.7}");
+        assertEquals(400, res1.statusCode());
+
+        // 0.3 is not a valid 0.5 increment
+        var res2 = post("/books",
+            "{\"title\":\"T\",\"author\":\"A\",\"readStatus\":\"READING\",\"rating\":0.3}");
+        assertEquals(400, res2.statusCode());
+
+        // 5.5 is out of range
+        var res3 = post("/books",
+            "{\"title\":\"T\",\"author\":\"A\",\"readStatus\":\"READING\",\"rating\":5.5}");
+        assertEquals(400, res3.statusCode());
+    }
+
+    @Test
+    void testHalfStar_minimumRating() throws Exception {
+        JsonObject json = new JsonObject();
+        json.addProperty("title", "Min Rating");
+        json.addProperty("author", "Author");
+        json.addProperty("readStatus", "READING");
+        json.addProperty("rating", 0.5);
+        var res = post("/books", json.toString());
+        assertEquals(201, res.statusCode());
+        JsonObject body = JsonParser.parseString(res.body()).getAsJsonObject();
+        assertEquals(0.5, body.get("rating").getAsDouble(), 0.001);
+    }
+
+    @Test
+    void testHalfStar_sortByRatingStillWorks() throws Exception {
+        // Create books with half-star ratings
+        for (double r : new double[]{2.5, 4.0, 3.5}) {
+            JsonObject json = new JsonObject();
+            json.addProperty("title", "Book " + r);
+            json.addProperty("author", "Author");
+            json.addProperty("readStatus", "READING");
+            json.addProperty("rating", r);
+            post("/books", json.toString());
+        }
+
+        var res = get("/books?sort=rating,desc");
+        assertEquals(200, res.statusCode());
+        JsonArray books = JsonParser.parseString(res.body()).getAsJsonArray();
+        assertEquals(3, books.size());
+        assertEquals(4.0, books.get(0).getAsJsonObject().get("rating").getAsDouble(), 0.001);
+        assertEquals(3.5, books.get(1).getAsJsonObject().get("rating").getAsDouble(), 0.001);
+        assertEquals(2.5, books.get(2).getAsJsonObject().get("rating").getAsDouble(), 0.001);
+    }
+
+    @Test
+    void testHalfStar_zeroStillRejected() throws Exception {
+        // Rating 0 should still be rejected as invalid user input
+        var res = post("/books",
+            "{\"title\":\"T\",\"author\":\"A\",\"readStatus\":\"READING\",\"rating\":0}");
+        assertEquals(400, res.statusCode());
+    }
 }

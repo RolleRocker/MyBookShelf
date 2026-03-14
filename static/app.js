@@ -188,7 +188,15 @@ function statusClass(status) {
 function renderStars(rating, bookId) {
   let html = "";
   for (let i = 1; i <= 5; i++) {
-    html += `<button class="star${i <= rating ? " filled" : ""}" data-value="${i}" data-book="${bookId}" aria-label="${i} star${i > 1 ? "s" : ""}">&#9733;</button>`;
+    const isFull = rating >= i;
+    const isHalf = !isFull && rating >= i - 0.5;
+    let cls = "star";
+    if (isFull) cls += " filled";
+    else if (isHalf) cls += " half-filled";
+    html += `<button class="${cls}" data-value="${i}" data-book="${bookId}" aria-label="${i} star${i > 1 ? "s" : ""}">` +
+      `<span class="star-bg">&#9733;</span>` +
+      `<span class="star-half-fill">&#9733;</span>` +
+      `</button>`;
   }
   return html;
 }
@@ -564,6 +572,16 @@ function handleStarClick(bookId, value) {
     .catch(() => showToast("Failed to update rating", "error"));
 }
 
+function getStarRatingFromEvent(e) {
+  const star = e.target.closest(".star");
+  if (!star) return null;
+  const value = parseInt(star.dataset.value);
+  const rect = star.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const isLeftHalf = x < rect.width / 2;
+  return isLeftHalf ? value - 0.5 : value;
+}
+
 // ---- Edit Modal ----
 
 function openEditModal(bookId) {
@@ -579,11 +597,15 @@ function openEditModal(bookId) {
   progressGroup.hidden =
     book.readStatus !== "READING" && book.readStatus !== "DNF";
 
-  // Set star rating
+  // Set star rating (supports half-stars)
   const stars = editRating.querySelectorAll(".star");
   const rating = book.rating || 0;
   stars.forEach((star) => {
-    star.classList.toggle("filled", parseInt(star.dataset.value) <= rating);
+    const sv = parseInt(star.dataset.value);
+    const isFull = rating >= sv;
+    const isHalf = !isFull && rating >= sv - 0.5;
+    star.classList.toggle("filled", isFull);
+    star.classList.toggle("half-filled", isHalf);
   });
   editRating.dataset.currentValue = rating;
 
@@ -632,8 +654,8 @@ async function submitEdit(e) {
     updates.readingProgress = null;
   }
 
-  const ratingVal = parseInt(editRating.dataset.currentValue) || 0;
-  if (ratingVal >= 1 && ratingVal <= 5) {
+  const ratingVal = parseFloat(editRating.dataset.currentValue) || 0;
+  if (ratingVal >= 0.5 && ratingVal <= 5) {
     updates.rating = ratingVal;
   }
 
@@ -2009,7 +2031,8 @@ bookGrid.addEventListener("click", (e) => {
 
   const starBtn = e.target.closest(".book-stars .star");
   if (starBtn) {
-    handleStarClick(starBtn.dataset.book, parseInt(starBtn.dataset.value));
+    const rating = getStarRatingFromEvent(e);
+    if (rating !== null) handleStarClick(starBtn.dataset.book, rating);
     return;
   }
 
@@ -2045,13 +2068,16 @@ editStatus.addEventListener("change", () => {
 
 // Star picker in modal
 editRating.addEventListener("click", (e) => {
-  const star = e.target.closest(".star");
-  if (!star) return;
+  const rating = getStarRatingFromEvent(e);
+  if (rating === null) return;
 
-  const value = parseInt(star.dataset.value);
-  editRating.dataset.currentValue = value;
+  editRating.dataset.currentValue = rating;
   editRating.querySelectorAll(".star").forEach((s) => {
-    s.classList.toggle("filled", parseInt(s.dataset.value) <= value);
+    const sv = parseInt(s.dataset.value);
+    const isFull = rating >= sv;
+    const isHalf = !isFull && rating >= sv - 0.5;
+    s.classList.toggle("filled", isFull);
+    s.classList.toggle("half-filled", isHalf);
   });
 });
 

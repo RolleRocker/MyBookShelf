@@ -321,7 +321,7 @@ public class InMemoryShelfRepository implements ShelfRepository {
             .toList();
         double avgRating = rated.isEmpty()
             ? 0.0
-            : rated.stream().mapToInt(Integer::intValue).average().orElse(0.0);
+            : rated.stream().mapToInt(Integer::intValue).average().orElse(0.0) / 2.0;
         stats.put("averageRating", avgRating);
 
         // Total pages

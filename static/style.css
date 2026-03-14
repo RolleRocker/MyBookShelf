@@ -840,6 +840,7 @@ body {
 }
 
 .book-stars .star {
+    position: relative;
     color: var(--text-dim);
     font-size: 0.95rem;
     cursor: pointer;
@@ -852,12 +853,34 @@ body {
     line-height: 1;
 }
 
+.book-stars .star .star-bg {
+    color: var(--text-dim);
+}
+
+.book-stars .star .star-half-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 50%;
+    overflow: hidden;
+    color: var(--gold);
+    display: none;
+}
+
 .book-stars .star:hover {
     transform: scale(1.2);
 }
 
-.book-stars .star.filled {
+.book-stars .star.filled .star-bg {
     color: var(--gold);
+}
+
+.book-stars .star.filled .star-half-fill {
+    display: none;
+}
+
+.book-stars .star.half-filled .star-half-fill {
+    display: block;
 }
 
 /* ---- Book Review ---- */
@@ -1119,6 +1142,7 @@ body {
 }
 
 .star-picker .star {
+    position: relative;
     font-size: 1.5rem;
     color: var(--text-dim);
     background: none;
@@ -1131,12 +1155,34 @@ body {
     line-height: 1;
 }
 
+.star-picker .star .star-bg {
+    color: var(--text-dim);
+}
+
+.star-picker .star .star-half-fill {
+    position: absolute;
+    left: 0.1rem;
+    top: 0.1rem;
+    width: 50%;
+    overflow: hidden;
+    color: var(--gold);
+    display: none;
+}
+
 .star-picker .star:hover {
     transform: scale(1.15);
 }
 
-.star-picker .star.filled {
+.star-picker .star.filled .star-bg {
     color: var(--gold);
+}
+
+.star-picker .star.filled .star-half-fill {
+    display: none;
+}
+
+.star-picker .star.half-filled .star-half-fill {
+    display: block;
 }
 
 .form-actions {

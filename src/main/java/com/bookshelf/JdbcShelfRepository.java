@@ -486,7 +486,7 @@ public class JdbcShelfRepository implements ShelfRepository {
                           .stream()
                           .mapToInt(Integer::intValue)
                           .average()
-                          .orElse(0.0);
+                          .orElse(0.0) / 2.0;
                 stats.put("averageRating", avgRating);
 
                 int totalPages = books
