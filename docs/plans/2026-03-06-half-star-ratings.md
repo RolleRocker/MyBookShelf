@@ -1,6 +1,6 @@
 # Half-Star Ratings
 
-**Status:** Not started
+**Status:** Completed (commit d50f4cb)
 **Date:** 2026-03-06
 
 ## Research Findings

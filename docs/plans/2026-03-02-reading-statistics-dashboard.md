@@ -2,6 +2,64 @@
 
 **Status:** Not started
 **Date:** 2026-03-02
+**Updated:** 2026-03-06 (enriched with competitive research)
+
+## Research Findings
+
+### How Other Apps Do It
+
+**StoryGraph** (gold standard for stats):
+- Pie charts for genre distribution, mood distribution, fiction vs non-fiction
+- Bar charts for pages read per day/month, books finished per month
+- Pace distribution (fast/medium/slow books)
+- Plus subscribers get custom charts, color customization, year-over-year comparisons
+- "Stats V4" is their most requested feature upgrade — readers love data
+- Filterable by time period, genre, mood, fiction/nonfiction, custom tags
+
+**Goodreads**:
+- Year-in-review summary (books read, pages read, top-rated, shortest/longest)
+- Basic reading challenge progress
+- No interactive charts — mostly static summary cards
+
+**Basmo/Bookly**:
+- Reading speed tracking (pages per hour)
+- Session-based analytics (average session length, total time spent reading)
+- Daily/weekly reading time graphs
+- Estimated completion date for current books
+
+**Literal.club**:
+- Clean minimal stats: books finished, pages read, average rating
+- Reading timeline visualization
+
+### Key Patterns Across Apps
+
+| Stat | Goodreads | StoryGraph | Basmo | Value to Users |
+|------|-----------|------------|-------|---------------|
+| Books finished count | Yes | Yes | Yes | Essential |
+| Pages read total | Yes | Yes | Yes | High |
+| Genre breakdown | No | Yes (pie) | No | High |
+| Rating distribution | No | Yes (bar) | No | Medium |
+| Books per month | Yes | Yes (bar) | No | High |
+| Top authors | No | Yes | No | Medium |
+| Average rating | Yes | Yes | No | Medium |
+| Reading speed | No | Pace only | Yes (pages/hr) | Low (needs sessions) |
+| Shortest/longest book | Yes | No | No | Fun |
+| Year-over-year compare | No | Yes (Plus) | No | Power user |
+
+### Design Decisions for MyBookShelf
+
+1. **Pure CSS charts** — no chart library. Horizontal bar charts with percentage widths. Consistent with the no-framework philosophy.
+2. **All-time + yearly views** — show stats for all books by default, with a year filter dropdown.
+3. **Computed on every request** — no caching, no denormalized stats table. Fine for < 1000 books.
+4. **Stats we CAN compute now** (from existing data): total books, by-status, by-genre, ratings, pages, books per month, top authors.
+5. **Stats we CANNOT compute yet**: reading speed, time-based analytics (need start/finish dates and reading sessions — see Start/Finish Dates plan).
+
+### Future Enhancements (not in this plan)
+- Year-over-year comparison charts
+- Reading speed / pages-per-day (requires start/finish dates feature)
+- Mood/pace tracking (requires new metadata fields)
+- Exportable year-in-review summary
+- Integration with Reading Goals (show goal progress in stats)
 
 ## Overview
 
@@ -63,13 +121,13 @@ Add a statistics endpoint (`GET /books/stats`) and a frontend stats dashboard th
 - `byStatus` — count per `ReadStatus` enum value
 - `byGenre` — count per genre string; books with `null` genre grouped under key `"null"`
 - `ratings.average` — mean of all books with `rating > 0`; exclude unrated (rating == 0)
-- `ratings.distribution` — count of books at each rating 1-5
+- `ratings.distribution` — count of books at each rating level. **If half-star ratings are implemented first**, keys should be `"0.5"`, `"1"`, `"1.5"`, ..., `"5"` (10 buckets). **If integer ratings only**, keys are `"1"` through `"5"` (5 buckets). Implementation should dynamically group by actual rating values to handle either case.
 - `ratings.unrated` — count of books with `rating == 0`
 - `pages.totalRead` — sum of `pageCount` for `FINISHED` books only (where `pageCount` is not null)
 - `pages.averagePerBook` — `totalRead / count(FINISHED books with pageCount)`; 0 if none
-- `finishedByMonth` — count of `FINISHED` books grouped by `YYYY-MM` of `createdAt`. Only include months that have at least 1 finished book. Sorted chronologically.
+- `finishedByMonth` — count of `FINISHED` books grouped by `YYYY-MM`. **Prefer `finishedAt` when available** (from Start/Finish Dates feature), **fall back to `createdAt`** for books without a finish date. Only include months that have at least 1 finished book. Sorted chronologically.
 - `topAuthors` — top 5 authors by book count (all statuses). Exclude `null` authors. Sorted by count desc.
-- `recentlyFinished` — last 5 books with `readStatus == FINISHED`, sorted by `createdAt` desc. Include `id`, `title`, `author`, `rating`, `createdAt`.
+- `recentlyFinished` — last 5 books with `readStatus == FINISHED`, sorted by `finishedAt` desc (if available, else `createdAt` desc). Include `id`, `title`, `author`, `rating`, `createdAt`, `finishedAt`.
 
 ## Backend Changes
 
@@ -195,3 +253,6 @@ Add a stats panel (hidden by default):
 - `pages.averagePerBook` — guard against division by zero when no finished books have `pageCount`
 - `ratings.average` — exclude unrated books (rating == 0) from the average calculation
 - Stats are computed on every request (no caching). Fine for a personal shelf with < 1000 books
+- **Cross-feature dependency: Half-Star Ratings** — if half-stars are implemented first, `ratings.distribution` keys change from `"1"-"5"` to `"0.5"-"5"` in 0.5 increments. Also, `ratings.average` must use the decimal value (internal / 2.0), not the raw internal integer.
+- **Cross-feature dependency: Start/Finish Dates** — `finishedByMonth` and `recentlyFinished` should prefer `finishedAt` over `createdAt` when available. If dates aren't implemented yet, use `createdAt` as fallback.
+- **MCP `get_bookshelf_stats` overlap** — the existing MCP tool computes basic stats (counts by status, average rating). After this feature, there's duplication. The MCP tool can remain independent for simplicity, or be refactored to call the same computation logic. No change needed for V1.

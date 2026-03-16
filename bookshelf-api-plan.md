@@ -938,10 +938,14 @@ curl http://localhost:8080/books
 
 ## Stretch Goals (if you want to keep going)
 - Add **pagination** (`?page=1&size=10`) with prev/next buttons in the frontend
-- Add **search** (`?search=dune` searches title and author) with a search bar in the UI
+- ~~Add **search** (`?search=dune` searches title and author) with a search bar in the UI~~ *(done — client-side and server-side search)*
 - Add **request logging middleware**
 - Add **authentication** (basic API key or token-based)
 - Add a **subjects filter** (`GET /books?subject=science+fiction`) with clickable subject tags
-- Add **sorting** (by title, author, rating, date added) with clickable column headers
+- ~~Add **sorting** (by title, author, rating, date added) with clickable column headers~~ *(done — client-side and server-side sorting)*
 - ~~Add a **barcode scanner** using the browser camera~~ *(done — uses zbar-wasm with multi-pass image processing pipeline)*
-- Add **reading progress** — a percentage field for books with status `READING`
+- ~~Add **reading progress** — a percentage field for books with status `READING`~~ *(done — 0-100 percentage tracking)*
+- ~~Add **half-star ratings** (0.5–5.0 in 0.5 increments)~~ *(done — Letterboxd-style hover UX, stored as doubled integers)*
+- ~~Add **start/finish date tracking**~~ *(done — YYYY-MM-DD dates with auto-fill on status change)*
+- ~~Add **yearly reading goals**~~ *(done — target + progress + pace tracking)*
+- ~~Add **book reviews/notes**~~ *(done — free-text review field)*

@@ -11,10 +11,14 @@ A personal bookshelf REST API built from scratch in Java 17 using only `java.net
 - **ISBN barcode scanner** — scan a book's barcode with your device camera to add it instantly
 - **Custom shelves / collections** — create named shelves with colors, descriptions, and notes; drag-and-drop books between shelves; per-shelf sorting and stats
 - **Vanilla JS frontend** — dark antiquarian-library-themed UI with ISBN input, filter tabs, sort dropdown, search bar, inline editing, star ratings, and a sidebar for shelf management
+- **Half-star ratings** — rate books from 0.5 to 5.0 in 0.5 increments with Letterboxd-style hover interaction
 - **Reading progress** — track a percentage (0-100) for books currently being read
+- **Start/finish dates** — track when you started and finished reading each book (YYYY-MM-DD)
+- **Yearly reading goals** — set a target number of books per year with live progress tracking, pace calculations, and on-track indicators
+- **Book reviews/notes** — add personal notes or reviews to any book
 - **MCP integration** — query your bookshelf from Claude Code via natural language ("Do I have Dune?", "What am I reading?")
 - **Dockerized** — single `docker compose up` to run the app and database together
-- **186 automated tests** covering the full API surface, shelves, MCP protocol, validation, edge cases, and enrichment logic
+- **223 automated tests** covering the full API surface, shelves, goals, MCP protocol, validation, edge cases, and enrichment logic
 
 ## Tech Stack
 
@@ -63,7 +67,7 @@ This runs the server with an in-memory store (no database needed):
 ./gradlew test
 ```
 
-All 186 unit tests use an in-memory repository — no database or Docker required. 11 integration tests (Open Library) are excluded from the default run.
+All 223 unit tests use an in-memory repository — no database or Docker required. 11 integration tests (Open Library) are excluded from the default run.
 
 ## API Reference
 
@@ -88,6 +92,11 @@ All 186 unit tests use an in-memory repository — no database or Docker require
 | `POST` | `/shelves/{id}/books` | Add a book to a shelf | `201` |
 | `PUT` | `/shelves/{id}/books/reorder` | Reorder books within a shelf | `200` |
 | `DELETE` | `/shelves/{id}/books/{bookId}` | Remove a book from a shelf | `204` |
+| `GET` | `/goals` | List all reading goals (with progress) | `200` |
+| `POST` | `/goals` | Create a new reading goal | `201` |
+| `GET` | `/goals/{year}` | Get a specific year's goal with progress | `200` |
+| `PUT` | `/goals/{year}` | Update goal target | `200` |
+| `DELETE` | `/goals/{year}` | Delete a reading goal | `204` |
 | `POST` | `/mcp` | MCP Streamable HTTP endpoint (JSON-RPC) | `200` |
 
 ### Create a book
@@ -133,9 +142,10 @@ Only fields present in the request body are updated. Send `null` to clear a fiel
 
 | Code | Meaning |
 |------|---------|
-| `400` | Missing required fields, invalid JSON, rating not 1-5, bad ISBN format |
-| `404` | Book or cover not found |
+| `400` | Missing required fields, invalid JSON, rating not 0.5-5.0, bad ISBN format, invalid dates |
+| `404` | Book, cover, or goal not found |
 | `405` | HTTP method not supported on this route |
+| `409` | Duplicate reading goal for a year |
 
 ## Data Model
 
@@ -145,7 +155,7 @@ Only fields present in the request body are updated. Send `null` to clear a fiel
 | `title` | String | Required (optional if ISBN provided) |
 | `author` | String | Required (optional if ISBN provided) |
 | `genre` | String | Optional |
-| `rating` | Integer | 1-5 (0 = not rated) |
+| `rating` | Number | 0.5-5.0 in 0.5 increments (0 = not rated) |
 | `isbn` | String | 10 or 13 digits |
 | `readStatus` | Enum | `WANT_TO_READ`, `READING`, `FINISHED`, `DNF` |
 | `readingProgress` | Integer | 0-100, only for `READING` status |
@@ -153,6 +163,9 @@ Only fields present in the request body are updated. Send `null` to clear a fiel
 | `publishDate` | String | Auto-filled from Open Library |
 | `pageCount` | Integer | Auto-filled from Open Library |
 | `subjects` | List | Auto-filled from Open Library |
+| `review` | String | Personal notes/review |
+| `startedAt` | String | Start date (YYYY-MM-DD) |
+| `finishedAt` | String | Finish date (YYYY-MM-DD) |
 | `coverUrl` | String | Open Library cover URL |
 
 ## Architecture
@@ -164,6 +177,7 @@ V1  Core HTTP server + REST API + in-memory storage
 V2  Open Library + Google Books integration (async enrichment + cover downloads)
 V3  PostgreSQL persistence + Docker Compose
 V4  Vanilla HTML/CSS/JS frontend + custom shelves + MCP integration
++   Half-star ratings, start/finish dates, reading goals, book reviews
 ```
 
 ### Project Structure
@@ -192,16 +206,23 @@ src/main/java/com/bookshelf/
 ├── BookEnrichmentService.java  # Async enrichment: Open Library + Google Books fallback
 ├── BookMetadata.java           # Enrichment data model
 ├── StaticFileHandler.java      # Static file serving
+├── ReadingGoal.java            # Reading goal entity
+├── GoalRepository.java         # Reading goal repository interface
+├── InMemoryGoalRepository.java # In-memory goal store (tests)
+├── JdbcGoalRepository.java     # PostgreSQL goal implementation
+├── GoalController.java         # Goal API endpoint handlers
+├── DuplicateGoalException.java # Exception for duplicate year goals
 ├── RequestTooLargeException.java # Custom exception for oversized requests
 └── mcp/
     ├── McpController.java      # MCP Streamable HTTP endpoint — JSON-RPC dispatch
     └── McpToolHandler.java     # MCP tool implementations
 
 src/test/java/com/bookshelf/
-├── BookApiTest.java            # 66 tests — CRUD, filtering, search, sorting, validation, edge cases
+├── BookApiTest.java            # 89 tests — CRUD, filtering, search, sorting, half-star ratings, dates, validation, edge cases
 ├── BookMetadataTest.java       # 43 tests — metadata parsing, Google Books, enrichment logic
-├── ShelfApiTest.java           # 56 tests — shelf CRUD, book assignment, reordering, stats
-├── McpTest.java                # 21 tests — MCP JSON-RPC protocol and tool implementations
+├── ShelfApiTest.java           # 57 tests — shelf CRUD, book assignment, reordering, stats
+├── McpTest.java                # 22 tests — MCP JSON-RPC protocol and tool implementations
+├── GoalApiTest.java            # 12 tests — reading goal CRUD, progress, validation
 └── OpenLibraryTest.java        # 11 integration tests — live Open Library API (excluded from default run)
 
 static/
@@ -236,7 +257,7 @@ static/
 ## Testing
 
 ```bash
-# Run all unit tests (186 tests)
+# Run all unit tests (223 tests)
 ./gradlew test
 
 # Run integration tests (11 tests, requires network)
@@ -255,6 +276,9 @@ Tests start the server on a random port using `new ServerSocket(0)` and use `InM
 - CRUD operations (create, read, update, delete) for books and shelves
 - ISBN lookup and duplicate handling
 - Genre and read status filtering, search, sorting
+- Half-star ratings (0.5–5.0 in 0.5 increments)
+- Start/finish date tracking and auto-fill on status change
+- Reading goals — CRUD, progress computation, pace tracking
 - Custom shelves — CRUD, book assignment, reordering, stats, edge cases
 - MCP JSON-RPC protocol and all 5 tool implementations
 - Input validation (missing fields, bad JSON, invalid rating/ISBN)

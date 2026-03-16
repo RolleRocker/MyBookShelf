@@ -74,7 +74,7 @@ The project is built in progressive versions (V1 → V4), each adding a layer:
 | `title`          | String                                      | yes*     | *Optional if `isbn` provided (V4+) |
 | `author`         | String                                      | yes*     | *Optional if `isbn` provided (V4+) |
 | `genre`          | String                                      | no       | |
-| `rating`         | Integer (1–5, default 0)                    | no       | 0 = not rated; user cannot explicitly set 0. Boxed type for nullable partial updates |
+| `rating`         | Integer (0–10 internal, 0.5–5.0 display)    | no       | 0 = not rated. Internal scale: 0–10 (doubled); API accepts/returns 0.5–5.0 in 0.5 increments. Boxed type for nullable partial updates |
 | `isbn`           | String                                      | no       | 10-char (last may be 'X') or 13-digit |
 | `publisher`      | String                                      | no       | Auto-filled from Open Library |
 | `publishDate`    | String                                      | no       | Auto-filled from Open Library |
@@ -82,6 +82,9 @@ The project is built in progressive versions (V1 → V4), each adding a layer:
 | `subjects`       | List\<String\>                              | no       | Auto-filled; stored as JSON array string in DB |
 | `readStatus`     | enum: `WANT_TO_READ`, `READING`, `FINISHED`, `DNF` | yes      | |
 | `readingProgress`| Integer (0–100)                             | no       | Only meaningful when `readStatus == READING`. Nullable. |
+| `review`         | String                                      | no       | User notes/review for the book |
+| `startedAt`      | String (YYYY-MM-DD)                         | no       | Date the user started reading. Cannot be in the future |
+| `finishedAt`     | String (YYYY-MM-DD)                         | no       | Date the user finished reading. Cannot be before `startedAt` or in the future |
 | `coverData`      | byte[] (transient)                          | no       | Cover image bytes, stored as BYTEA in DB. Not serialized to JSON |
 | `coverUrl`       | String                                      | no       | Original Open Library URL |
 | `createdAt`      | Instant                                     | auto     | Serialized as ISO-8601 string in JSON responses |
@@ -106,6 +109,18 @@ The project is built in progressive versions (V1 → V4), each adding a layer:
 | `books`          | List\<Book\> (transient) | computed | Populated on GET `/shelves/{id}` |
 | `stats`          | Map (transient)| computed | Per-shelf statistics |
 
+## Data Model — ReadingGoal
+
+| Field            | Type           | Required | Notes |
+|------------------|----------------|----------|-------|
+| `id`             | UUID           | auto     | Server-generated |
+| `year`           | int            | yes      | Must be unique, range 2000–2100 |
+| `target`         | int            | yes      | Minimum 1 |
+| `createdAt`      | Instant        | auto     | |
+| `updatedAt`      | Instant (transient) | auto | Not serialized to JSON |
+
+Responses include computed fields: `progress` (finished books in that year), `percentage` (0–100), `onPace` (boolean), `paceDelta` (books ahead/behind target).
+
 ## API Endpoints
 
 | Method   | Path                  | Description                              | Success Code     |
@@ -127,6 +142,11 @@ The project is built in progressive versions (V1 → V4), each adding a layer:
 | `POST`   | `/shelves/{id}/books` | Add a book to a shelf                    | `201 Created`    |
 | `PUT`    | `/shelves/{id}/books/reorder` | Reorder books within a shelf     | `200 OK`         |
 | `DELETE` | `/shelves/{id}/books/{bookId}` | Remove a book from a shelf      | `204 No Content` |
+| `GET`    | `/goals`              | List all reading goals (with progress)   | `200 OK`         |
+| `POST`   | `/goals`              | Create a new reading goal                | `201 Created`    |
+| `GET`    | `/goals/{year}`       | Get a specific year's goal with progress | `200 OK`         |
+| `PUT`    | `/goals/{year}`       | Update goal target                       | `200 OK`         |
+| `DELETE` | `/goals/{year}`       | Delete a reading goal                    | `204 No Content` |
 | `POST`   | `/mcp`                | MCP Streamable HTTP endpoint (JSON-RPC)  | `200 OK`         |
 
 ### `GET /books` Query Parameters
@@ -145,9 +165,10 @@ Parameters can be combined: `?search=frank&readStatus=FINISHED&sort=rating,desc`
 ### Error Responses
 | Code  | When |
 |-------|------|
-| `400` | Missing required fields, malformed JSON, invalid rating (must be 1–5 when provided), invalid ISBN format, `readingProgress` out of 0–100 range |
-| `404` | Book ID not found, ISBN not found, cover not available |
+| `400` | Missing required fields, malformed JSON, invalid rating (must be 0.5–5.0 in 0.5 increments when provided), invalid ISBN format, `readingProgress` out of 0–100 range, invalid date format, future dates, `finishedAt` before `startedAt` |
+| `404` | Book ID not found, ISBN not found, cover not available, goal not found |
 | `405` | Unsupported HTTP method on a route |
+| `409` | Duplicate reading goal for a year |
 
 ## Key Design Decisions
 
@@ -155,8 +176,10 @@ Parameters can be combined: `?search=frank&readStatus=FINISHED&sort=rating,desc`
 - **Gson** is the only external dependency in V1 (V3 adds PostgreSQL driver and HikariCP). Gson is configured with `serializeNulls()` and a custom `Instant` serializer that writes ISO-8601 strings
 - **ISBN validation**: accepts 10-char (last char may be 'X') or 13-digit format
 - **Duplicate ISBNs allowed** — users may own multiple copies; `findByIsbn` returns the oldest (first-created)
-- **Rating**: Integer 1–5, default `0` (not rated). User cannot explicitly set `0`; it's only the default
+- **Rating**: Half-star scale 0.5–5.0 in 0.5 increments. Stored internally as Integer 0–10 (doubled). API accepts/returns decimal (e.g., `3.5`). Default `0` (not rated). User cannot explicitly set `0`; it's only the default. Whole-number ratings serialize as integers (`4`), half-stars as decimals (`4.5`)
 - **`rating`/`pageCount`/`readingProgress` use `Integer`** (boxed) — nullable to distinguish "not provided" from 0 in partial updates
+- **Start/finish dates** — `startedAt` and `finishedAt` are YYYY-MM-DD strings. Cannot be in the future. `finishedAt` cannot be before `startedAt`. When `readStatus` changes to `READING`, `startedAt` auto-fills to today if not set. When status changes to `FINISHED` or `DNF`, `finishedAt` auto-fills. When status changes to `WANT_TO_READ`, both dates are cleared
+- **Reading goals** — keyed by year (unique). Progress is computed dynamically from finished books using `finishedAt` (preferred) or `createdAt` (fallback). `onPace` calculation differs for past, current, and future years
 - **Subjects**: stored as JSON array string in a TEXT column
 - **Open Library enrichment** only fills in `null` fields — user-provided values are never overwritten. On ISBN change (PUT), previously-enriched fields are cleared before re-enrichment. Genre is auto-derived from subjects during enrichment
 - **Re-enrichment** — `POST /books/re-enrich` queues all ISBN-bearing books for background re-enrichment (null-title books first), with 3-second delays between requests to respect rate limits
@@ -197,10 +220,11 @@ The server exposes an MCP endpoint at `POST /mcp` using the Streamable HTTP tran
 Tests use JUnit 5 with `java.net.HttpClient`. The server starts on a random port (`new ServerSocket(0)`) before each test class and shuts down after. Repository is cleaned between tests for isolation. Tests run against `InMemoryBookRepository` only (no DB required for `./gradlew test`).
 
 Test classes:
-- **`BookApiTest`** (66 tests) — full HTTP integration tests covering CRUD, filtering, search, sorting, reading progress, partial updates, validation, and cover endpoints
+- **`BookApiTest`** (89 tests) — full HTTP integration tests covering CRUD, filtering, search, sorting, reading progress, half-star ratings, start/finish dates, reviews, partial updates, validation, and cover endpoints
 - **`BookMetadataTest`** (43 tests) — unit tests for `BookMetadata.deriveGenre()`, Google Books response parsing, and `mergeMetadata()`
-- **`ShelfApiTest`** (56 tests) — shelf CRUD, book assignment, reordering, stats, validation, and edge cases
-- **`McpTest`** (21 tests) — MCP endpoint tests covering JSON-RPC protocol (initialize, tools/list, tools/call, ping, errors) and all 5 tool implementations
+- **`ShelfApiTest`** (57 tests) — shelf CRUD, book assignment, reordering, stats, validation, and edge cases
+- **`McpTest`** (22 tests) — MCP endpoint tests covering JSON-RPC protocol (initialize, tools/list, tools/call, ping, errors) and all 5 tool implementations
+- **`GoalApiTest`** (12 tests) — reading goal CRUD, progress computation, validation, duplicate handling, and edge cases
 - **`OpenLibraryTest`** (11 tests) — live integration tests for Open Library enrichment service (excluded from default `./gradlew test` via `@Tag("integration")`; run with `./gradlew integrationTest`)
 
 ## Database Column Mapping
@@ -217,6 +241,9 @@ DB uses `snake_case`, Java uses `camelCase`. Map explicitly in `JdbcBookReposito
 | `createdAt`       | `created_at`       |
 | `updatedAt`       | `updated_at`       |
 | `readingProgress` | `reading_progress` |
+| `review`          | `review`           |
+| `startedAt`       | `started_at`       |
+| `finishedAt`      | `finished_at`      |
 
 ## DB Schema Migrations
 
@@ -224,6 +251,11 @@ Migrations run on startup via `DatabaseConfig.runMigrations()`. The schema uses 
 
 1. `cover_data BYTEA` — cover image bytes
 2. `reading_progress INTEGER DEFAULT NULL` — reading progress (0–100)
+3. `review TEXT DEFAULT NULL` — book review/notes
+4. `started_at DATE DEFAULT NULL` — reading start date
+5. `finished_at DATE DEFAULT NULL` — reading finish date
+6. Half-star migration: `UPDATE books SET rating = rating * 2 WHERE rating > 0` (guarded by max-rating check)
+7. `reading_goals` table — `id UUID`, `year INTEGER UNIQUE`, `target INTEGER`, `created_at`, `updated_at`
 
 ## Source File Overview
 
@@ -247,6 +279,12 @@ Migrations run on startup via `DatabaseConfig.runMigrations()`. The schema uses 
 | `ShelfRepository.java` | Shelf repository interface |
 | `InMemoryShelfRepository.java` | In-memory shelf store (used in tests) |
 | `JdbcShelfRepository.java` | PostgreSQL shelf implementation |
+| `ReadingGoal.java` | Reading goal entity (year + target) |
+| `GoalRepository.java` | Reading goal repository interface |
+| `InMemoryGoalRepository.java` | In-memory goal store (used in tests) |
+| `JdbcGoalRepository.java` | PostgreSQL goal implementation |
+| `GoalController.java` | Goal API endpoint handlers with computed progress |
+| `DuplicateGoalException.java` | Exception for duplicate year goals |
 | `RequestTooLargeException.java` | Custom exception for oversized request bodies |
 | `DatabaseConfig.java` | HikariCP pool setup + schema migrations |
 | `BookEnrichmentService.java` | Async enrichment: Open Library + Google Books fallback |
