@@ -9,6 +9,9 @@ let groupByAuthor = false;
 let searchQuery = "";
 let currentSubjectFilter = "";
 let currentSort = "";
+let currentPage = 1;
+let pageSize = 20;
+let totalPages = 1;
 const pollingTimers = new Map();
 let allShelves = [];
 let activeShelfId = null;
@@ -368,6 +371,35 @@ function updateSubjectFilterChip() {
   }
 }
 
+// ---- Pagination ----
+
+function renderFilteredBooks() {
+  const filtered = getFilteredBooks();
+  totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  if (currentPage > totalPages) currentPage = totalPages;
+  const startIdx = (currentPage - 1) * pageSize;
+  const pageItems = filtered.slice(startIdx, startIdx + pageSize);
+  renderBooks(pageItems);
+  updatePaginationNav();
+}
+
+function updatePaginationNav() {
+  const nav = document.getElementById("pagination-nav");
+  const info = document.getElementById("page-info");
+  const prev = document.getElementById("prev-page");
+  const next = document.getElementById("next-page");
+  if (!nav) return;
+
+  const filtered = getFilteredBooks();
+  totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  if (currentPage > totalPages) currentPage = totalPages;
+
+  nav.style.display = filtered.length > pageSize ? "flex" : "none";
+  info.textContent = "Page " + currentPage + " of " + totalPages;
+  prev.disabled = currentPage <= 1;
+  next.disabled = currentPage >= totalPages;
+}
+
 // ---- Render All Books ----
 
 function renderBooks(books) {
@@ -458,7 +490,7 @@ async function loadBooks() {
     if (activeShelfId) {
       await loadShelfBooks(activeShelfId);
     } else {
-      renderBooks(getFilteredBooks());
+      renderFilteredBooks();
     }
     updateCounts(books);
     loadShelves();
@@ -704,10 +736,11 @@ async function deleteBook(bookId) {
 
 function setFilter(status) {
   currentFilter = status;
+  currentPage = 1;
   filterTabs.forEach((tab) => {
     tab.classList.toggle("active", tab.dataset.status === status);
   });
-  renderBooks(getFilteredBooks());
+  renderFilteredBooks();
 }
 
 // ---- ISBN Scanner (zbar-wasm) ----
@@ -1334,6 +1367,7 @@ function renderShelfCard(shelf) {
 
 // Select a shelf — show its books
 async function selectShelf(shelfId) {
+  currentPage = 1;
   activeShelfId = shelfId;
   sidebarAllBooks.classList.remove("active");
   // Highlight in sidebar
@@ -1377,6 +1411,7 @@ async function loadShelfBooks(shelfId) {
 
 // Clear shelf filter — back to all books
 function clearShelfFilter() {
+  currentPage = 1;
   activeShelfId = null;
   activeShelfData = null;
   sidebarAllBooks.classList.add("active");
@@ -1384,7 +1419,7 @@ function clearShelfFilter() {
     .querySelectorAll(".shelf-card")
     .forEach((c) => c.classList.remove("active"));
   shelfStatsBar.hidden = true;
-  renderBooks(getFilteredBooks());
+  renderFilteredBooks();
 }
 
 // Render shelf stats bar
@@ -1503,7 +1538,7 @@ async function deleteShelf(id) {
     // Refresh books to update shelf tags
     const books = await apiGet("/books");
     allBooks = books;
-    if (!activeShelfId) renderBooks(getFilteredBooks());
+    if (!activeShelfId) renderFilteredBooks();
   } catch (e) {
     showToast(e.message || "Failed to delete shelf", "error");
   }
@@ -1539,7 +1574,7 @@ async function addBookToShelf(shelfId, bookId) {
     if (activeShelfId) {
       await loadShelfBooks(activeShelfId);
     } else {
-      renderBooks(getFilteredBooks());
+      renderFilteredBooks();
     }
     return true;
   } catch (e) {
@@ -1557,7 +1592,7 @@ async function removeBookFromShelf(shelfId, bookId) {
     if (activeShelfId) {
       await loadShelfBooks(activeShelfId);
     } else {
-      renderBooks(getFilteredBooks());
+      renderFilteredBooks();
     }
     return true;
   } catch (e) {
@@ -1910,7 +1945,8 @@ searchInput.addEventListener("input", () => {
   clearTimeout(searchDebounceTimer);
   searchDebounceTimer = setTimeout(() => {
     searchQuery = searchInput.value.trim();
-    renderBooks(getFilteredBooks());
+    currentPage = 1;
+    renderFilteredBooks();
   }, 300);
 });
 
@@ -1923,13 +1959,15 @@ filterTabs.forEach((tab) => {
 groupToggle.addEventListener("click", () => {
   groupByAuthor = !groupByAuthor;
   groupToggle.classList.toggle("active", groupByAuthor);
-  renderBooks(getFilteredBooks());
+  currentPage = 1;
+  renderFilteredBooks();
 });
 
 // Sort select
 sortSelect.addEventListener("change", () => {
   currentSort = sortSelect.value;
-  renderBooks(getFilteredBooks());
+  currentPage = 1;
+  renderFilteredBooks();
 });
 
 // Refresh Library
@@ -2047,7 +2085,8 @@ bookGrid.addEventListener("click", (e) => {
     } else {
       currentSubjectFilter = subject;
     }
-    renderBooks(getFilteredBooks());
+    currentPage = 1;
+    renderFilteredBooks();
     return;
   }
 });
@@ -2093,7 +2132,8 @@ document.addEventListener("keydown", (e) => {
 // Clear subject tag filter
 document.getElementById("clear-tag-filter").addEventListener("click", () => {
   currentSubjectFilter = "";
-  renderBooks(getFilteredBooks());
+  currentPage = 1;
+  renderFilteredBooks();
 });
 
 // ---- Shelf Event Listeners ----
@@ -2228,6 +2268,20 @@ document.getElementById("goal-delete-btn").addEventListener("click", async () =>
     await loadCurrentGoal();
   } catch {
     showToast("Failed to delete goal", "error");
+  }
+});
+
+// ---- Pagination Buttons ----
+document.getElementById("prev-page")?.addEventListener("click", () => {
+  if (currentPage > 1) {
+    currentPage--;
+    renderFilteredBooks();
+  }
+});
+document.getElementById("next-page")?.addEventListener("click", () => {
+  if (currentPage < totalPages) {
+    currentPage++;
+    renderFilteredBooks();
   }
 });
 

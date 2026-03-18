@@ -2171,6 +2171,41 @@ body {
     }
 }
 
+/* Pagination */
+.pagination-nav {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+    padding: 20px 0;
+    margin-top: 8px;
+}
+
+.pagination-btn {
+    padding: 8px 16px;
+    border: 1px solid var(--border, #ddd);
+    border-radius: 8px;
+    background: var(--surface, #fff);
+    color: var(--text-primary, #333);
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.15s;
+}
+
+.pagination-btn:hover:not(:disabled) {
+    background: var(--bg-card-hover, #e8e8e8);
+}
+
+.pagination-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+#page-info {
+    font-size: 0.9rem;
+    color: var(--text-secondary, #666);
+}
+
 @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
