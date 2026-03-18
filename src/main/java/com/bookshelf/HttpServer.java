@@ -11,6 +11,8 @@ import java.util.concurrent.TimeUnit;
 
 public class HttpServer {
 
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(HttpServer.class);
+
     private final int port;
     private final Router router;
     private ServerSocket serverSocket;
@@ -34,7 +36,7 @@ public class HttpServer {
                     threadPool.submit(() -> handleConnection(clientSocket));
                 } catch (IOException e) {
                     if (running) {
-                        System.err.println("Error accepting connection: " + e.getMessage());
+                        logger.warn("Error accepting connection: {}", e.getMessage());
                     }
                 }
             }
@@ -46,25 +48,35 @@ public class HttpServer {
     private static final int READ_TIMEOUT_MS = 30_000;
 
     private void handleConnection(Socket socket) {
+        HttpRequest request = null;
+        HttpResponse response = null;
+        long startTime = System.nanoTime();
+        String clientIp = socket.getInetAddress().getHostAddress();
         try {
             socket.setSoTimeout(READ_TIMEOUT_MS);
             InputStream buffered = new BufferedInputStream(socket.getInputStream());
-            HttpRequest request = RequestParser.parse(buffered);
-            HttpResponse response = router.route(request);
+            request = RequestParser.parse(buffered);
+            response = router.route(request);
             ResponseWriter.write(socket.getOutputStream(), response);
             socket.shutdownOutput();
         } catch (RequestTooLargeException e) {
+            response = HttpResponse.payloadTooLarge("Request body too large");
             try {
-                ResponseWriter.write(socket.getOutputStream(), HttpResponse.payloadTooLarge("Request body too large"));
+                ResponseWriter.write(socket.getOutputStream(), response);
             } catch (IOException ignored) {}
         } catch (IOException e) {
+            response = HttpResponse.badRequest("Bad request");
             try {
-                ResponseWriter.write(socket.getOutputStream(), HttpResponse.badRequest("Bad request"));
+                ResponseWriter.write(socket.getOutputStream(), response);
             } catch (IOException ignored) {}
-            System.err.println("Error parsing request: " + e.getMessage());
         } catch (Exception e) {
-            System.err.println("Error handling request: " + e.getMessage());
+            response = HttpResponse.internalServerError("Internal server error");
+            try {
+                ResponseWriter.write(socket.getOutputStream(), response);
+            } catch (IOException ignored) {}
         } finally {
+            long elapsedMs = (System.nanoTime() - startTime) / 1_000_000;
+            RequestLogger.log(request, response, elapsedMs, clientIp);
             try { socket.close(); } catch (IOException ignored) {}
         }
     }
@@ -76,7 +88,7 @@ public class HttpServer {
                 serverSocket.close();
             }
         } catch (IOException e) {
-            System.err.println("Error closing server socket: " + e.getMessage());
+            logger.error("Error closing server socket: {}", e.getMessage());
         }
         if (threadPool != null) {
             threadPool.shutdown();

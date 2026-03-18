@@ -6,6 +6,8 @@ import java.nio.file.Path;
 
 public class App {
 
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(App.class);
+
     public static void main(String[] args) throws Exception {
         Path staticDir = Path.of("static");
         Files.createDirectories(staticDir);
@@ -58,33 +60,29 @@ public class App {
             try {
                 port = Integer.parseInt(portEnv);
             } catch (NumberFormatException e) {
-                System.err.println(
-                    "Warning: Invalid APP_PORT '" +
-                        portEnv +
-                        "', defaulting to 8080"
-                );
+                logger.warn("Invalid APP_PORT '{}', defaulting to 8080", portEnv);
             }
         }
         HttpServer server = new HttpServer(port, router);
         server.start();
-        System.out.println("Bookshelf server started on port " + port);
+        logger.info("Bookshelf server started on port {}", port);
 
         Runtime.getRuntime().addShutdownHook(
             new Thread(() -> {
                 try {
                     openLibraryService.shutdown();
                 } catch (Exception e) {
-                    System.err.println("Shutdown error: " + e.getMessage());
+                    logger.error("Shutdown error: {}", e.getMessage());
                 }
                 try {
                     server.stop();
                 } catch (Exception e) {
-                    System.err.println("Shutdown error: " + e.getMessage());
+                    logger.error("Shutdown error: {}", e.getMessage());
                 }
                 try {
                     dbConfig.close();
                 } catch (Exception e) {
-                    System.err.println("Shutdown error: " + e.getMessage());
+                    logger.error("Shutdown error: {}", e.getMessage());
                 }
             })
         );
