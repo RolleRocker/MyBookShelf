@@ -158,6 +158,22 @@ public class DatabaseConfig {
         } catch (SQLException e) {
             throw new RuntimeException("Failed to run reading goals migration", e);
         }
+
+        // Users table
+        try (Connection conn = dataSource.getConnection();
+             Statement stmt = conn.createStatement()) {
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id UUID PRIMARY KEY,
+                    username VARCHAR(50) UNIQUE NOT NULL,
+                    password_hash VARCHAR(255) NOT NULL,
+                    salt VARCHAR(255) NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """);
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to run users migration", e);
+        }
     }
 
     public void close() {
