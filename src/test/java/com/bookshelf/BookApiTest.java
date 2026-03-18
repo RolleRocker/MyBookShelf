@@ -1846,4 +1846,88 @@ public class BookApiTest {
         assertEquals("Middle Book", books.get(1).getAsJsonObject().get("title").getAsString());
         assertEquals("Zebra Book", books.get(2).getAsJsonObject().get("title").getAsString());
     }
+
+    // --- Pagination tests ---
+
+    @Test
+    void testPaginationBasic() throws Exception {
+        for (int i = 1; i <= 25; i++) {
+            post("/books", gson.toJson(java.util.Map.of(
+                "title", "Book " + String.format("%02d", i),
+                "author", "Author", "readStatus", "WANT_TO_READ")));
+        }
+        var response = get("/books?page=1&size=10");
+        assertEquals(200, response.statusCode());
+        var obj = gson.fromJson(response.body(), JsonObject.class);
+        assertEquals(10, obj.getAsJsonArray("books").size());
+        assertEquals(1, obj.get("page").getAsInt());
+        assertEquals(10, obj.get("size").getAsInt());
+        assertEquals(25, obj.get("totalItems").getAsInt());
+        assertEquals(3, obj.get("totalPages").getAsInt());
+    }
+
+    @Test
+    void testPaginationDefaultSize() throws Exception {
+        for (int i = 1; i <= 25; i++) {
+            post("/books", gson.toJson(java.util.Map.of(
+                "title", "Book " + i, "author", "Author", "readStatus", "WANT_TO_READ")));
+        }
+        var response = get("/books?page=1");
+        assertEquals(200, response.statusCode());
+        var obj = gson.fromJson(response.body(), JsonObject.class);
+        assertEquals(20, obj.getAsJsonArray("books").size());
+        assertEquals(20, obj.get("size").getAsInt());
+    }
+
+    @Test
+    void testPaginationSizeClampedTo100() throws Exception {
+        for (int i = 1; i <= 5; i++) {
+            post("/books", gson.toJson(java.util.Map.of(
+                "title", "Book " + i, "author", "Author", "readStatus", "WANT_TO_READ")));
+        }
+        var response = get("/books?page=1&size=999");
+        assertEquals(200, response.statusCode());
+        var obj = gson.fromJson(response.body(), JsonObject.class);
+        assertEquals(100, obj.get("size").getAsInt());
+    }
+
+    @Test
+    void testPaginationInvalidPage() throws Exception {
+        var resp1 = get("/books?page=0");
+        assertEquals(400, resp1.statusCode());
+        var resp2 = get("/books?page=-1");
+        assertEquals(400, resp2.statusCode());
+        var resp3 = get("/books?page=abc");
+        assertEquals(400, resp3.statusCode());
+    }
+
+    @Test
+    void testPaginationBeyondRange() throws Exception {
+        for (int i = 1; i <= 5; i++) {
+            post("/books", gson.toJson(java.util.Map.of(
+                "title", "Book " + i, "author", "Author", "readStatus", "WANT_TO_READ")));
+        }
+        var response = get("/books?page=99&size=10");
+        assertEquals(200, response.statusCode());
+        var obj = gson.fromJson(response.body(), JsonObject.class);
+        assertEquals(0, obj.getAsJsonArray("books").size());
+        assertEquals(5, obj.get("totalItems").getAsInt());
+    }
+
+    @Test
+    void testNoPaginationParamReturnsArray() throws Exception {
+        post("/books", gson.toJson(java.util.Map.of(
+            "title", "Book 1", "author", "Author", "readStatus", "WANT_TO_READ")));
+        var response = get("/books");
+        assertEquals(200, response.statusCode());
+        var arr = gson.fromJson(response.body(), JsonArray.class);
+        assertNotNull(arr);
+        assertTrue(arr.size() > 0);
+    }
+
+    @Test
+    void testPaginationInvalidSizeReturns400() throws Exception {
+        var response = get("/books?page=1&size=abc");
+        assertEquals(400, response.statusCode());
+    }
 }

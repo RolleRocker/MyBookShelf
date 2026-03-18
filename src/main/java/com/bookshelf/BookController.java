@@ -128,6 +128,52 @@ public class BookController {
                 }
             }
 
+            // Pagination
+            String pageParam = request.getQueryParams().get("page");
+            String sizeParam = request.getQueryParams().get("size");
+
+            if (pageParam != null) {
+                int page;
+                try {
+                    page = Integer.parseInt(pageParam);
+                } catch (NumberFormatException e) {
+                    return HttpResponse.badRequest("{\"error\": \"invalid page parameter\"}");
+                }
+                if (page < 1) {
+                    return HttpResponse.badRequest("{\"error\": \"page must be >= 1\"}");
+                }
+
+                int size = 20;
+                if (sizeParam != null) {
+                    try {
+                        size = Integer.parseInt(sizeParam);
+                    } catch (NumberFormatException e) {
+                        return HttpResponse.badRequest("{\"error\": \"invalid size parameter\"}");
+                    }
+                }
+                if (size < 1) size = 20;
+                if (size > 100) size = 100;
+
+                int totalItems = books.size();
+                int totalPages = (int) Math.ceil((double) totalItems / size);
+                int offset = (page - 1) * size;
+                int end = Math.min(offset + size, totalItems);
+                List<Book> pageItems = offset < totalItems ? books.subList(offset, end) : List.of();
+
+                JsonArray pageArray = new JsonArray();
+                for (Book book : pageItems) {
+                    pageArray.add(enrichBookJson(book));
+                }
+
+                JsonObject wrapper = new JsonObject();
+                wrapper.add("books", pageArray);
+                wrapper.addProperty("page", page);
+                wrapper.addProperty("size", size);
+                wrapper.addProperty("totalItems", totalItems);
+                wrapper.addProperty("totalPages", totalPages);
+                return HttpResponse.ok(wrapper.toString());
+            }
+
             JsonArray booksArray = new JsonArray();
             for (Book book : books) {
                 booksArray.add(enrichBookJson(book));
