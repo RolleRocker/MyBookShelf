@@ -44,11 +44,16 @@ public class App {
             repository,
             shelfRepository
         );
+        JwtUtil jwtUtil = new JwtUtil();
+        UserRepository userRepository = new JdbcUserRepository(dbConfig.getDataSource());
+        AuthController authController = new AuthController(userRepository, jwtUtil);
+        AuthMiddleware authMiddleware = new AuthMiddleware(jwtUtil);
         Router router = createRouter(
             controller,
             shelfController,
             mcpController,
-            goalController
+            goalController,
+            authController
         );
 
         StaticFileHandler staticHandler = new StaticFileHandler(staticDir);
@@ -63,7 +68,7 @@ public class App {
                 logger.warn("Invalid APP_PORT '{}', defaulting to 8080", portEnv);
             }
         }
-        HttpServer server = new HttpServer(port, router);
+        HttpServer server = new HttpServer(port, router, authMiddleware);
         server.start();
         logger.info("Bookshelf server started on port {}", port);
 
@@ -95,7 +100,8 @@ public class App {
         BookController controller,
         ShelfController shelfController,
         McpController mcpController,
-        GoalController goalController
+        GoalController goalController,
+        AuthController authController
     ) {
         Router router = new Router();
         router.addRoute("GET", "/books", controller::handleGetBooks);
@@ -159,6 +165,12 @@ public class App {
 
         // MCP endpoint
         router.addRoute("POST", "/mcp", mcpController::handleMcp);
+
+        // Auth routes
+        if (authController != null) {
+            router.addRoute("POST", "/auth/register", authController::handleRegister);
+            router.addRoute("POST", "/auth/login", authController::handleLogin);
+        }
 
         return router;
     }

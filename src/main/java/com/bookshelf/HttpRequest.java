@@ -2,6 +2,7 @@ package com.bookshelf;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 public class HttpRequest {
     private final String method;
@@ -10,6 +11,7 @@ public class HttpRequest {
     private final Map<String, String> queryParams;
     private final Map<String, String> headers;
     private final String body;
+    private UUID userId;
 
     public HttpRequest(String method, String path, Map<String, String> queryParams,
                        Map<String, String> headers, String body) {
@@ -30,4 +32,7 @@ public class HttpRequest {
     public Map<String, String> getQueryParams() { return queryParams; }
     public Map<String, String> getHeaders() { return headers; }
     public String getBody() { return body; }
+
+    public UUID getUserId() { return userId; }
+    public void setUserId(UUID userId) { this.userId = userId; }
 }

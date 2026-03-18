@@ -30,7 +30,7 @@ public class McpTest {
         ShelfController shelfController = new ShelfController(shelfRepository, repository);
         McpController mcpController = new McpController(repository, shelfRepository);
         GoalController goalController = new GoalController(new InMemoryGoalRepository(), repository);
-        Router router = App.createRouter(controller, shelfController, mcpController, goalController);
+        Router router = App.createRouter(controller, shelfController, mcpController, goalController, null);
         server = new HttpServer(0, router);
         server.start();
         port = server.getPort();

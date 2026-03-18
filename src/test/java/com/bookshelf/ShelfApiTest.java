@@ -53,7 +53,8 @@ public class ShelfApiTest {
             bookController,
             shelfController,
             mcpController,
-            goalController
+            goalController,
+            null
         );
         server = new HttpServer(0, router);
         server.start();

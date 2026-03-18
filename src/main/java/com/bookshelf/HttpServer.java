@@ -15,13 +15,19 @@ public class HttpServer {
 
     private final int port;
     private final Router router;
+    private final AuthMiddleware authMiddleware;
     private ServerSocket serverSocket;
     private ExecutorService threadPool;
     private volatile boolean running;
 
     public HttpServer(int port, Router router) {
+        this(port, router, null);
+    }
+
+    public HttpServer(int port, Router router, AuthMiddleware authMiddleware) {
         this.port = port;
         this.router = router;
+        this.authMiddleware = authMiddleware;
     }
 
     public void start() throws IOException {
@@ -56,6 +62,22 @@ public class HttpServer {
             socket.setSoTimeout(READ_TIMEOUT_MS);
             InputStream buffered = new BufferedInputStream(socket.getInputStream());
             request = RequestParser.parse(buffered);
+
+            // Auth check
+            if (authMiddleware != null) {
+                boolean isPublic = AuthMiddleware.isPublicRoute(request.getMethod(), request.getPath());
+                if (!isPublic) {
+                    java.util.Optional<java.util.UUID> userId = authMiddleware.authenticate(request);
+                    if (userId.isEmpty()) {
+                        response = HttpResponse.unauthorized("authentication required");
+                        ResponseWriter.write(socket.getOutputStream(), response);
+                        socket.shutdownOutput();
+                        return;
+                    }
+                    request.setUserId(userId.get());
+                }
+            }
+
             response = router.route(request);
             ResponseWriter.write(socket.getOutputStream(), response);
             socket.shutdownOutput();

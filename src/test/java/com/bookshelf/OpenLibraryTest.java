@@ -53,7 +53,8 @@ public class OpenLibraryTest {
             controller,
             shelfController,
             mcpController,
-            goalController
+            goalController,
+            null
         );
         server = new HttpServer(0, router);
         server.start();

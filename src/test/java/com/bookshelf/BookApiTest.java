@@ -61,7 +61,8 @@ public class BookApiTest {
             controller,
             shelfController,
             mcpController,
-            goalController
+            goalController,
+            null
         );
         server = new HttpServer(0, router);
         server.start();

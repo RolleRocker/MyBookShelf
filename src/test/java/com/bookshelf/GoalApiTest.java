@@ -34,7 +34,7 @@ public class GoalApiTest {
         ShelfController shelfController = new ShelfController(shelfRepository, bookRepository);
         McpController mcpController = new McpController(bookRepository, shelfRepository);
         GoalController goalController = new GoalController(goalRepository, bookRepository);
-        Router router = App.createRouter(bookController, shelfController, mcpController, goalController);
+        Router router = App.createRouter(bookController, shelfController, mcpController, goalController, null);
         server = new HttpServer(0, router);
         server.start();
         port = server.getPort();
