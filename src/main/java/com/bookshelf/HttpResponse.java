@@ -79,6 +79,15 @@ public class HttpResponse {
         );
     }
 
+    public static HttpResponse unauthorized(String error) {
+        return new HttpResponse(
+            401,
+            "Unauthorized",
+            new HashMap<>(),
+            "{\"error\":\"" + escapeJson(error) + "\"}"
+        );
+    }
+
     public static HttpResponse notFound(String error) {
         return new HttpResponse(
             404,
