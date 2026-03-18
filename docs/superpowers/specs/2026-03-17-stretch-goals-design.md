@@ -69,6 +69,10 @@ In `HttpServer.handleConnection()`:
 - Replace any existing `System.out.println` debug logging with SLF4J calls
 - HikariCP will automatically pick up SLF4J (it already uses it internally)
 
+### Tests
+
+No dedicated logging test class. Logging is verified visually via `docker compose logs` and indirectly by all existing tests (every request generates a log line). Adding a custom Logback test appender is over-engineering for this feature.
+
 ---
 
 ## 2. Subjects Filter
@@ -87,7 +91,9 @@ New query parameter on `GET /books`:
 search > subject > genre > readStatus (as base query)
 ```
 
-When combined with other filters, `readStatus` and `genre` act as post-filters on top of subject results. Example: `?subject=fiction&readStatus=FINISHED` fetches by subject first, then filters by status.
+The base query filters are mutually exclusive (if/else if chain). Only one of `search`, `subject`, `genre`, or `readStatus` is used as the base query, in priority order. `?subject=science&genre=Fiction` uses `subject` as base and ignores `genre`.
+
+`readStatus` is applied as a **post-filter** on top of `search`, `subject`, or `genre` results when combined. Example: `?subject=fiction&readStatus=FINISHED` fetches by subject first, then filters by status in Java.
 
 ### Repository Changes
 
@@ -113,14 +119,14 @@ public List<Book> findBySubject(String subject) {
 SELECT * FROM books WHERE LOWER(subjects) LIKE LOWER(?) ESCAPE '\' ORDER BY created_at ASC
 ```
 
-Since subjects are stored as a JSON array string (e.g., `["Science fiction","Space"]`), a LIKE query on the TEXT column works for substring matching.
+Since subjects are stored as a JSON array string (e.g., `["Science fiction","Space"]`), a LIKE query on the TEXT column works for substring matching. The search term must be escaped via the existing `escapeLike()` method (escapes `%`, `_`, `\`) before wrapping with `%...%`, same as `findBySearch()`.
 
 ### Controller Change
 
 In `BookController.handleGetBooks()`, add `subject` parameter handling between `search` and `genre`:
 
 ```java
-String subject = request.getQueryParam("subject");
+String subject = request.getQueryParams().get("subject");
 // ...
 if (search != null && !search.isBlank()) {
     books = repository.findBySearch(search);
@@ -181,8 +187,10 @@ New query parameters on `GET /books`:
 ### Validation
 
 - `page` < 1 or non-numeric → `400 Bad Request`
-- `size` < 1 → defaults to 20
+- `size` non-numeric → `400 Bad Request`
+- `size` < 1 → clamped to 20 (default)
 - `size` > 100 → clamped to 100
+- `size` present without `page` → ignored (returns raw array, same as no pagination params)
 
 ### Implementation
 
@@ -282,14 +290,14 @@ Migration runs in `DatabaseConfig.runMigrations()` alongside existing book/shelf
 
 | Code | When |
 |------|------|
-| `400` | Missing username/password, username < 3 or > 50 chars, password < 8 chars |
+| `400` | Missing username/password, username < 3 or > 50 chars, password < 8 or > 128 chars |
 | `401` | Login with wrong username or password |
 | `409` | Register with duplicate username |
 
 ### JWT Implementation — `JwtUtil`
 
 - **Algorithm:** HMAC-SHA256 via `javax.crypto.Mac` (built-in)
-- **Secret:** `JWT_SECRET` env var, or auto-generated 256-bit random secret on startup (log warning if auto-generated)
+- **Secret:** `JWT_SECRET` env var (required for production — must be set in `docker-compose.yml`). If absent, auto-generates a 256-bit random secret on startup and logs a warning. Note: auto-generated secrets do not survive container restarts, invalidating all tokens
 - **Token payload:** `{"sub": "<userId>", "username": "<username>", "iat": <epoch>, "exp": <epoch>}`
 - **Expiry:** 24 hours from issuance
 - **Encoding:** Manual base64url encode/decode of `header.payload.signature`
@@ -332,14 +340,14 @@ HttpResponse response = router.route(request);
 - `POST /auth/register`
 - `POST /auth/login`
 - All `GET` requests (books, shelves, goals, covers, static files)
+- `POST /mcp` — MCP must remain public because Claude Code's MCP client cannot send JWT tokens
 - Static file fallback handler
 
 **Protected (valid JWT required):**
-- `POST`, `PUT`, `DELETE` on `/books/**`
+- `POST`, `PUT`, `DELETE` on `/books/**` (except MCP)
 - `POST /books/re-enrich`
 - `POST`, `PUT`, `DELETE` on `/shelves/**`
 - `POST`, `PUT`, `DELETE` on `/goals/**`
-- `POST /mcp`
 
 ### HttpRequest Change
 
@@ -384,9 +392,24 @@ private UUID userId; // Set by AuthMiddleware for authenticated requests
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `JWT_SECRET` | *(auto-generated)* | HMAC-SHA256 signing key. Auto-generates if absent (warning logged) |
+| `JWT_SECRET` | *(auto-generated)* | HMAC-SHA256 signing key. Auto-generates if absent (warning logged). **Must be set in `docker-compose.yml` for token persistence across restarts** |
 
-### Tests (~10 new in `AuthApiTest`)
+### Existing Test Migration
+
+Auth will break all 223 existing tests that call write endpoints without tokens. Migration strategy:
+
+- Tests use `InMemoryBookRepository` and start their own `HttpServer` — auth middleware is wired in `App.java` / test setup
+- Add a test helper method (e.g., `registerAndGetToken()`) that calls `POST /auth/register` and returns the JWT
+- In each test class's `@BeforeAll`, register a test user and store the token
+- Update all `POST`, `PUT`, `DELETE` test requests to include `Authorization: Bearer <token>` header
+- Add a helper method like `authenticatedRequest(HttpRequest.Builder)` to reduce boilerplate
+- `GET` requests remain unchanged (public access)
+
+### Design Note: Auto-Login on Register
+
+`POST /auth/register` returns a token immediately (auto-login). This is a deliberate UX choice — the user doesn't need to register then log in separately. No rate limiting on registration; acceptable for a personal app.
+
+### Tests (~12 new in `AuthApiTest`)
 
 1. Register with valid credentials returns 201 + token
 2. Login with valid credentials returns 200 + token
@@ -446,5 +469,6 @@ private UUID userId; // Set by AuthMiddleware for authenticated requests
 
 ### Test Count Impact
 - Current: 223 tests
-- Added: ~27 new tests (5 subjects + 6 pagination + 12 auth + ~4 logging)
-- Expected total: ~250 tests
+- Added: ~23 new tests (5 subjects + 6 pagination + 12 auth)
+- Updated: all existing write-endpoint tests updated with auth tokens
+- Expected total: ~246 tests
