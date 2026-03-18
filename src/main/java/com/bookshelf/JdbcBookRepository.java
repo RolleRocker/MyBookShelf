@@ -95,6 +95,23 @@ public class JdbcBookRepository implements BookRepository {
     }
 
     @Override
+    public List<Book> findBySubject(String subject) {
+        String sql = "SELECT * FROM books WHERE LOWER(subjects) LIKE LOWER(?) ESCAPE '\\' ORDER BY created_at ASC";
+        String pattern = "%" + escapeLike(subject) + "%";
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, pattern);
+            try (ResultSet rs = stmt.executeQuery()) {
+                List<Book> books = new ArrayList<>();
+                while (rs.next()) books.add(mapRow(rs));
+                return books;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to find books by subject", e);
+        }
+    }
+
+    @Override
     public Optional<Book> findById(UUID id) {
         String sql = "SELECT * FROM books WHERE id = ?";
         try (Connection conn = dataSource.getConnection();

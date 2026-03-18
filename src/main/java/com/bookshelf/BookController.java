@@ -58,6 +58,7 @@ public class BookController {
             String genre = request.getQueryParams().get("genre");
             String readStatusParam = request.getQueryParams().get("readStatus");
             String search = request.getQueryParams().get("search");
+            String subject = request.getQueryParams().get("subject");
 
             ReadStatus readStatus = null;
             if (readStatusParam != null && !readStatusParam.isEmpty()) {
@@ -71,6 +72,8 @@ public class BookController {
             List<Book> books;
             if (search != null && !search.isBlank()) {
                 books = repository.findBySearch(search.trim());
+            } else if (subject != null && !subject.isBlank()) {
+                books = repository.findBySubject(subject.trim());
             } else if (genre != null && !genre.isBlank()) {
                 books = repository.findByGenre(genre);
             } else if (readStatus != null) {
@@ -79,10 +82,11 @@ public class BookController {
                 books = repository.findAll();
             }
 
-            // Apply readStatus filter on top of search or genre result
+            // Apply readStatus filter on top of search, subject, or genre result
             if (
                 readStatus != null &&
                 ((search != null && !search.isBlank()) ||
+                    (subject != null && !subject.isBlank()) ||
                     (genre != null && !genre.isBlank()))
             ) {
                 ReadStatus finalReadStatus = readStatus;

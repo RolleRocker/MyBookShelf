@@ -9,6 +9,7 @@ public interface BookRepository {
     List<Book> findByGenre(String genre);
     List<Book> findByReadStatus(ReadStatus readStatus);
     List<Book> findBySearch(String query);
+    List<Book> findBySubject(String subject);
     Optional<Book> findById(UUID id);
     Optional<Book> findByIsbn(String isbn);
     Book save(Book book);

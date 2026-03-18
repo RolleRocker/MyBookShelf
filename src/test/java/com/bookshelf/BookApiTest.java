@@ -1768,4 +1768,82 @@ public class BookApiTest {
             "{\"title\":\"T\",\"author\":\"A\",\"readStatus\":\"READING\",\"rating\":0}");
         assertEquals(400, res.statusCode());
     }
+
+    // --- Subject filter tests ---
+
+    private String createBookWithSubjects(String title, java.util.List<String> subjects) throws Exception {
+        return createBookWithSubjects(title, subjects, "WANT_TO_READ");
+    }
+
+    private String createBookWithSubjects(String title, java.util.List<String> subjects, String readStatus) throws Exception {
+        var createResp = post("/books", gson.toJson(java.util.Map.of(
+            "title", title, "author", "Test Author", "readStatus", readStatus)));
+        String id = gson.fromJson(createResp.body(), JsonObject.class).get("id").getAsString();
+        JsonObject update = new JsonObject();
+        update.add("subjects", gson.toJsonTree(subjects));
+        put("/books/" + id, gson.toJson(update));
+        return id;
+    }
+
+    @Test
+    void testFilterBySubject() throws Exception {
+        createBookWithSubjects("Cosmos", java.util.List.of("Science", "Astronomy"));
+        createBookWithSubjects("A Brief History of Time", java.util.List.of("Science", "Physics"));
+        createBookWithSubjects("Pride and Prejudice", java.util.List.of("Fiction", "Romance"));
+
+        var res = get("/books?subject=science");
+        assertEquals(200, res.statusCode());
+        JsonArray books = JsonParser.parseString(res.body()).getAsJsonArray();
+        assertEquals(2, books.size());
+    }
+
+    @Test
+    void testFilterBySubjectCaseInsensitive() throws Exception {
+        createBookWithSubjects("Cosmos", java.util.List.of("Science Fiction"));
+        createBookWithSubjects("Neuromancer", java.util.List.of("science fiction"));
+
+        var res = get("/books?subject=SCIENCE");
+        assertEquals(200, res.statusCode());
+        JsonArray books = JsonParser.parseString(res.body()).getAsJsonArray();
+        assertEquals(2, books.size());
+    }
+
+    @Test
+    void testFilterBySubjectNoMatches() throws Exception {
+        createBookWithSubjects("Cosmos", java.util.List.of("Science", "Astronomy"));
+        createBookWithSubjects("Dune", java.util.List.of("Science Fiction"));
+
+        var res = get("/books?subject=romance");
+        assertEquals(200, res.statusCode());
+        JsonArray books = JsonParser.parseString(res.body()).getAsJsonArray();
+        assertEquals(0, books.size());
+    }
+
+    @Test
+    void testFilterBySubjectWithReadStatus() throws Exception {
+        createBookWithSubjects("Cosmos", java.util.List.of("Science"), "FINISHED");
+        createBookWithSubjects("A Brief History of Time", java.util.List.of("Science"), "READING");
+        createBookWithSubjects("Physics", java.util.List.of("Science"), "WANT_TO_READ");
+
+        var res = get("/books?subject=science&readStatus=FINISHED");
+        assertEquals(200, res.statusCode());
+        JsonArray books = JsonParser.parseString(res.body()).getAsJsonArray();
+        assertEquals(1, books.size());
+        assertEquals("Cosmos", books.get(0).getAsJsonObject().get("title").getAsString());
+    }
+
+    @Test
+    void testFilterBySubjectWithSort() throws Exception {
+        createBookWithSubjects("Zebra Book", java.util.List.of("Science"));
+        createBookWithSubjects("Alpha Book", java.util.List.of("Science"));
+        createBookWithSubjects("Middle Book", java.util.List.of("Science"));
+
+        var res = get("/books?subject=science&sort=title,asc");
+        assertEquals(200, res.statusCode());
+        JsonArray books = JsonParser.parseString(res.body()).getAsJsonArray();
+        assertEquals(3, books.size());
+        assertEquals("Alpha Book", books.get(0).getAsJsonObject().get("title").getAsString());
+        assertEquals("Middle Book", books.get(1).getAsJsonObject().get("title").getAsString());
+        assertEquals("Zebra Book", books.get(2).getAsJsonObject().get("title").getAsString());
+    }
 }
