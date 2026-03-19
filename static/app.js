@@ -3,6 +3,13 @@
 // ========================================
 
 const API = "";
+function getToken() { return localStorage.getItem('token'); }
+function isAuthenticated() { return !!getToken(); }
+function handleAuthExpired() {
+  localStorage.removeItem('token');
+  localStorage.removeItem('username');
+  window.location.href = '/login.html';
+}
 let currentFilter = "all";
 let allBooks = [];
 let groupByAuthor = false;
@@ -105,12 +112,20 @@ async function apiGet(path) {
   return resp.json();
 }
 
+function authHeaders() {
+  const h = { "Content-Type": "application/json" };
+  const token = getToken();
+  if (token) h["Authorization"] = "Bearer " + token;
+  return h;
+}
+
 async function apiPost(path, body) {
   const resp = await fetch(API + path, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders(),
     body: JSON.stringify(body),
   });
+  if (resp.status === 401) { handleAuthExpired(); return; }
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({}));
     throw new Error(err.error || `POST failed: ${resp.status}`);
@@ -121,9 +136,10 @@ async function apiPost(path, body) {
 async function apiPut(path, body) {
   const resp = await fetch(API + path, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders(),
     body: JSON.stringify(body),
   });
+  if (resp.status === 401) { handleAuthExpired(); return; }
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({}));
     throw new Error(err.error || `PUT failed: ${resp.status}`);
@@ -132,7 +148,10 @@ async function apiPut(path, body) {
 }
 
 async function apiDelete(path) {
-  const resp = await fetch(API + path, { method: "DELETE" });
+  const token = getToken();
+  const headers = token ? { "Authorization": "Bearer " + token } : {};
+  const resp = await fetch(API + path, { method: "DELETE", headers: headers });
+  if (resp.status === 401) { handleAuthExpired(); return; }
   if (!resp.ok && resp.status !== 204)
     throw new Error(`DELETE failed: ${resp.status}`);
 }
@@ -2284,6 +2303,27 @@ document.getElementById("next-page")?.addEventListener("click", () => {
     renderFilteredBooks();
   }
 });
+
+// ---- Auth UI ----
+(function setupAuth() {
+  const logoutBtn = document.getElementById("logout-btn");
+  if (!isAuthenticated()) {
+    // Hide write controls for unauthenticated users
+    document.querySelectorAll(".add-book-btn, .add-shelf-btn, #add-book-btn").forEach(
+      el => el.style.display = "none"
+    );
+    if (logoutBtn) logoutBtn.style.display = "none";
+  } else {
+    if (logoutBtn) {
+      logoutBtn.style.display = "";
+      logoutBtn.addEventListener("click", function() {
+        localStorage.removeItem("token");
+        localStorage.removeItem("username");
+        window.location.href = "/login.html";
+      });
+    }
+  }
+})();
 
 // ---- Init ----
 restoreSidebarState();

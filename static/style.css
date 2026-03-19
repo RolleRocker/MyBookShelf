@@ -2206,6 +2206,24 @@ body {
     color: var(--text-secondary, #666);
 }
 
+/* Logout */
+.logout-btn {
+    padding: 6px 14px;
+    border: 1px solid var(--border, #ddd);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-secondary, #666);
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
+}
+.logout-btn:hover {
+    background: #e74c3c;
+    color: #fff;
+    border-color: #e74c3c;
+}
+
 @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
