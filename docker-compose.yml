@@ -12,6 +12,7 @@ services:
       DB_PASS: ${DB_PASS:-bookshelf}
       APP_PORT: "8080"
       GOOGLE_BOOKS_API_KEY: ${GOOGLE_BOOKS_API_KEY:-}
+      JWT_SECRET: ${JWT_SECRET:-change-me-to-a-secure-random-string}
     depends_on:
       db:
         condition: service_healthy
