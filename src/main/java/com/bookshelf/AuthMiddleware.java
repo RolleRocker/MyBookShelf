@@ -26,7 +26,8 @@ public class AuthMiddleware {
             return true;
         }
         if ("POST".equalsIgnoreCase(method)) {
-            if ("/auth/register".equals(path) || "/auth/login".equals(path) || "/mcp".equals(path)) {
+            if ("/auth/register".equals(path) || "/auth/login".equals(path)
+                    || "/auth/google".equals(path) || "/mcp".equals(path)) {
                 return true;
             }
         }

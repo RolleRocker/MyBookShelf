@@ -95,6 +95,25 @@
             font-size: 0.9rem;
             border: 1px solid #fecaca;
         }
+        .auth-divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 20px 0;
+            color: var(--text-secondary, #666);
+            font-size: 0.85rem;
+        }
+        .auth-divider::before,
+        .auth-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border, #ddd);
+        }
+        #google-signin-container {
+            display: flex;
+            justify-content: center;
+        }
     </style>
 </head>
 <body>
@@ -104,6 +123,8 @@
             <button class="auth-tab active" id="login-tab">Login</button>
             <button class="auth-tab" id="register-tab">Register</button>
         </div>
+        <div id="google-signin-container" hidden></div>
+        <div class="auth-divider" id="auth-divider" hidden>or</div>
         <form class="auth-form" id="auth-form">
             <input class="auth-input" type="text" id="username" placeholder="Username" autocomplete="username" required>
             <input class="auth-input" type="password" id="password" placeholder="Password" autocomplete="current-password" required>
@@ -119,6 +140,66 @@
                 window.location.href = '/';
                 return;
             }
+
+            // Check if Google login is configured and load GIS
+            fetch('/auth/config')
+                .then(function(resp) { return resp.json(); })
+                .then(function(config) {
+                    if (config.googleClientId) {
+                        var script = document.createElement('script');
+                        script.src = 'https://accounts.google.com/gsi/client';
+                        script.async = true;
+                        script.defer = true;
+                        script.onload = function() {
+                            google.accounts.id.initialize({
+                                client_id: config.googleClientId,
+                                callback: handleGoogleCredential
+                            });
+                            var container = document.getElementById('google-signin-container');
+                            container.hidden = false;
+                            document.getElementById('auth-divider').hidden = false;
+                            google.accounts.id.renderButton(container, {
+                                theme: 'outline',
+                                size: 'large',
+                                width: '100%',
+                                text: 'signin_with'
+                            });
+                        };
+                        document.head.appendChild(script);
+                    }
+                })
+                .catch(function() { /* Google login not available */ });
+
+            window.handleGoogleCredential = function(response) {
+                var errorDiv = document.getElementById('auth-error');
+                errorDiv.style.display = 'none';
+
+                fetch('/auth/google', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ credential: response.credential })
+                })
+                .then(function(resp) {
+                    return resp.json().then(function(data) {
+                        return { status: resp.status, data: data };
+                    });
+                })
+                .then(function(result) {
+                    if (result.status === 200 || result.status === 201) {
+                        localStorage.setItem('token', result.data.token);
+                        localStorage.setItem('username', result.data.user.username);
+                        window.location.href = '/';
+                    } else {
+                        var msg = result.data.error || 'Google login failed';
+                        errorDiv.textContent = msg;
+                        errorDiv.style.display = 'block';
+                    }
+                })
+                .catch(function() {
+                    errorDiv.textContent = 'Network error. Please try again.';
+                    errorDiv.style.display = 'block';
+                });
+            };
 
             let mode = 'login';
             const loginTab = document.getElementById('login-tab');

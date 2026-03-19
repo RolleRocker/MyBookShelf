@@ -21,8 +21,21 @@ public class InMemoryUserRepository implements UserRepository {
     }
 
     @Override
+    public Optional<User> findByGoogleId(String googleId) {
+        if (googleId == null) return Optional.empty();
+        return store.values().stream()
+            .filter(u -> googleId.equals(u.getGoogleId()))
+            .findFirst();
+    }
+
+    @Override
     public User save(User user) {
         store.put(user.getId(), user);
         return user;
+    }
+
+    @Override
+    public void update(User user) {
+        store.put(user.getId(), user);
     }
 }

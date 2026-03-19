@@ -46,7 +46,14 @@ public class App {
         );
         JwtUtil jwtUtil = new JwtUtil();
         UserRepository userRepository = new JdbcUserRepository(dbConfig.getDataSource());
-        AuthController authController = new AuthController(userRepository, jwtUtil);
+        String googleClientId = System.getenv("GOOGLE_CLIENT_ID");
+        GoogleTokenVerifier googleTokenVerifier = null;
+        if (googleClientId != null && !googleClientId.isEmpty()) {
+            googleTokenVerifier = new GoogleTokenVerifier(googleClientId);
+            logger.info("Google OAuth enabled (client ID configured)");
+        }
+        AuthController authController = new AuthController(
+            userRepository, jwtUtil, googleTokenVerifier, googleClientId);
         AuthMiddleware authMiddleware = new AuthMiddleware(jwtUtil);
         Router router = createRouter(
             controller,
@@ -173,6 +180,8 @@ public class App {
         if (authController != null) {
             router.addRoute("POST", "/auth/register", authController::handleRegister);
             router.addRoute("POST", "/auth/login", authController::handleLogin);
+            router.addRoute("POST", "/auth/google", authController::handleGoogleLogin);
+            router.addRoute("GET", "/auth/config", authController::handleGetAuthConfig);
         }
 
         return router;

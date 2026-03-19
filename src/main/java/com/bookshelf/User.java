@@ -8,6 +8,8 @@ public class User {
     private String username;
     private String passwordHash;
     private String salt;
+    private String googleId;
+    private String email;
     private Instant createdAt;
 
     public UUID getId() { return id; }
@@ -18,6 +20,10 @@ public class User {
     public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
     public String getSalt() { return salt; }
     public void setSalt(String salt) { this.salt = salt; }
+    public String getGoogleId() { return googleId; }
+    public void setGoogleId(String googleId) { this.googleId = googleId; }
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
 }

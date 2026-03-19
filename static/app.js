@@ -2568,12 +2568,13 @@ document.getElementById("next-page")?.addEventListener("click", () => {
 // ---- Auth UI ----
 (function setupAuth() {
   const logoutBtn = document.getElementById("logout-btn");
+  const loginBtn = document.getElementById("login-btn");
   if (!isAuthenticated()) {
     // Hide write controls for unauthenticated users
     document.querySelectorAll(".add-book-btn, .add-shelf-btn, #add-book-btn").forEach(
       el => el.style.display = "none"
     );
-    if (logoutBtn) logoutBtn.style.display = "none";
+    if (loginBtn) loginBtn.style.display = "";
   } else {
     if (logoutBtn) {
       logoutBtn.style.display = "";

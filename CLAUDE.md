@@ -2,10 +2,6 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Plan File
-
-**IMPORTANT:** Before starting any implementation work, always read `bookshelf-api-plan.md` in the project root. This is the master plan for the entire project — it contains the detailed build order, design decisions, data model, API specs, architecture, integration tests, and version roadmap (V1 through V4). All implementation should follow the plan file.
-
 ## Project Overview
 
 A personal bookshelf REST API built from scratch in Java 17+ using only `java.net.ServerSocket` — no Spring, no Javalin, no frameworks. The HTTP layer, routing, request parsing, and response writing are all hand-built.
@@ -127,8 +123,10 @@ Responses include computed fields: `progress` (finished books in that year), `pe
 |------------------|----------------|----------|-------|
 | `id`             | UUID           | auto     | Server-generated |
 | `username`       | String         | yes      | 3-50 chars, unique |
-| `passwordHash`   | String         | auto     | PBKDF2WithHmacSHA256 hash |
-| `salt`           | String         | auto     | 16-byte random, Base64-encoded |
+| `passwordHash`   | String         | no*      | PBKDF2WithHmacSHA256 hash. *Nullable for Google-only users |
+| `salt`           | String         | no*      | 16-byte random, Base64-encoded. *Nullable for Google-only users |
+| `googleId`       | String         | no       | Google account `sub` claim. Unique index (partial, non-null) |
+| `email`          | String         | no       | Email from Google ID token |
 | `createdAt`      | Instant        | auto     | |
 
 ## API Endpoints
@@ -163,6 +161,8 @@ Responses include computed fields: `progress` (finished books in that year), `pe
 | `POST`   | `/mcp`                | MCP Streamable HTTP endpoint (JSON-RPC)  | `200 OK`         |
 | `POST`   | `/auth/register`      | Register a new user (returns JWT token)  | `201 Created`    |
 | `POST`   | `/auth/login`         | Login with credentials (returns JWT token)| `200 OK`        |
+| `POST`   | `/auth/google`        | Login with Google ID token (creates user if new) | `200 OK` / `201 Created` |
+| `GET`    | `/auth/config`        | Returns `{googleClientId}` for frontend  | `200 OK`         |
 
 ### `GET /books` Query Parameters
 
@@ -213,7 +213,8 @@ When `?page=` is present, the response is a wrapper object: `{"books":[...], "pa
 - **Search is client-side in the frontend** and server-side via `?search=` for API consumers. The frontend does not call `?search=` — it filters `allBooks` in memory
 - **Sorting is in-memory in `BookController`** — a `Comparator` is applied to the result list after repository fetch. No `ORDER BY` is added to SQL queries
 - **`readingProgress`** is validated as 0–100 on both create and update. Setting it to `null` via PUT clears it. Only displayed in the UI for `READING` books
-- **Authentication** — Hand-built JWT (HMAC-SHA256 via `javax.crypto.Mac`), PBKDF2WithHmacSHA256 password hashing (310k iterations, 16-byte salt). No external auth libraries. Public routes: all GET requests, `POST /auth/register`, `POST /auth/login`, `POST /mcp`. All other POST/PUT/DELETE require `Authorization: Bearer <token>` header. JWT secret from `JWT_SECRET` env var (random generated if not set). Tokens expire after 24 hours. Username: 3-50 chars. Password: 8-128 chars
+- **Authentication** — Hand-built JWT (HMAC-SHA256 via `javax.crypto.Mac`), PBKDF2WithHmacSHA256 password hashing (310k iterations, 16-byte salt). No external auth libraries. Public routes: all GET requests, `POST /auth/register`, `POST /auth/login`, `POST /auth/google`, `POST /mcp`. All other POST/PUT/DELETE require `Authorization: Bearer <token>` header. JWT secret from `JWT_SECRET` env var (random generated if not set). Tokens expire after 24 hours. Username: 3-50 chars. Password: 8-128 chars
+- **Google OAuth** — Uses Google Identity Services (GIS) credential flow. Frontend loads `accounts.google.com/gsi/client`, gets an ID token from Google, POSTs it to `/auth/google`. Backend verifies the RS256-signed ID token using Google's JWKS public keys (`java.security.Signature`, no libraries). Keys are cached and refreshed on rotation. `GET /auth/config` returns the client ID so the frontend can conditionally show the Google button. Google-only users have null `passwordHash`/`salt`. Username is derived from email prefix with uniqueness suffix
 - **Request logging** — SLF4J 2.0.12 + Logback 1.5.6. `RequestLogger` routes to INFO (2xx/3xx), WARN (4xx), ERROR (5xx). Format: `METHOD /path STATUS TIMEms CLIENT_IP`. HikariCP logs suppressed to WARN level
 - **Subject filter** — `?subject=` query param with case-insensitive substring match on the JSON array TEXT column. Mutually exclusive with `?search=` (search takes priority). Uses `LOWER(subjects) LIKE LOWER(?)` in SQL with `escapeLike()` for safe matching
 - **Pagination** — Backward-compatible: without `?page=`, returns raw JSON array. With `?page=`, returns wrapper object with `books`, `page`, `size`, `totalItems`, `totalPages`. In-memory slicing (not SQL LIMIT/OFFSET) because sorting/post-filtering already happens in Java. Default page size 20, max 100
@@ -240,6 +241,7 @@ The server exposes an MCP endpoint at `POST /mcp` using the Streamable HTTP tran
 | `APP_PORT`  | `8080`      | Server listen port |
 | `GOOGLE_BOOKS_API_KEY` | *(none)* | Optional — raises Google Books API quota |
 | `JWT_SECRET` | *(random)* | HMAC-SHA256 secret for JWT tokens. If not set, a random secret is generated (tokens won't survive restarts) |
+| `GOOGLE_CLIENT_ID` | *(none)* | Google OAuth client ID. If set, enables "Sign in with Google" on login page |
 
 ## Testing
 
@@ -248,10 +250,11 @@ Tests use JUnit 5 with `java.net.HttpClient`. The server starts on a random port
 Test classes:
 - **`BookApiTest`** (117 tests) — full HTTP integration tests covering CRUD, filtering, search, sorting, reading progress, half-star ratings, start/finish dates, reviews, partial updates, validation, cover endpoints, subject filtering, pagination, statistics, and CSV import/export
 - **`BookMetadataTest`** (43 tests) — unit tests for `BookMetadata.deriveGenre()`, Google Books response parsing, and `mergeMetadata()`
-- **`ShelfApiTest`** (57 tests) — shelf CRUD, book assignment, reordering, stats, validation, and edge cases
-- **`McpTest`** (22 tests) — MCP endpoint tests covering JSON-RPC protocol (initialize, tools/list, tools/call, ping, errors) and all 5 tool implementations
-- **`GoalApiTest`** (12 tests) — reading goal CRUD, progress computation, validation, duplicate handling, and edge cases
+- **`ShelfApiTest`** (56 tests) — shelf CRUD, book assignment, reordering, stats, validation, and edge cases
+- **`McpTest`** (21 tests) — MCP endpoint tests covering JSON-RPC protocol (initialize, tools/list, tools/call, ping, errors) and all 5 tool implementations
+- **`GoalApiTest`** (11 tests) — reading goal CRUD, progress computation, validation, duplicate handling, and edge cases
 - **`AuthApiTest`** (12 tests) — auth endpoint tests covering register, login, duplicate username, wrong password, protected endpoints (no/valid/invalid/tampered token), public GET access, and validation
+- **`GoogleAuthApiTest`** (11 tests) — Google OAuth tests using test RSA key pair: new user creation, existing user login, JWT works on protected endpoints, invalid/expired/tampered tokens, username derivation, auth config endpoint
 - **`OpenLibraryTest`** (11 tests) — live integration tests for Open Library enrichment service (excluded from default `./gradlew test` via `@Tag("integration")`; run with `./gradlew integrationTest`)
 
 ## Database Column Mapping
@@ -284,6 +287,7 @@ Migrations run on startup via `DatabaseConfig.runMigrations()`. The schema uses 
 6. Half-star migration: `UPDATE books SET rating = rating * 2 WHERE rating > 0` (guarded by max-rating check)
 7. `reading_goals` table — `id UUID`, `year INTEGER UNIQUE`, `target INTEGER`, `created_at`, `updated_at`
 8. `users` table — `id UUID`, `username VARCHAR(50) UNIQUE`, `password_hash VARCHAR(255)`, `salt VARCHAR(255)`, `created_at`
+9. Google OAuth: `google_id VARCHAR(255)`, `email VARCHAR(255)` on users; `password_hash`/`salt` made nullable; unique partial index on `google_id`
 
 ## Source File Overview
 
@@ -319,7 +323,7 @@ Migrations run on startup via `DatabaseConfig.runMigrations()`. The schema uses 
 | `BookMetadata.java` | DTO for Open Library response |
 | `StaticFileHandler.java` | Serves `static/` files |
 | `RequestLogger.java` | SLF4J structured request logging (INFO/WARN/ERROR by status code) |
-| `User.java` | User entity (id, username, passwordHash, salt, createdAt) |
+| `User.java` | User entity (id, username, passwordHash, salt, googleId, email, createdAt) |
 | `UserRepository.java` | User repository interface |
 | `InMemoryUserRepository.java` | In-memory user store (used in tests) |
 | `JdbcUserRepository.java` | PostgreSQL user implementation |
@@ -327,6 +331,7 @@ Migrations run on startup via `DatabaseConfig.runMigrations()`. The schema uses 
 | `AuthMiddleware.java` | JWT validation + public route checking |
 | `JwtUtil.java` | Hand-built JWT creation/validation (HMAC-SHA256) |
 | `PasswordUtil.java` | PBKDF2 password hashing and verification |
+| `GoogleTokenVerifier.java` | Verifies Google ID tokens (RS256) using JWKS public keys; test constructor accepts pre-loaded keys |
 | `DuplicateUserException.java` | Exception for duplicate username |
 | `mcp/McpController.java` | MCP Streamable HTTP endpoint — JSON-RPC dispatch |
 | `mcp/McpToolHandler.java` | MCP tool implementations (check_book, search_books, list_books, get_book_by_isbn, get_bookshelf_stats) |

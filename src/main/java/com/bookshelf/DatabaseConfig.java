@@ -174,6 +174,18 @@ public class DatabaseConfig {
         } catch (SQLException e) {
             throw new RuntimeException("Failed to run users migration", e);
         }
+
+        // Google OAuth columns on users table
+        try (Connection conn = dataSource.getConnection();
+             Statement stmt = conn.createStatement()) {
+            stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(255)");
+            stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255)");
+            stmt.execute("ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL");
+            stmt.execute("ALTER TABLE users ALTER COLUMN salt DROP NOT NULL");
+            stmt.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id) WHERE google_id IS NOT NULL");
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to run Google OAuth migration", e);
+        }
     }
 
     public void close() {
