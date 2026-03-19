@@ -2290,6 +2290,267 @@ document.getElementById("goal-delete-btn").addEventListener("click", async () =>
   }
 });
 
+// ---- CSV Export/Import ----
+
+document.getElementById("export-btn")?.addEventListener("click", async () => {
+  try {
+    const resp = await fetch(API + "/books/export", {
+      headers: authHeaders()
+    });
+    if (resp.status === 401) { handleAuthExpired(); return; }
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "mybookshelf-export.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast("Library exported");
+  } catch {
+    showToast("Export failed", "error");
+  }
+});
+
+const importFileInput = document.getElementById("import-file");
+document.getElementById("import-btn")?.addEventListener("click", () => {
+  if (importFileInput) importFileInput.click();
+});
+
+importFileInput?.addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  importFileInput.value = "";
+  try {
+    const text = await file.text();
+    const resp = await fetch(API + "/books/import", {
+      method: "POST",
+      headers: { "Content-Type": "text/csv", ...authHeaders() },
+      body: text
+    });
+    if (resp.status === 401) { handleAuthExpired(); return; }
+    const data = await resp.json();
+    if (resp.ok) {
+      showImportResults(data);
+      await loadBooks();
+    } else {
+      showToast(data.error || "Import failed", "error");
+    }
+  } catch {
+    showToast("Import failed", "error");
+  }
+});
+
+function showImportResults(data) {
+  const modal = document.getElementById("import-modal");
+  const summary = document.getElementById("import-summary");
+  const details = document.getElementById("import-details");
+  summary.textContent = "";
+  details.textContent = "";
+
+  const p = document.createElement("p");
+  p.textContent = data.imported + " imported, " + data.skipped + " skipped, " + data.errors + " errors";
+  summary.appendChild(p);
+
+  if (data.details && data.details.length > 0) {
+    const ul = document.createElement("ul");
+    for (const d of data.details) {
+      const li = document.createElement("li");
+      li.textContent = "Row " + d.row + ": " + d.reason + (d.isbn ? " (ISBN: " + d.isbn + ")" : "");
+      ul.appendChild(li);
+    }
+    details.appendChild(ul);
+  }
+
+  modal.hidden = false;
+}
+
+document.getElementById("import-close")?.addEventListener("click", () => {
+  document.getElementById("import-modal").hidden = true;
+});
+document.getElementById("import-modal")?.addEventListener("click", (e) => {
+  if (e.target === e.currentTarget) e.currentTarget.hidden = true;
+});
+
+// ---- Stats Dashboard ----
+document.getElementById("stats-toggle")?.addEventListener("click", toggleStats);
+
+function escHtml(str) {
+  const el = document.createElement("span");
+  el.textContent = str;
+  return el.innerHTML;
+}
+
+async function toggleStats() {
+  const panel = document.getElementById("stats-panel");
+  if (!panel) return;
+  const isHidden = panel.hidden;
+  panel.hidden = !isHidden;
+  if (isHidden) {
+    try {
+      const resp = await apiGet("/books/stats");
+      const data = await resp.json();
+      renderStats(data);
+    } catch {
+      document.getElementById("stats-panel").textContent = "Failed to load statistics.";
+    }
+  }
+}
+
+function renderStats(data) {
+  // Total books
+  const totalEl = document.getElementById("stat-total");
+  totalEl.textContent = "";
+  const h = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+  totalEl.appendChild(h("h3", "stat-heading", "Total Books"));
+  totalEl.appendChild(h("div", "stat-big-number", String(data.totalBooks)));
+
+  // Status breakdown
+  const statusLabels = { WANT_TO_READ: "Want to Read", READING: "Reading", FINISHED: "Finished", DNF: "Did Not Finish" };
+  const statusColors = { WANT_TO_READ: "var(--status-want)", READING: "var(--status-reading)", FINISHED: "var(--status-finished)", DNF: "var(--status-dnf)" };
+  const statusEl = document.getElementById("stat-status");
+  statusEl.textContent = "";
+  statusEl.appendChild(h("h3", "stat-heading", "By Status"));
+  if (data.totalBooks > 0) {
+    for (const [key, label] of Object.entries(statusLabels)) {
+      const count = (data.byStatus && data.byStatus[key]) || 0;
+      const pct = Math.round((count / data.totalBooks) * 100);
+      statusEl.appendChild(makeBarRow(label, pct, count, statusColors[key]));
+    }
+  } else {
+    statusEl.appendChild(h("p", "stat-empty", "No books yet"));
+  }
+
+  // Genre breakdown
+  const genreEl = document.getElementById("stat-genres");
+  genreEl.textContent = "";
+  genreEl.appendChild(h("h3", "stat-heading", "Top Genres"));
+  if (data.byGenre && Object.keys(data.byGenre).length > 0) {
+    const sorted = Object.entries(data.byGenre).sort((a, b) => b[1] - a[1]).slice(0, 8);
+    const max = sorted[0][1];
+    for (const [genre, count] of sorted) {
+      const pct = Math.round((count / max) * 100);
+      const label = genre === "null" ? "Unclassified" : genre;
+      genreEl.appendChild(makeBarRow(label, pct, count));
+    }
+  } else {
+    genreEl.appendChild(h("p", "stat-empty", "No genre data"));
+  }
+
+  // Ratings
+  const ratingsEl = document.getElementById("stat-ratings");
+  ratingsEl.textContent = "";
+  ratingsEl.appendChild(h("h3", "stat-heading", "Ratings"));
+  if (data.ratings) {
+    const avg = data.ratings.average || 0;
+    const sub = h("div", "stat-sub");
+    sub.textContent = "Average: " + (avg > 0 ? avg.toFixed(1) : "N/A") + " \u00B7 Unrated: " + data.ratings.unrated;
+    ratingsEl.appendChild(sub);
+    if (data.ratings.distribution && Object.keys(data.ratings.distribution).length > 0) {
+      const dist = data.ratings.distribution;
+      const maxCount = Math.max(...Object.values(dist), 1);
+      const keys = Object.keys(dist).map(Number).sort((a, b) => b - a);
+      for (const k of keys) {
+        const pct = Math.round((dist[k] / maxCount) * 100);
+        const label = Number.isInteger(k) ? k + " \u2605" : k.toFixed(1) + " \u2605";
+        ratingsEl.appendChild(makeBarRow(label, pct, dist[k]));
+      }
+    }
+  }
+
+  // Pages
+  const pagesEl = document.getElementById("stat-pages");
+  pagesEl.textContent = "";
+  pagesEl.appendChild(h("h3", "stat-heading", "Pages"));
+  if (data.pages) {
+    pagesEl.appendChild(h("div", "stat-big-number", (data.pages.totalRead || 0).toLocaleString()));
+    pagesEl.appendChild(h("div", "stat-sub", "pages read (finished books)"));
+    if (data.pages.averagePerBook > 0) {
+      const avgSub = h("div", "stat-sub", "Average: " + data.pages.averagePerBook + " pages/book");
+      avgSub.style.marginTop = "0.5rem";
+      pagesEl.appendChild(avgSub);
+    }
+  }
+
+  // Finished by month
+  const monthlyEl = document.getElementById("stat-monthly");
+  monthlyEl.textContent = "";
+  monthlyEl.appendChild(h("h3", "stat-heading", "Books Finished by Month"));
+  if (data.finishedByMonth && Object.keys(data.finishedByMonth).length > 0) {
+    const entries = Object.entries(data.finishedByMonth);
+    const max = Math.max(...entries.map(e => e[1]), 1);
+    for (const [month, count] of entries) {
+      const pct = Math.round((count / max) * 100);
+      monthlyEl.appendChild(makeBarRow(month, pct, count));
+    }
+  } else {
+    monthlyEl.appendChild(h("p", "stat-empty", "No finished books yet"));
+  }
+
+  // Top authors
+  const authorsEl = document.getElementById("stat-authors");
+  authorsEl.textContent = "";
+  authorsEl.appendChild(h("h3", "stat-heading", "Top Authors"));
+  if (data.topAuthors && data.topAuthors.length > 0) {
+    const ol = document.createElement("ol");
+    ol.className = "stat-list";
+    for (const a of data.topAuthors) {
+      const li = document.createElement("li");
+      const nameSpan = h("span", "stat-list-name", a.author);
+      const countSpan = h("span", "stat-list-count", a.count + " book" + (a.count !== 1 ? "s" : ""));
+      li.appendChild(nameSpan);
+      li.appendChild(countSpan);
+      ol.appendChild(li);
+    }
+    authorsEl.appendChild(ol);
+  } else {
+    authorsEl.appendChild(h("p", "stat-empty", "No authors yet"));
+  }
+
+  // Recently finished
+  const recentEl = document.getElementById("stat-recent");
+  recentEl.textContent = "";
+  recentEl.appendChild(h("h3", "stat-heading", "Recently Finished"));
+  if (data.recentlyFinished && data.recentlyFinished.length > 0) {
+    const ul = document.createElement("ul");
+    ul.className = "stat-recent-list";
+    for (const b of data.recentlyFinished) {
+      const li = document.createElement("li");
+      const strong = h("strong", null, b.title || "Untitled");
+      li.appendChild(strong);
+      const byText = " by " + (b.author || "Unknown") + (b.rating > 0 ? " \u00B7 " + b.rating.toFixed(1) + " \u2605" : "");
+      li.appendChild(document.createTextNode(byText));
+      ul.appendChild(li);
+    }
+    recentEl.appendChild(ul);
+  } else {
+    recentEl.appendChild(h("p", "stat-empty", "No finished books yet"));
+  }
+}
+
+function makeBarRow(label, pct, value, color) {
+  const row = document.createElement("div");
+  row.className = "bar-row";
+  const labelSpan = document.createElement("span");
+  labelSpan.className = "bar-label";
+  labelSpan.textContent = label;
+  const track = document.createElement("div");
+  track.className = "bar-track";
+  const fill = document.createElement("div");
+  fill.className = "bar-fill";
+  fill.style.width = pct + "%";
+  if (color) fill.style.background = color;
+  track.appendChild(fill);
+  const valueSpan = document.createElement("span");
+  valueSpan.className = "bar-value";
+  valueSpan.textContent = String(value);
+  row.appendChild(labelSpan);
+  row.appendChild(track);
+  row.appendChild(valueSpan);
+  return row;
+}
+
 // ---- Pagination Buttons ----
 document.getElementById("prev-page")?.addEventListener("click", () => {
   if (currentPage > 1) {

@@ -1956,4 +1956,295 @@ public class BookApiTest {
         var response = get("/books?page=1&size=abc");
         assertEquals(400, response.statusCode());
     }
+
+    // --- Stats endpoint tests ---
+
+    @Test
+    void testStatsEmpty() throws Exception {
+        var response = get("/books/stats");
+        assertEquals(200, response.statusCode());
+        var stats = gson.fromJson(response.body(), JsonObject.class);
+        assertEquals(0, stats.get("totalBooks").getAsInt());
+        assertEquals(0, stats.getAsJsonObject("byStatus").get("WANT_TO_READ").getAsInt());
+        assertEquals(0, stats.getAsJsonObject("byStatus").get("READING").getAsInt());
+        assertEquals(0, stats.getAsJsonObject("byStatus").get("FINISHED").getAsInt());
+        assertEquals(0, stats.getAsJsonObject("byStatus").get("DNF").getAsInt());
+        assertEquals(0, stats.getAsJsonObject("ratings").get("unrated").getAsInt());
+        assertEquals(0, stats.getAsJsonObject("pages").get("totalRead").getAsInt());
+    }
+
+    @Test
+    void testStatsWithData() throws Exception {
+        post("/books", gson.toJson(java.util.Map.of(
+            "title", "Book A", "author", "Author X", "readStatus", "FINISHED",
+            "rating", 4.0, "pageCount", 300, "genre", "Fiction",
+            "finishedAt", "2025-06-15")));
+        post("/books", gson.toJson(java.util.Map.of(
+            "title", "Book B", "author", "Author Y", "readStatus", "READING",
+            "rating", 3.5, "pageCount", 200, "genre", "Science")));
+        post("/books", gson.toJson(java.util.Map.of(
+            "title", "Book C", "author", "Author X", "readStatus", "WANT_TO_READ",
+            "genre", "Fiction")));
+
+        var response = get("/books/stats");
+        assertEquals(200, response.statusCode());
+        var stats = gson.fromJson(response.body(), JsonObject.class);
+
+        assertEquals(3, stats.get("totalBooks").getAsInt());
+        var byStatus = stats.getAsJsonObject("byStatus");
+        assertEquals(1, byStatus.get("FINISHED").getAsInt());
+        assertEquals(1, byStatus.get("READING").getAsInt());
+        assertEquals(1, byStatus.get("WANT_TO_READ").getAsInt());
+    }
+
+    @Test
+    void testStatsGenreBreakdown() throws Exception {
+        post("/books", gson.toJson(java.util.Map.of(
+            "title", "A", "author", "A", "readStatus", "FINISHED", "genre", "Fiction")));
+        post("/books", gson.toJson(java.util.Map.of(
+            "title", "B", "author", "B", "readStatus", "READING", "genre", "Fiction")));
+        post("/books", gson.toJson(java.util.Map.of(
+            "title", "C", "author", "C", "readStatus", "FINISHED", "genre", "Science")));
+
+        var response = get("/books/stats");
+        var stats = gson.fromJson(response.body(), JsonObject.class);
+        var byGenre = stats.getAsJsonObject("byGenre");
+        assertEquals(2, byGenre.get("Fiction").getAsInt());
+        assertEquals(1, byGenre.get("Science").getAsInt());
+    }
+
+    @Test
+    void testStatsTopAuthors() throws Exception {
+        for (int i = 0; i < 3; i++) {
+            post("/books", gson.toJson(java.util.Map.of(
+                "title", "Book " + i, "author", "Popular Author", "readStatus", "FINISHED")));
+        }
+        post("/books", gson.toJson(java.util.Map.of(
+            "title", "Solo", "author", "One-Hit Wonder", "readStatus", "FINISHED")));
+
+        var response = get("/books/stats");
+        var stats = gson.fromJson(response.body(), JsonObject.class);
+        var topAuthors = stats.getAsJsonArray("topAuthors");
+        assertTrue(topAuthors.size() >= 1);
+        var first = topAuthors.get(0).getAsJsonObject();
+        assertEquals("Popular Author", first.get("author").getAsString());
+        assertEquals(3, first.get("count").getAsInt());
+    }
+
+    @Test
+    void testStatsFinishedByMonth() throws Exception {
+        post("/books", gson.toJson(java.util.Map.of(
+            "title", "Jan Book", "author", "A", "readStatus", "FINISHED",
+            "finishedAt", "2025-01-15")));
+        post("/books", gson.toJson(java.util.Map.of(
+            "title", "Jan Book 2", "author", "B", "readStatus", "FINISHED",
+            "finishedAt", "2025-01-20")));
+        post("/books", gson.toJson(java.util.Map.of(
+            "title", "Mar Book", "author", "C", "readStatus", "FINISHED",
+            "finishedAt", "2025-03-10")));
+
+        var response = get("/books/stats");
+        var stats = gson.fromJson(response.body(), JsonObject.class);
+        var byMonth = stats.getAsJsonObject("finishedByMonth");
+        assertEquals(2, byMonth.get("2025-01").getAsInt());
+        assertEquals(1, byMonth.get("2025-03").getAsInt());
+    }
+
+    // --- CSV Export/Import tests ---
+
+    private HttpResponse<String> postCsv(String path, String csvBody)
+        throws IOException, InterruptedException {
+        return client.send(
+            HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl() + path))
+                .header("Content-Type", "text/csv")
+                .header("Authorization", "Bearer " + authToken)
+                .POST(HttpRequest.BodyPublishers.ofString(csvBody))
+                .build(),
+            HttpResponse.BodyHandlers.ofString()
+        );
+    }
+
+    @Test
+    void testExportEmpty() throws Exception {
+        var response = get("/books/export");
+        assertEquals(200, response.statusCode());
+        String body = response.body();
+        assertTrue(body.startsWith("id,title,author,genre,rating,isbn"));
+        // Only header row, no data
+        String[] lines = body.trim().split("\r\n|\n");
+        assertEquals(1, lines.length);
+    }
+
+    @Test
+    void testExportBooks() throws Exception {
+        post("/books", gson.toJson(java.util.Map.of(
+            "title", "Dune", "author", "Frank Herbert", "readStatus", "FINISHED",
+            "isbn", "9780441013593", "rating", 4.5, "genre", "Science Fiction")));
+        post("/books", gson.toJson(java.util.Map.of(
+            "title", "Neuromancer", "author", "William Gibson", "readStatus", "READING")));
+        post("/books", gson.toJson(java.util.Map.of(
+            "title", "Snow Crash", "author", "Neal Stephenson", "readStatus", "WANT_TO_READ")));
+
+        var response = get("/books/export");
+        assertEquals(200, response.statusCode());
+        String body = response.body();
+        String[] lines = body.trim().split("\r\n|\n");
+        assertEquals(4, lines.length); // header + 3 books
+        assertTrue(body.contains("Dune"));
+        assertTrue(body.contains("Neuromancer"));
+        assertTrue(body.contains("Snow Crash"));
+    }
+
+    @Test
+    void testExportSpecialCharacters() throws Exception {
+        post("/books", gson.toJson(java.util.Map.of(
+            "title", "The \"Big\" Book, Vol. 1", "author", "Some Author",
+            "readStatus", "WANT_TO_READ")));
+
+        var response = get("/books/export");
+        assertEquals(200, response.statusCode());
+        // The title should be properly CSV-escaped
+        assertTrue(response.body().contains("\"The \"\"Big\"\" Book, Vol. 1\""));
+    }
+
+    @Test
+    void testImportMyBookShelfCsv() throws Exception {
+        // Create books, export, clear, re-import
+        post("/books", gson.toJson(java.util.Map.of(
+            "title", "Book A", "author", "Author A", "readStatus", "FINISHED",
+            "rating", 4.0, "genre", "Fiction")));
+        post("/books", gson.toJson(java.util.Map.of(
+            "title", "Book B", "author", "Author B", "readStatus", "READING")));
+        post("/books", gson.toJson(java.util.Map.of(
+            "title", "Book C", "author", "Author C", "readStatus", "WANT_TO_READ")));
+
+        var exportResp = get("/books/export");
+        String csv = exportResp.body();
+
+        repository.clear();
+
+        var importResp = postCsv("/books/import", csv);
+        assertEquals(200, importResp.statusCode());
+        var result = gson.fromJson(importResp.body(), JsonObject.class);
+        assertEquals(3, result.get("imported").getAsInt());
+        assertEquals(0, result.get("skipped").getAsInt());
+
+        var booksResp = get("/books");
+        var arr = gson.fromJson(booksResp.body(), JsonArray.class);
+        assertEquals(3, arr.size());
+    }
+
+    @Test
+    void testImportGoodreadsCsv() throws Exception {
+        String csv = "Title,Author,ISBN,ISBN13,My Rating,Publisher,Number of Pages,Year Published,Exclusive Shelf,Date Read,My Review\r\n"
+            + "Dune,Frank Herbert,,=\"9780441013593\",5,Ace,,1965,read,2025/01/15,Great book\r\n"
+            + "Neuromancer,William Gibson,,=\"9780441569595\",4,Ace,,1984,currently-reading,,\r\n";
+
+        var response = postCsv("/books/import", csv);
+        assertEquals(200, response.statusCode());
+        var result = gson.fromJson(response.body(), JsonObject.class);
+        assertEquals(2, result.get("imported").getAsInt());
+
+        var booksResp = get("/books");
+        var books = gson.fromJson(booksResp.body(), JsonArray.class);
+        assertEquals(2, books.size());
+
+        // Check status mapping
+        boolean foundFinished = false, foundReading = false;
+        for (var el : books) {
+            var b = el.getAsJsonObject();
+            if ("Dune".equals(b.get("title").getAsString())) {
+                assertEquals("FINISHED", b.get("readStatus").getAsString());
+                foundFinished = true;
+            }
+            if ("Neuromancer".equals(b.get("title").getAsString())) {
+                assertEquals("READING", b.get("readStatus").getAsString());
+                foundReading = true;
+            }
+        }
+        assertTrue(foundFinished);
+        assertTrue(foundReading);
+    }
+
+    @Test
+    void testImportSkipsDuplicateIsbn() throws Exception {
+        post("/books", gson.toJson(java.util.Map.of(
+            "title", "Existing Book", "author", "Author", "readStatus", "FINISHED",
+            "isbn", "9780441013593")));
+
+        String csv = "Title,Author,ISBN,ISBN13,My Rating,Exclusive Shelf\r\n"
+            + "Dune,Frank Herbert,,=\"9780441013593\",5,read\r\n";
+
+        var response = postCsv("/books/import", csv);
+        assertEquals(200, response.statusCode());
+        var result = gson.fromJson(response.body(), JsonObject.class);
+        assertEquals(0, result.get("imported").getAsInt());
+        assertEquals(1, result.get("skipped").getAsInt());
+    }
+
+    @Test
+    void testImportRejectsEmptyBody() throws Exception {
+        var response = postCsv("/books/import", "");
+        assertEquals(400, response.statusCode());
+    }
+
+    @Test
+    void testImportGoodreadsIsbnCleanup() throws Exception {
+        String csv = "Title,Author,ISBN,ISBN13,My Rating,Exclusive Shelf\r\n"
+            + "Dune,Frank Herbert,=\"0441013597\",=\"9780441013593\",5,read\r\n";
+
+        var response = postCsv("/books/import", csv);
+        assertEquals(200, response.statusCode());
+
+        // Verify ISBN was cleaned
+        var booksResp = get("/books");
+        var books = gson.fromJson(booksResp.body(), JsonArray.class);
+        assertEquals(1, books.size());
+        assertEquals("9780441013593", books.get(0).getAsJsonObject().get("isbn").getAsString());
+    }
+
+    @Test
+    void testImportRoundTrip() throws Exception {
+        post("/books", gson.toJson(java.util.Map.of(
+            "title", "Book 1", "author", "Author 1", "readStatus", "FINISHED",
+            "rating", 3.5, "genre", "Fantasy", "review", "Loved it")));
+        post("/books", gson.toJson(java.util.Map.of(
+            "title", "Book 2", "author", "Author 2", "readStatus", "READING",
+            "readingProgress", 42)));
+
+        var exportResp = get("/books/export");
+        String csv = exportResp.body();
+
+        repository.clear();
+        assertEquals(0, repository.findAll().size());
+
+        var importResp = postCsv("/books/import", csv);
+        assertEquals(200, importResp.statusCode());
+        var result = gson.fromJson(importResp.body(), JsonObject.class);
+        assertEquals(2, result.get("imported").getAsInt());
+
+        var booksResp = get("/books");
+        var books = gson.fromJson(booksResp.body(), JsonArray.class);
+        assertEquals(2, books.size());
+
+        // Check fields preserved
+        boolean found1 = false, found2 = false;
+        for (var el : books) {
+            var b = el.getAsJsonObject();
+            if ("Book 1".equals(b.get("title").getAsString())) {
+                assertEquals("FINISHED", b.get("readStatus").getAsString());
+                assertEquals(3.5, b.get("rating").getAsDouble(), 0.01);
+                assertEquals("Fantasy", b.get("genre").getAsString());
+                found1 = true;
+            }
+            if ("Book 2".equals(b.get("title").getAsString())) {
+                assertEquals("READING", b.get("readStatus").getAsString());
+                assertEquals(42, b.get("readingProgress").getAsInt());
+                found2 = true;
+            }
+        }
+        assertTrue(found1);
+        assertTrue(found2);
+    }
 }

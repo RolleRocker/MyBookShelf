@@ -107,6 +107,9 @@ public class App {
         router.addRoute("GET", "/books", controller::handleGetBooks);
         router.addRoute("POST", "/books", controller::handleCreateBook);
         router.addRoute("POST", "/books/re-enrich", controller::handleReEnrich);
+        router.addRoute("GET", "/books/stats", controller::handleGetStats);
+        router.addRoute("GET", "/books/export", controller::handleExportBooks);
+        router.addRoute("POST", "/books/import", controller::handleImportBooks);
         router.addRoute("GET", "/books/{id}", controller::handleGetBook);
         router.addRoute("PUT", "/books/{id}", controller::handleUpdateBook);
         router.addRoute("DELETE", "/books/{id}", controller::handleDeleteBook);

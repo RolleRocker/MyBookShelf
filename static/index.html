@@ -238,6 +238,31 @@
                 </select>
                 <button
                     class="group-toggle"
+                    id="stats-toggle"
+                    type="button"
+                    title="Reading Statistics"
+                >
+                    Stats
+                </button>
+                <button
+                    class="group-toggle"
+                    id="export-btn"
+                    type="button"
+                    title="Export library as CSV"
+                >
+                    Export
+                </button>
+                <button
+                    class="group-toggle"
+                    id="import-btn"
+                    type="button"
+                    title="Import books from CSV"
+                >
+                    Import
+                </button>
+                <input type="file" id="import-file" accept=".csv" hidden />
+                <button
+                    class="group-toggle"
                     id="refresh-library-btn"
                     type="button"
                     title="Re-fetch metadata from Open Library for all books"
@@ -246,6 +271,19 @@
                 </button>
             </div>
         </nav>
+
+        <div id="stats-panel" class="stats-panel" hidden>
+            <div class="stats-grid">
+                <div class="stat-card" id="stat-total"></div>
+                <div class="stat-card" id="stat-status"></div>
+                <div class="stat-card" id="stat-genres"></div>
+                <div class="stat-card" id="stat-ratings"></div>
+                <div class="stat-card" id="stat-pages"></div>
+                <div class="stat-card" id="stat-monthly"></div>
+                <div class="stat-card" id="stat-authors"></div>
+                <div class="stat-card" id="stat-recent"></div>
+            </div>
+        </div>
 
         <div class="app-layout">
             <aside id="shelf-sidebar" class="shelf-sidebar">
@@ -645,6 +683,22 @@
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+
+        <!-- Import Results Modal -->
+        <div id="import-modal" class="modal-overlay" hidden>
+            <div class="modal import-modal">
+                <div class="modal-header">
+                    <h2>Import Results</h2>
+                    <button class="modal-close" id="import-close" type="button" aria-label="Close">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M4 4l12 12M16 4L4 16" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                        </svg>
+                    </button>
+                </div>
+                <div id="import-summary" class="import-summary"></div>
+                <div id="import-details" class="import-details"></div>
             </div>
         </div>
 

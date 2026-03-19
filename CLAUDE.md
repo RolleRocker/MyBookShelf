@@ -142,6 +142,9 @@ Responses include computed fields: `progress` (finished books in that year), `pe
 | `PUT`    | `/books/{id}`         | Partial update (only sent fields change) | `200 OK`         |
 | `DELETE` | `/books/{id}`         | Delete a book                            | `204 No Content` |
 | `POST`   | `/books/re-enrich`    | Re-enrich all books with ISBNs from Open Library | `202 Accepted` |
+| `GET`    | `/books/stats`        | Return computed reading statistics        | `200 OK`         |
+| `GET`    | `/books/export`       | Export all books as CSV                   | `200 OK`         |
+| `POST`   | `/books/import`       | Import books from CSV (MyBookShelf or Goodreads format) | `200 OK` |
 | `GET`    | `/books/{id}/cover`   | Serve cover image from DB (V2+)          | `200 OK`         |
 | `GET`    | `/shelves`            | List all shelves (with book counts)      | `200 OK`         |
 | `POST`   | `/shelves`            | Create a new shelf                       | `201 Created`    |
@@ -243,7 +246,7 @@ The server exposes an MCP endpoint at `POST /mcp` using the Streamable HTTP tran
 Tests use JUnit 5 with `java.net.HttpClient`. The server starts on a random port (`new ServerSocket(0)`) before each test class and shuts down after. Repository is cleaned between tests for isolation. Tests run against `InMemoryBookRepository` only (no DB required for `./gradlew test`).
 
 Test classes:
-- **`BookApiTest`** (101 tests) — full HTTP integration tests covering CRUD, filtering, search, sorting, reading progress, half-star ratings, start/finish dates, reviews, partial updates, validation, cover endpoints, subject filtering, and pagination
+- **`BookApiTest`** (117 tests) — full HTTP integration tests covering CRUD, filtering, search, sorting, reading progress, half-star ratings, start/finish dates, reviews, partial updates, validation, cover endpoints, subject filtering, pagination, statistics, and CSV import/export
 - **`BookMetadataTest`** (43 tests) — unit tests for `BookMetadata.deriveGenre()`, Google Books response parsing, and `mergeMetadata()`
 - **`ShelfApiTest`** (57 tests) — shelf CRUD, book assignment, reordering, stats, validation, and edge cases
 - **`McpTest`** (22 tests) — MCP endpoint tests covering JSON-RPC protocol (initialize, tools/list, tools/call, ping, errors) and all 5 tool implementations
