@@ -937,11 +937,11 @@ curl http://localhost:8080/books
 ---
 
 ## Stretch Goals (if you want to keep going)
-- Add **pagination** (`?page=1&size=10`) with prev/next buttons in the frontend
+- ~~Add **pagination** (`?page=1&size=10`) with prev/next buttons in the frontend~~ *(done — backward-compatible server-side + client-side pagination, default 20/max 100)*
 - ~~Add **search** (`?search=dune` searches title and author) with a search bar in the UI~~ *(done — client-side and server-side search)*
-- Add **request logging middleware**
-- Add **authentication** (basic API key or token-based)
-- Add a **subjects filter** (`GET /books?subject=science+fiction`) with clickable subject tags
+- ~~Add **request logging middleware**~~ *(done — SLF4J 2.0.12 + Logback 1.5.6, structured request logging)*
+- ~~Add **authentication** (basic API key or token-based)~~ *(done — JWT auth with PBKDF2 passwords, login/register page, public read-only access)*
+- ~~Add a **subjects filter** (`GET /books?subject=science+fiction`) with clickable subject tags~~ *(done — case-insensitive substring matching, clickable tags in frontend)*
 - ~~Add **sorting** (by title, author, rating, date added) with clickable column headers~~ *(done — client-side and server-side sorting)*
 - ~~Add a **barcode scanner** using the browser camera~~ *(done — uses zbar-wasm with multi-pass image processing pipeline)*
 - ~~Add **reading progress** — a percentage field for books with status `READING`~~ *(done — 0-100 percentage tracking)*
