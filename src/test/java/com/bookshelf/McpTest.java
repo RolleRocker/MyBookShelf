@@ -21,6 +21,7 @@ public class McpTest {
     private static InMemoryBookRepository repository;
     private static InMemoryShelfRepository shelfRepository;
     private static int port;
+    private static String authToken;
 
     @BeforeAll
     static void startServer() throws IOException, InterruptedException {
@@ -30,12 +31,26 @@ public class McpTest {
         ShelfController shelfController = new ShelfController(shelfRepository, repository);
         McpController mcpController = new McpController(repository, shelfRepository);
         GoalController goalController = new GoalController(new InMemoryGoalRepository(), repository);
-        Router router = App.createRouter(controller, shelfController, mcpController, goalController, null);
-        server = new HttpServer(0, router);
+        JwtUtil jwtUtil = new JwtUtil("test-secret");
+        InMemoryUserRepository userRepository = new InMemoryUserRepository();
+        AuthController authController = new AuthController(userRepository, jwtUtil);
+        AuthMiddleware authMiddleware = new AuthMiddleware(jwtUtil);
+        Router router = App.createRouter(controller, shelfController, mcpController, goalController, authController);
+        server = new HttpServer(0, router, authMiddleware);
         server.start();
         port = server.getPort();
         client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
         Thread.sleep(100);
+        // Register test user and get auth token
+        String regBody = "{\"username\":\"testuser\",\"password\":\"testpassword123\"}";
+        var regResp = client.send(
+            HttpRequest.newBuilder()
+                .uri(URI.create("http://localhost:" + port + "/auth/register"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(regBody))
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
+        authToken = JsonParser.parseString(regResp.body()).getAsJsonObject().get("token").getAsString();
     }
 
     @AfterAll
@@ -86,6 +101,7 @@ public class McpTest {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create("http://localhost:" + port + "/books"))
                 .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + authToken)
                 .POST(HttpRequest.BodyPublishers.ofString(book.toString()))
                 .build();
         client.send(request, HttpResponse.BodyHandlers.ofString());
@@ -100,6 +116,7 @@ public class McpTest {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create("http://localhost:" + port + "/books"))
                 .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + authToken)
                 .POST(HttpRequest.BodyPublishers.ofString(book.toString()))
                 .build();
         client.send(request, HttpResponse.BodyHandlers.ofString());

@@ -23,6 +23,7 @@ public class GoalApiTest {
     private static InMemoryBookRepository bookRepository;
     private static InMemoryGoalRepository goalRepository;
     private static int port;
+    private static String authToken;
     private static final Gson gson = new GsonBuilder().serializeNulls().create();
 
     @BeforeAll
@@ -34,12 +35,26 @@ public class GoalApiTest {
         ShelfController shelfController = new ShelfController(shelfRepository, bookRepository);
         McpController mcpController = new McpController(bookRepository, shelfRepository);
         GoalController goalController = new GoalController(goalRepository, bookRepository);
-        Router router = App.createRouter(bookController, shelfController, mcpController, goalController, null);
-        server = new HttpServer(0, router);
+        JwtUtil jwtUtil = new JwtUtil("test-secret");
+        InMemoryUserRepository userRepository = new InMemoryUserRepository();
+        AuthController authController = new AuthController(userRepository, jwtUtil);
+        AuthMiddleware authMiddleware = new AuthMiddleware(jwtUtil);
+        Router router = App.createRouter(bookController, shelfController, mcpController, goalController, authController);
+        server = new HttpServer(0, router, authMiddleware);
         server.start();
         port = server.getPort();
         client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
         Thread.sleep(100);
+        // Register test user and get auth token
+        String regBody = "{\"username\":\"testuser\",\"password\":\"testpassword123\"}";
+        var regResp = client.send(
+            HttpRequest.newBuilder()
+                .uri(URI.create("http://localhost:" + port + "/auth/register"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(regBody))
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
+        authToken = JsonParser.parseString(regResp.body()).getAsJsonObject().get("token").getAsString();
     }
 
     @AfterAll
@@ -67,6 +82,7 @@ public class GoalApiTest {
         return client.send(
             HttpRequest.newBuilder().uri(URI.create(baseUrl() + path))
                 .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + authToken)
                 .POST(HttpRequest.BodyPublishers.ofString(body)).build(),
             HttpResponse.BodyHandlers.ofString());
     }
@@ -75,13 +91,16 @@ public class GoalApiTest {
         return client.send(
             HttpRequest.newBuilder().uri(URI.create(baseUrl() + path))
                 .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + authToken)
                 .PUT(HttpRequest.BodyPublishers.ofString(body)).build(),
             HttpResponse.BodyHandlers.ofString());
     }
 
     private HttpResponse<String> delete(String path) throws IOException, InterruptedException {
         return client.send(
-            HttpRequest.newBuilder().uri(URI.create(baseUrl() + path)).DELETE().build(),
+            HttpRequest.newBuilder().uri(URI.create(baseUrl() + path))
+                .header("Authorization", "Bearer " + authToken)
+                .DELETE().build(),
             HttpResponse.BodyHandlers.ofString());
     }
 

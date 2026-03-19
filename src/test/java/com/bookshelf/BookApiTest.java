@@ -32,6 +32,7 @@ public class BookApiTest {
     private static InMemoryBookRepository repository;
     private static InMemoryShelfRepository shelfRepository;
     private static int port;
+    private static String authToken;
     private static final Gson gson = new GsonBuilder()
         .serializeNulls()
         .create();
@@ -57,14 +58,18 @@ public class BookApiTest {
             new InMemoryGoalRepository(),
             repository
         );
+        JwtUtil jwtUtil = new JwtUtil("test-secret");
+        InMemoryUserRepository userRepository = new InMemoryUserRepository();
+        AuthController authController = new AuthController(userRepository, jwtUtil);
+        AuthMiddleware authMiddleware = new AuthMiddleware(jwtUtil);
         Router router = App.createRouter(
             controller,
             shelfController,
             mcpController,
             goalController,
-            null
+            authController
         );
-        server = new HttpServer(0, router);
+        server = new HttpServer(0, router, authMiddleware);
         server.start();
         port = server.getPort();
         client = HttpClient.newBuilder()
@@ -72,6 +77,16 @@ public class BookApiTest {
             .build();
         // Give the server a moment to start accepting
         Thread.sleep(100);
+        // Register test user and get auth token
+        String regBody = "{\"username\":\"testuser\",\"password\":\"testpassword123\"}";
+        var regResp = client.send(
+            HttpRequest.newBuilder()
+                .uri(URI.create("http://localhost:" + port + "/auth/register"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(regBody))
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
+        authToken = JsonParser.parseString(regResp.body()).getAsJsonObject().get("token").getAsString();
     }
 
     @AfterAll
@@ -108,6 +123,7 @@ public class BookApiTest {
             HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl() + path))
                 .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + authToken)
                 .POST(HttpRequest.BodyPublishers.ofString(body))
                 .build(),
             HttpResponse.BodyHandlers.ofString()
@@ -120,6 +136,7 @@ public class BookApiTest {
             HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl() + path))
                 .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + authToken)
                 .PUT(HttpRequest.BodyPublishers.ofString(body))
                 .build(),
             HttpResponse.BodyHandlers.ofString()
@@ -131,6 +148,7 @@ public class BookApiTest {
         return client.send(
             HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl() + path))
+                .header("Authorization", "Bearer " + authToken)
                 .DELETE()
                 .build(),
             HttpResponse.BodyHandlers.ofString()
@@ -142,6 +160,7 @@ public class BookApiTest {
         return client.send(
             HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl() + path))
+                .header("Authorization", "Bearer " + authToken)
                 .method(method, HttpRequest.BodyPublishers.noBody())
                 .build(),
             HttpResponse.BodyHandlers.ofString()
@@ -833,6 +852,7 @@ public class BookApiTest {
             HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl() + "/books"))
                 .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + authToken)
                 .POST(HttpRequest.BodyPublishers.ofString(body))
                 .build(),
             HttpResponse.BodyHandlers.ofString()
@@ -851,6 +871,7 @@ public class BookApiTest {
             HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl() + "/books"))
                 .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + authToken)
                 .POST(HttpRequest.BodyPublishers.ofString(createBody))
                 .build(),
             HttpResponse.BodyHandlers.ofString()
@@ -866,6 +887,7 @@ public class BookApiTest {
             HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl() + "/books/" + id))
                 .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + authToken)
                 .method("PUT", HttpRequest.BodyPublishers.ofString(updateBody))
                 .build(),
             HttpResponse.BodyHandlers.ofString()
@@ -886,6 +908,7 @@ public class BookApiTest {
             HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl() + "/books"))
                 .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + authToken)
                 .POST(HttpRequest.BodyPublishers.ofString(body))
                 .build(),
             HttpResponse.BodyHandlers.ofString()
@@ -902,6 +925,7 @@ public class BookApiTest {
             HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl() + "/books"))
                 .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + authToken)
                 .POST(HttpRequest.BodyPublishers.ofString(createBody))
                 .build(),
             HttpResponse.BodyHandlers.ofString()
@@ -916,6 +940,7 @@ public class BookApiTest {
             HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl() + "/books/" + id))
                 .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + authToken)
                 .PUT(
                     HttpRequest.BodyPublishers.ofString(
                         "{\"readingProgress\":null}"
