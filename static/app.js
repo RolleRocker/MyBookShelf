@@ -579,6 +579,7 @@ function pollForEnrichment(bookId) {
     if (elapsed > 30000) {
       clearInterval(interval);
       pollingTimers.delete(bookId);
+      showToast("Could not find book info. You can edit it manually.", "error");
       return;
     }
 

@@ -2,6 +2,8 @@ package com.bookshelf;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.bookshelf.adapter.out.enrichment.OpenLibraryClient;
+import com.bookshelf.domain.model.BookMetadata;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -323,10 +325,8 @@ public class BookMetadataTest {
               }]
             }
             """;
-        BookEnrichmentService service = new BookEnrichmentService(
-            new InMemoryBookRepository()
-        );
-        BookMetadata m = service.parseGoogleBooksResponse(json);
+        OpenLibraryClient client = new OpenLibraryClient();
+        BookMetadata m = client.parseGoogleBooksResponse(json);
         assertNotNull(m);
         assertEquals("The Witcher: The Last Wish", m.getTitle());
         assertEquals("Andrzej Sapkowski", m.getAuthor());
@@ -343,10 +343,8 @@ public class BookMetadataTest {
     @Test
     void testParseGoogleBooks_emptyResponse() {
         String json = "{\"kind\":\"books#volumes\",\"totalItems\":0}";
-        BookEnrichmentService service = new BookEnrichmentService(
-            new InMemoryBookRepository()
-        );
-        BookMetadata m = service.parseGoogleBooksResponse(json);
+        OpenLibraryClient client = new OpenLibraryClient();
+        BookMetadata m = client.parseGoogleBooksResponse(json);
         assertNull(m);
     }
 
@@ -363,10 +361,8 @@ public class BookMetadataTest {
               }]
             }
             """;
-        BookEnrichmentService service = new BookEnrichmentService(
-            new InMemoryBookRepository()
-        );
-        BookMetadata m = service.parseGoogleBooksResponse(json);
+        OpenLibraryClient client = new OpenLibraryClient();
+        BookMetadata m = client.parseGoogleBooksResponse(json);
         assertNotNull(m);
         assertEquals("Some Book", m.getTitle());
         assertNull(m.getCoverUrl());
@@ -380,10 +376,8 @@ public class BookMetadataTest {
               "items": [{"volumeInfo": {"title": "Minimal"}}]
             }
             """;
-        BookEnrichmentService service = new BookEnrichmentService(
-            new InMemoryBookRepository()
-        );
-        BookMetadata m = service.parseGoogleBooksResponse(json);
+        OpenLibraryClient client = new OpenLibraryClient();
+        BookMetadata m = client.parseGoogleBooksResponse(json);
         assertNotNull(m);
         assertEquals("Minimal", m.getTitle());
         assertNull(m.getAuthor());
@@ -397,7 +391,7 @@ public class BookMetadataTest {
     void testMergeMetadata_primaryNull() {
         BookMetadata fallback = new BookMetadata();
         fallback.setTitle("Fallback Title");
-        BookMetadata result = BookEnrichmentService.mergeMetadata(
+        BookMetadata result = OpenLibraryClient.mergeMetadata(
             null,
             fallback
         );
@@ -408,7 +402,7 @@ public class BookMetadataTest {
     void testMergeMetadata_fallbackNull() {
         BookMetadata primary = new BookMetadata();
         primary.setTitle("Primary Title");
-        BookMetadata result = BookEnrichmentService.mergeMetadata(
+        BookMetadata result = OpenLibraryClient.mergeMetadata(
             primary,
             null
         );
@@ -426,7 +420,7 @@ public class BookMetadataTest {
         fallback.setAuthor("Google Author");
         fallback.setPublisher("Google Publisher");
 
-        BookMetadata result = BookEnrichmentService.mergeMetadata(
+        BookMetadata result = OpenLibraryClient.mergeMetadata(
             primary,
             fallback
         );
@@ -450,7 +444,7 @@ public class BookMetadataTest {
         fallback.setCoverUrl("https://example.com/cover.jpg");
         fallback.setGenre("Fiction");
 
-        BookMetadata result = BookEnrichmentService.mergeMetadata(
+        BookMetadata result = OpenLibraryClient.mergeMetadata(
             primary,
             fallback
         );

@@ -1,6 +1,27 @@
 package com.bookshelf;
 
-import com.bookshelf.mcp.McpController;
+import com.bookshelf.adapter.in.http.AuthController;
+import com.bookshelf.adapter.in.http.BookController;
+import com.bookshelf.adapter.in.http.GoalController;
+import com.bookshelf.adapter.in.http.ShelfController;
+import com.bookshelf.adapter.in.mcp.McpController;
+import com.bookshelf.adapter.out.auth.GoogleTokenVerifier;
+import com.bookshelf.adapter.out.auth.JwtUtil;
+import com.bookshelf.adapter.out.enrichment.BookEnrichmentService;
+import com.bookshelf.adapter.out.enrichment.OpenLibraryClient;
+import com.bookshelf.adapter.out.persistence.DatabaseConfig;
+import com.bookshelf.adapter.out.persistence.JdbcBookRepository;
+import com.bookshelf.adapter.out.persistence.JdbcGoalRepository;
+import com.bookshelf.adapter.out.persistence.JdbcShelfRepository;
+import com.bookshelf.adapter.out.persistence.JdbcUserRepository;
+import com.bookshelf.domain.port.out.BookRepository;
+import com.bookshelf.domain.port.out.GoalRepository;
+import com.bookshelf.domain.port.out.ShelfRepository;
+import com.bookshelf.domain.port.out.UserRepository;
+import com.bookshelf.framework.http.AuthMiddleware;
+import com.bookshelf.framework.http.HttpServer;
+import com.bookshelf.framework.http.Router;
+import com.bookshelf.framework.http.StaticFileHandler;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -21,8 +42,10 @@ public class App {
         ShelfRepository shelfRepository = new JdbcShelfRepository(
             dbConfig.getDataSource()
         );
+        OpenLibraryClient openLibraryClient = new OpenLibraryClient();
         BookEnrichmentService openLibraryService = new BookEnrichmentService(
-            repository
+            repository,
+            openLibraryClient
         );
         BookController controller = new BookController(
             repository,

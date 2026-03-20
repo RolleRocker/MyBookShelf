@@ -2,7 +2,19 @@ package com.bookshelf;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import com.bookshelf.mcp.McpController;
+import com.bookshelf.adapter.in.http.AuthController;
+import com.bookshelf.adapter.in.http.BookController;
+import com.bookshelf.adapter.in.http.GoalController;
+import com.bookshelf.adapter.in.http.ShelfController;
+import com.bookshelf.adapter.in.mcp.McpController;
+import com.bookshelf.adapter.out.auth.JwtUtil;
+import com.bookshelf.adapter.out.persistence.InMemoryBookRepository;
+import com.bookshelf.adapter.out.persistence.InMemoryGoalRepository;
+import com.bookshelf.adapter.out.persistence.InMemoryShelfRepository;
+import com.bookshelf.adapter.out.persistence.InMemoryUserRepository;
+import com.bookshelf.framework.http.AuthMiddleware;
+import com.bookshelf.framework.http.HttpServer;
+import com.bookshelf.framework.http.Router;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
@@ -1187,7 +1199,7 @@ public class BookApiTest {
     @Test
     void testBadRequestBodyWithControlCharsIsValidJson() {
         // Directly test HttpResponse.badRequest() with control characters in the message
-        com.bookshelf.HttpResponse resp = com.bookshelf.HttpResponse.badRequest(
+        com.bookshelf.framework.http.HttpResponse resp = com.bookshelf.framework.http.HttpResponse.badRequest(
             "line1\nline2\ttab\r"
         );
         String body = resp.getBody();

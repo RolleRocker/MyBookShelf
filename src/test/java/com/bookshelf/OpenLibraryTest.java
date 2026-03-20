@@ -2,7 +2,17 @@ package com.bookshelf;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import com.bookshelf.mcp.McpController;
+import com.bookshelf.adapter.in.http.BookController;
+import com.bookshelf.adapter.in.http.GoalController;
+import com.bookshelf.adapter.in.http.ShelfController;
+import com.bookshelf.adapter.in.mcp.McpController;
+import com.bookshelf.adapter.out.enrichment.BookEnrichmentService;
+import com.bookshelf.adapter.out.enrichment.OpenLibraryClient;
+import com.bookshelf.adapter.out.persistence.InMemoryBookRepository;
+import com.bookshelf.adapter.out.persistence.InMemoryGoalRepository;
+import com.bookshelf.adapter.out.persistence.InMemoryShelfRepository;
+import com.bookshelf.framework.http.HttpServer;
+import com.bookshelf.framework.http.Router;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
@@ -28,7 +38,7 @@ public class OpenLibraryTest {
     @BeforeAll
     static void startServer() throws IOException, InterruptedException {
         repository = new InMemoryBookRepository();
-        openLibraryService = new BookEnrichmentService(repository);
+        openLibraryService = new BookEnrichmentService(repository, new OpenLibraryClient());
         InMemoryShelfRepository shelfRepository = new InMemoryShelfRepository(
             repository
         );
