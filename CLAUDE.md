@@ -35,27 +35,59 @@ docker compose down -v   # removes data volumes too
 
 ## Architecture
 
-The project is built in progressive versions (V1 → V4), each adding a layer:
+The project follows **hexagonal architecture** (ports & adapters) with three layers:
 
-### Core Components (V1)
+### Package Structure
+
+```
+com.bookshelf
+├── App.java                          # Composition root — wires all layers
+├── domain/                           # Pure domain — ZERO infrastructure imports
+│   ├── model/                        # Book, ReadStatus, Shelf, ReadingGoal, User, BookMetadata
+│   ├── port/out/                     # Outbound port interfaces (BookRepository, ShelfRepository,
+│   │                                 #   GoalRepository, UserRepository, BookMetadataFetcher, TokenService)
+│   └── exception/                    # DuplicateGoalException, DuplicateUserException
+├── adapter/                          # Adapters — depend on domain ports + framework
+│   ├── in/http/                      # Inbound HTTP adapters (BookController, ShelfController,
+│   │                                 #   GoalController, AuthController)
+│   ├── in/mcp/                       # Inbound MCP adapter (McpController, McpToolHandler)
+│   └── out/
+│       ├── persistence/              # Outbound persistence (InMemory*Repository, Jdbc*Repository, DatabaseConfig)
+│       ├── enrichment/               # Outbound enrichment (BookEnrichmentService, OpenLibraryClient)
+│       └── auth/                     # Outbound auth (JwtUtil, PasswordUtil, GoogleTokenVerifier)
+└── framework/http/                   # Hand-built HTTP framework (HttpServer, HttpRequest, HttpResponse,
+                                      #   RequestParser, ResponseWriter, Router, AuthMiddleware,
+                                      #   StaticFileHandler, RequestLogger, RequestTooLargeException)
+```
+
+### Dependency Rules
+- **`domain`** depends on NOTHING — pure Java, no imports from adapter/framework
+- **`adapter`** depends on `domain` (ports) and `framework` (HTTP types)
+- **`framework`** depends on `domain` only for `AuthMiddleware` → `TokenService`
+- **`App.java`** sits at the top as the composition root — depends on all layers
+
+### Key Ports (interfaces in `domain.port.out`)
+- **`BookRepository`** / **`ShelfRepository`** / **`GoalRepository`** / **`UserRepository`** — persistence ports. Implemented by `InMemory*` (tests) and `Jdbc*` (production)
+- **`BookMetadataFetcher`** — outbound port for fetching book metadata. Methods: `fetchByIsbn(isbn)`, `fetchCoverByIsbn(isbn)`, `fetchCoverByUrl(url)`. Implemented by `OpenLibraryClient`
+- **`TokenService`** — outbound port for JWT token creation/validation. Methods: `createToken(userId, username)`, `validateToken(token)`. Implemented by `JwtUtil`
+
+### Framework Layer
 - **`HttpServer`** — `ServerSocket` listener with a fixed thread pool (10 threads via `ExecutorService`)
 - **`RequestParser`** — Reads raw socket `InputStream`, produces `HttpRequest` (method, path, queryParams, headers, body)
 - **`HttpRequest` / `HttpResponse`** — Simple model classes
 - **`Router`** — Maps method + path patterns (with `{param}` extraction) to handler functions. Static segments (`isbn`) take priority over parameters (`{id}`) to avoid route conflicts
-- **`BookController`** — Endpoint handlers: deserializes JSON via Gson, validates input, calls repository, returns `HttpResponse`
-- **`BookRepository`** (interface) — `findAll()`, `findByGenre()`, `findByReadStatus()`, `findBySearch()`, `findById()`, `findByIsbn()`, `save()`, `update()`, `delete()`, `updateFromOpenLibrary()`, `clear()`. V1 uses `InMemoryBookRepository` (ConcurrentHashMap), V3 uses `JdbcBookRepository` (PostgreSQL + HikariCP)
 - **`ResponseWriter`** — Writes formatted HTTP response to socket `OutputStream`
-
-### Open Library Integration (V2)
-- **`BookEnrichmentService`** — Single-thread `ExecutorService` that asynchronously fetches metadata and cover images by ISBN. Tries Open Library first; falls back to Google Books API if Open Library returns no data. Enrichment is best-effort; POST returns immediately. Sends `User-Agent: MyBookShelf/1.0` header. Also provides `reEnrichAll()` for batch re-enrichment with rate-limit delays between requests.
-- **`BookMetadata`** — Model for parsed Open Library data (title, author, publisher, publishDate, pageCount, subjects, genre, coverUrl)
+- **`AuthMiddleware`** — JWT validation via `TokenService` port + public route checking
 - **`StaticFileHandler`** — Serves static frontend files from `/static` directory
 
-### Database Layer (V3)
+### Adapter Layer
+- **`BookController`** — Inbound HTTP adapter: endpoint handlers for books; deserializes JSON via Gson, validates input, calls repository, returns `HttpResponse`
+- **`BookEnrichmentService`** — Async orchestration: queues enrichment jobs via `ExecutorService`, delegates HTTP fetching to `BookMetadataFetcher` port, manages rate limiting for batch re-enrichment
+- **`OpenLibraryClient`** — Implements `BookMetadataFetcher`: fetches metadata from Open Library API, falls back to Google Books API, merges results, downloads cover images. Sends `User-Agent: MyBookShelf/1.0` header
+- **`BookMetadata`** (domain model) — DTO for parsed API data (title, author, publisher, publishDate, pageCount, subjects, genre, coverUrl)
 - **`DatabaseConfig`** — HikariCP connection pool, reads config from env vars, runs schema migration on startup
-- **`JdbcBookRepository`** — JDBC implementation of `BookRepository` against PostgreSQL
 
-### Frontend (V4)
+### Frontend
 - Vanilla HTML/CSS/JS in `/static` directory, served by the same Java server
 - ISBN-only input flow: POST with just ISBN → placeholder card → polls until enrichment completes
 - **Barcode scanner**: zbar-wasm (WASM C decoder) in `static/lib/zbar-wasm.js` (inlined UMD, 326 KB). Multi-pass pipeline: raw grayscale → sharpen → global thresholds → adaptive threshold. Scans camera ROI via `getUserMedia`.
@@ -291,47 +323,87 @@ Migrations run on startup via `DatabaseConfig.runMigrations()`. The schema uses 
 
 ## Source File Overview
 
+### `com.bookshelf` (Composition Root)
 | File | Role |
 |------|------|
-| `App.java` | Entry point; wires repository, controller, router, and server |
+| `App.java` | Entry point; wires all layers together |
+
+### `com.bookshelf.domain.model`
+| File | Role |
+|------|------|
+| `Book.java` | Book entity with all fields and getters/setters |
+| `ReadStatus.java` | Enum: `WANT_TO_READ`, `READING`, `FINISHED`, `DNF` |
+| `Shelf.java` | Shelf entity with computed transient fields |
+| `ReadingGoal.java` | Reading goal entity (year + target) |
+| `User.java` | User entity (id, username, passwordHash, salt, googleId, email, createdAt) |
+| `BookMetadata.java` | DTO for enrichment response data |
+
+### `com.bookshelf.domain.port.out`
+| File | Role |
+|------|------|
+| `BookRepository.java` | Book repository interface |
+| `ShelfRepository.java` | Shelf repository interface |
+| `GoalRepository.java` | Reading goal repository interface |
+| `UserRepository.java` | User repository interface |
+| `BookMetadataFetcher.java` | Outbound port for fetching book metadata by ISBN |
+| `TokenService.java` | Outbound port for JWT token creation/validation |
+
+### `com.bookshelf.domain.exception`
+| File | Role |
+|------|------|
+| `DuplicateGoalException.java` | Exception for duplicate year goals |
+| `DuplicateUserException.java` | Exception for duplicate username |
+
+### `com.bookshelf.adapter.in.http`
+| File | Role |
+|------|------|
+| `BookController.java` | Book API endpoint handlers; validation, JSON parsing, sorting |
+| `ShelfController.java` | Shelf API endpoint handlers |
+| `GoalController.java` | Goal API endpoint handlers with computed progress |
+| `AuthController.java` | Register + login + Google OAuth endpoint handlers |
+
+### `com.bookshelf.adapter.in.mcp`
+| File | Role |
+|------|------|
+| `McpController.java` | MCP Streamable HTTP endpoint — JSON-RPC dispatch |
+| `McpToolHandler.java` | MCP tool implementations (check_book, search_books, list_books, get_book_by_isbn, get_bookshelf_stats) |
+
+### `com.bookshelf.adapter.out.persistence`
+| File | Role |
+|------|------|
+| `InMemoryBookRepository.java` | `ConcurrentHashMap`-backed implementation (used in tests) |
+| `JdbcBookRepository.java` | PostgreSQL JDBC implementation |
+| `InMemoryShelfRepository.java` | In-memory shelf store (used in tests) |
+| `JdbcShelfRepository.java` | PostgreSQL shelf implementation |
+| `InMemoryGoalRepository.java` | In-memory goal store (used in tests) |
+| `JdbcGoalRepository.java` | PostgreSQL goal implementation |
+| `InMemoryUserRepository.java` | In-memory user store (used in tests) |
+| `JdbcUserRepository.java` | PostgreSQL user implementation |
+| `DatabaseConfig.java` | HikariCP pool setup + schema migrations |
+
+### `com.bookshelf.adapter.out.enrichment`
+| File | Role |
+|------|------|
+| `OpenLibraryClient.java` | Implements `BookMetadataFetcher`; HTTP calls to Open Library + Google Books fallback |
+| `BookEnrichmentService.java` | Async orchestration: queues ISBN lookups, delegates to `BookMetadataFetcher` |
+
+### `com.bookshelf.adapter.out.auth`
+| File | Role |
+|------|------|
+| `JwtUtil.java` | Implements `TokenService`; hand-built JWT creation/validation (HMAC-SHA256) |
+| `PasswordUtil.java` | PBKDF2 password hashing and verification |
+| `GoogleTokenVerifier.java` | Verifies Google ID tokens (RS256) using JWKS public keys |
+
+### `com.bookshelf.framework.http`
+| File | Role |
+|------|------|
 | `HttpServer.java` | `ServerSocket` + `ExecutorService` connection handler |
 | `RequestParser.java` | Raw socket stream → `HttpRequest` |
 | `ResponseWriter.java` | `HttpResponse` → raw socket stream |
 | `Router.java` | Method + path pattern → handler dispatch |
 | `HttpRequest.java` | Request model (method, path, pathParams, queryParams, headers, body) |
 | `HttpResponse.java` | Response model + factory methods (`ok`, `created`, `notFound`, etc.) |
-| `Book.java` | Book entity with all fields and getters/setters |
-| `ReadStatus.java` | Enum: `WANT_TO_READ`, `READING`, `FINISHED`, `DNF` |
-| `BookRepository.java` | Repository interface |
-| `InMemoryBookRepository.java` | `ConcurrentHashMap`-backed implementation (used in tests) |
-| `JdbcBookRepository.java` | PostgreSQL JDBC implementation |
-| `BookController.java` | HTTP handler methods; validation, JSON parsing, sorting |
-| `ShelfController.java` | Shelf API endpoint handlers |
-| `Shelf.java` | Shelf entity with computed transient fields |
-| `ShelfRepository.java` | Shelf repository interface |
-| `InMemoryShelfRepository.java` | In-memory shelf store (used in tests) |
-| `JdbcShelfRepository.java` | PostgreSQL shelf implementation |
-| `ReadingGoal.java` | Reading goal entity (year + target) |
-| `GoalRepository.java` | Reading goal repository interface |
-| `InMemoryGoalRepository.java` | In-memory goal store (used in tests) |
-| `JdbcGoalRepository.java` | PostgreSQL goal implementation |
-| `GoalController.java` | Goal API endpoint handlers with computed progress |
-| `DuplicateGoalException.java` | Exception for duplicate year goals |
-| `RequestTooLargeException.java` | Custom exception for oversized request bodies |
-| `DatabaseConfig.java` | HikariCP pool setup + schema migrations |
-| `BookEnrichmentService.java` | Async enrichment: Open Library + Google Books fallback |
-| `BookMetadata.java` | DTO for Open Library response |
 | `StaticFileHandler.java` | Serves `static/` files |
 | `RequestLogger.java` | SLF4J structured request logging (INFO/WARN/ERROR by status code) |
-| `User.java` | User entity (id, username, passwordHash, salt, googleId, email, createdAt) |
-| `UserRepository.java` | User repository interface |
-| `InMemoryUserRepository.java` | In-memory user store (used in tests) |
-| `JdbcUserRepository.java` | PostgreSQL user implementation |
-| `AuthController.java` | Register + login endpoint handlers |
-| `AuthMiddleware.java` | JWT validation + public route checking |
-| `JwtUtil.java` | Hand-built JWT creation/validation (HMAC-SHA256) |
-| `PasswordUtil.java` | PBKDF2 password hashing and verification |
-| `GoogleTokenVerifier.java` | Verifies Google ID tokens (RS256) using JWKS public keys; test constructor accepts pre-loaded keys |
-| `DuplicateUserException.java` | Exception for duplicate username |
-| `mcp/McpController.java` | MCP Streamable HTTP endpoint — JSON-RPC dispatch |
-| `mcp/McpToolHandler.java` | MCP tool implementations (check_book, search_books, list_books, get_book_by_isbn, get_bookshelf_stats) |
+| `AuthMiddleware.java` | JWT validation + public route checking (depends on `TokenService`) |
+| `RequestTooLargeException.java` | Custom exception for oversized request bodies |

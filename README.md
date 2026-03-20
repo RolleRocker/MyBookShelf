@@ -18,7 +18,12 @@ A personal bookshelf REST API built from scratch in Java 17 using only `java.net
 - **Book reviews/notes** — add personal notes or reviews to any book
 - **MCP integration** — query your bookshelf from Claude Code via natural language ("Do I have Dune?", "What am I reading?")
 - **Dockerized** — single `docker compose up` to run the app and database together
-- **223 automated tests** covering the full API surface, shelves, goals, MCP protocol, validation, edge cases, and enrichment logic
+- **Authentication** — hand-built JWT (HMAC-SHA256) + PBKDF2 password hashing; optional Google OAuth (Sign in with Google)
+- **Reading statistics** — total books, by-status/by-genre breakdowns, average rating, pages read, finished-by-month, top authors
+- **CSV import/export** — export your library as CSV, import from MyBookShelf or Goodreads format
+- **Subject filtering & pagination** — `?subject=` query param, backward-compatible paginated responses
+- **Hexagonal architecture** — domain layer has zero infrastructure dependencies; outbound ports for metadata fetching and token management
+- **271 automated tests** covering the full API surface, shelves, goals, MCP protocol, auth, validation, edge cases, and enrichment logic
 
 ## Tech Stack
 
@@ -67,7 +72,7 @@ This runs the server with an in-memory store (no database needed):
 ./gradlew test
 ```
 
-All 223 unit tests use an in-memory repository — no database or Docker required. 11 integration tests (Open Library) are excluded from the default run.
+All 271 unit tests use an in-memory repository — no database or Docker required. 11 integration tests (Open Library) are excluded from the default run.
 
 ## API Reference
 
@@ -75,13 +80,16 @@ All 223 unit tests use an in-memory repository — no database or Docker require
 
 | Method | Path | Description | Status |
 |--------|------|-------------|--------|
-| `GET` | `/books` | List all books. Supports `?genre=`, `?readStatus=`, `?search=`, `?sort=` | `200` |
+| `GET` | `/books` | List all books. Supports `?genre=`, `?readStatus=`, `?search=`, `?subject=`, `?sort=`, `?page=`, `?size=` | `200` |
 | `POST` | `/books` | Add a new book | `201` |
 | `GET` | `/books/{id}` | Get a book by ID | `200` |
 | `PUT` | `/books/{id}` | Partial update (only sent fields change) | `200` |
 | `DELETE` | `/books/{id}` | Delete a book | `204` |
 | `GET` | `/books/isbn/{isbn}` | Look up a book by ISBN | `200` |
 | `POST` | `/books/re-enrich` | Re-enrich all ISBN books from Open Library | `202` |
+| `GET` | `/books/stats` | Reading statistics (totals, averages, distributions) | `200` |
+| `GET` | `/books/export` | Export all books as CSV | `200` |
+| `POST` | `/books/import` | Import books from CSV (MyBookShelf or Goodreads format) | `200` |
 | `GET` | `/books/{id}/cover` | Serve cover image | `200` |
 | `GET` | `/shelves` | List all shelves (with book counts and cover IDs) | `200` |
 | `POST` | `/shelves` | Create a new shelf | `201` |
@@ -97,6 +105,10 @@ All 223 unit tests use an in-memory repository — no database or Docker require
 | `GET` | `/goals/{year}` | Get a specific year's goal with progress | `200` |
 | `PUT` | `/goals/{year}` | Update goal target | `200` |
 | `DELETE` | `/goals/{year}` | Delete a reading goal | `204` |
+| `POST` | `/auth/register` | Register a new user (returns JWT) | `201` |
+| `POST` | `/auth/login` | Login with credentials (returns JWT) | `200` |
+| `POST` | `/auth/google` | Login with Google ID token | `200`/`201` |
+| `GET` | `/auth/config` | Returns `{googleClientId}` for frontend | `200` |
 | `POST` | `/mcp` | MCP Streamable HTTP endpoint (JSON-RPC) | `200` |
 
 ### Create a book
@@ -143,9 +155,10 @@ Only fields present in the request body are updated. Send `null` to clear a fiel
 | Code | Meaning |
 |------|---------|
 | `400` | Missing required fields, invalid JSON, rating not 0.5-5.0, bad ISBN format, invalid dates |
+| `401` | Missing or invalid JWT token on protected endpoint |
 | `404` | Book, cover, or goal not found |
 | `405` | HTTP method not supported on this route |
-| `409` | Duplicate reading goal for a year |
+| `409` | Duplicate reading goal for a year, duplicate username |
 
 ## Data Model
 
@@ -170,59 +183,64 @@ Only fields present in the request body are updated. Send `null` to clear a fiel
 
 ## Architecture
 
-The project is built in four progressive versions, each adding a layer:
+The project follows **hexagonal architecture** (ports & adapters). The domain layer has zero dependencies on infrastructure — all external concerns are behind interfaces.
 
 ```
-V1  Core HTTP server + REST API + in-memory storage
-V2  Open Library + Google Books integration (async enrichment + cover downloads)
-V3  PostgreSQL persistence + Docker Compose
-V4  Vanilla HTML/CSS/JS frontend + custom shelves + MCP integration
-+   Half-star ratings, start/finish dates, reading goals, book reviews
+domain/          Pure business logic, entities, and port interfaces (zero framework imports)
+adapter/in/      Inbound adapters: HTTP controllers, MCP endpoint
+adapter/out/     Outbound adapters: persistence, enrichment, auth
+framework/       Hand-built HTTP infrastructure (ServerSocket, Router, middleware)
 ```
 
 ### Project Structure
 
 ```
 src/main/java/com/bookshelf/
-├── App.java                    # Entry point; wires all components
-├── HttpServer.java             # ServerSocket listener + thread pool
-├── RequestParser.java          # Raw HTTP request parsing
-├── HttpRequest.java            # Request model
-├── HttpResponse.java           # Response model + factory methods
-├── ResponseWriter.java         # HTTP response writing
-├── Router.java                 # Route matching with path params
-├── BookController.java         # Book API endpoint handlers
-├── Book.java                   # Book entity
-├── ReadStatus.java             # WANT_TO_READ / READING / FINISHED / DNF
-├── BookRepository.java         # Book repository interface
-├── InMemoryBookRepository.java # ConcurrentHashMap implementation (tests)
-├── JdbcBookRepository.java     # PostgreSQL implementation
-├── ShelfController.java        # Shelf API endpoint handlers
-├── Shelf.java                  # Shelf entity
-├── ShelfRepository.java        # Shelf repository interface
-├── InMemoryShelfRepository.java # In-memory shelf store (tests)
-├── JdbcShelfRepository.java    # PostgreSQL shelf implementation
-├── DatabaseConfig.java         # HikariCP pool + schema migration
-├── BookEnrichmentService.java  # Async enrichment: Open Library + Google Books fallback
-├── BookMetadata.java           # Enrichment data model
-├── StaticFileHandler.java      # Static file serving
-├── ReadingGoal.java            # Reading goal entity
-├── GoalRepository.java         # Reading goal repository interface
-├── InMemoryGoalRepository.java # In-memory goal store (tests)
-├── JdbcGoalRepository.java     # PostgreSQL goal implementation
-├── GoalController.java         # Goal API endpoint handlers
-├── DuplicateGoalException.java # Exception for duplicate year goals
-├── RequestTooLargeException.java # Custom exception for oversized requests
-└── mcp/
-    ├── McpController.java      # MCP Streamable HTTP endpoint — JSON-RPC dispatch
-    └── McpToolHandler.java     # MCP tool implementations
+├── App.java                              # Composition root; wires all layers
+├── domain/
+│   ├── model/                            # Entities
+│   │   ├── Book.java, ReadStatus.java, Shelf.java
+│   │   ├── ReadingGoal.java, User.java, BookMetadata.java
+│   ├── port/out/                         # Outbound port interfaces
+│   │   ├── BookRepository.java, ShelfRepository.java
+│   │   ├── GoalRepository.java, UserRepository.java
+│   │   ├── BookMetadataFetcher.java      # ISBN → metadata/cover
+│   │   └── TokenService.java            # JWT creation/validation
+│   └── exception/
+│       ├── DuplicateGoalException.java
+│       └── DuplicateUserException.java
+├── adapter/
+│   ├── in/http/                          # Inbound HTTP adapters
+│   │   ├── BookController.java, ShelfController.java
+│   │   ├── GoalController.java, AuthController.java
+│   ├── in/mcp/                           # Inbound MCP adapter
+│   │   ├── McpController.java, McpToolHandler.java
+│   ├── out/persistence/                  # Repository implementations
+│   │   ├── InMemory*Repository.java      # In-memory (tests)
+│   │   ├── Jdbc*Repository.java          # PostgreSQL (production)
+│   │   └── DatabaseConfig.java           # HikariCP + migrations
+│   ├── out/enrichment/                   # Book metadata fetching
+│   │   ├── OpenLibraryClient.java        # Implements BookMetadataFetcher
+│   │   └── BookEnrichmentService.java    # Async orchestration
+│   └── out/auth/                         # Auth implementations
+│       ├── JwtUtil.java                  # Implements TokenService
+│       ├── PasswordUtil.java, GoogleTokenVerifier.java
+└── framework/http/                       # Hand-built HTTP layer
+    ├── HttpServer.java, Router.java
+    ├── HttpRequest.java, HttpResponse.java
+    ├── RequestParser.java, ResponseWriter.java
+    ├── StaticFileHandler.java, RequestLogger.java
+    ├── AuthMiddleware.java               # Depends on TokenService port
+    └── RequestTooLargeException.java
 
 src/test/java/com/bookshelf/
-├── BookApiTest.java            # 89 tests — CRUD, filtering, search, sorting, half-star ratings, dates, validation, edge cases
+├── BookApiTest.java            # 117 tests — CRUD, filtering, search, sorting, ratings, dates, pagination, stats, CSV
 ├── BookMetadataTest.java       # 43 tests — metadata parsing, Google Books, enrichment logic
-├── ShelfApiTest.java           # 57 tests — shelf CRUD, book assignment, reordering, stats
-├── McpTest.java                # 22 tests — MCP JSON-RPC protocol and tool implementations
-├── GoalApiTest.java            # 12 tests — reading goal CRUD, progress, validation
+├── ShelfApiTest.java           # 56 tests — shelf CRUD, book assignment, reordering, stats
+├── McpTest.java                # 21 tests — MCP JSON-RPC protocol and tool implementations
+├── GoalApiTest.java            # 11 tests — reading goal CRUD, progress, validation
+├── AuthApiTest.java            # 12 tests — register, login, JWT auth, protected endpoints
+├── GoogleAuthApiTest.java      # 11 tests — Google OAuth with test RSA key pair
 └── OpenLibraryTest.java        # 11 integration tests — live Open Library API (excluded from default run)
 
 static/
@@ -253,11 +271,13 @@ static/
 | `DB_PASS` | `bookshelf` | Database password |
 | `APP_PORT` | `8080` | Server listen port |
 | `GOOGLE_BOOKS_API_KEY` | *(none)* | Optional — raises Google Books API quota |
+| `JWT_SECRET` | *(random)* | HMAC-SHA256 secret for JWT tokens. Random if not set (tokens won't survive restarts) |
+| `GOOGLE_CLIENT_ID` | *(none)* | Google OAuth client ID. Enables "Sign in with Google" on login page |
 
 ## Testing
 
 ```bash
-# Run all unit tests (223 tests)
+# Run all unit tests (271 tests)
 ./gradlew test
 
 # Run integration tests (11 tests, requires network)
@@ -275,11 +295,13 @@ Tests start the server on a random port using `new ServerSocket(0)` and use `InM
 **Test coverage includes:**
 - CRUD operations (create, read, update, delete) for books and shelves
 - ISBN lookup and duplicate handling
-- Genre and read status filtering, search, sorting
+- Genre and read status filtering, search, subject filtering, sorting, pagination
 - Half-star ratings (0.5–5.0 in 0.5 increments)
 - Start/finish date tracking and auto-fill on status change
+- Reading statistics and CSV import/export
 - Reading goals — CRUD, progress computation, pace tracking
 - Custom shelves — CRUD, book assignment, reordering, stats, edge cases
+- Authentication — register, login, JWT validation, protected endpoints, Google OAuth
 - MCP JSON-RPC protocol and all 5 tool implementations
 - Input validation (missing fields, bad JSON, invalid rating/ISBN)
 - HTTP method restrictions (405)
