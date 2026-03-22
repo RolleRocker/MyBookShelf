@@ -1575,7 +1575,7 @@ async function addBookToShelf(shelfId, bookId) {
   try {
     const resp = await fetch(API + `/shelves/${shelfId}/books`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders(),
       body: JSON.stringify({ bookId }),
     });
     if (resp.status === 409) {
@@ -2000,7 +2000,7 @@ refreshBtn.addEventListener("click", async () => {
   refreshBtn.disabled = true;
   refreshBtn.textContent = "Refreshing...";
   try {
-    const resp = await fetch(API + "/books/re-enrich", { method: "POST" });
+    const resp = await fetch(API + "/books/re-enrich", { method: "POST", headers: authHeaders() });
     if (!resp.ok) throw new Error("Request failed");
     const data = await resp.json();
     const count = data.queued || 0;
@@ -2267,7 +2267,7 @@ document.getElementById("goal-form").addEventListener("submit", async (e) => {
     const body = isEdit ? { target } : { year, target };
     const res = await fetch(url, {
       method,
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders(),
       body: JSON.stringify(body),
     });
     if (!res.ok) {
@@ -2287,7 +2287,7 @@ document.getElementById("goal-delete-btn").addEventListener("click", async () =>
   if (!currentGoal) return;
   if (!confirm("Delete this reading goal?")) return;
   try {
-    await fetch(`${API}/goals/${currentGoal.year}`, { method: "DELETE" });
+    await fetch(`${API}/goals/${currentGoal.year}`, { method: "DELETE", headers: authHeaders() });
     closeGoalModal();
     showToast("Goal deleted");
     await loadCurrentGoal();
