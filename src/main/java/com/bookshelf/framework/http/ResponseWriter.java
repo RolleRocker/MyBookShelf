@@ -32,9 +32,11 @@ public class ResponseWriter {
         }
         response.getHeaders().put("Connection", "close");
 
-        // Write headers
+        // Write headers (strip CR/LF as defense against header injection)
         for (var entry : response.getHeaders().entrySet()) {
-            sb.append(entry.getKey()).append(": ").append(entry.getValue()).append("\r\n");
+            String key = entry.getKey().replaceAll("[\\r\\n]", "");
+            String value = entry.getValue().replaceAll("[\\r\\n]", "");
+            sb.append(key).append(": ").append(value).append("\r\n");
         }
         sb.append("\r\n");
 
