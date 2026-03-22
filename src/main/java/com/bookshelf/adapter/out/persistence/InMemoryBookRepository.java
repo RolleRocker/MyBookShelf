@@ -66,7 +66,7 @@ public class InMemoryBookRepository implements BookRepository {
         if (isbn == null) return Optional.empty();
         return store.values().stream()
                 .filter(b -> isbn.equals(b.getIsbn()))
-                .min(Comparator.comparing(Book::getCreatedAt));
+                .min(Comparator.comparing(Book::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())));
     }
 
     @Override
