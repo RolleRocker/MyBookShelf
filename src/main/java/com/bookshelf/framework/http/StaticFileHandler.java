@@ -7,17 +7,17 @@ import java.util.Map;
 
 public class StaticFileHandler {
 
-    private static final Map<String, String> CONTENT_TYPES = Map.of(
-            ".html", "text/html; charset=utf-8",
-            ".css", "text/css; charset=utf-8",
-            ".js", "application/javascript; charset=utf-8",
-            ".json", "application/json; charset=utf-8",
-            ".wasm", "application/wasm",
-            ".png", "image/png",
-            ".jpg", "image/jpeg",
-            ".jpeg", "image/jpeg",
-            ".svg", "image/svg+xml",
-            ".ico", "image/x-icon"
+    private static final Map<String, String> CONTENT_TYPES = Map.ofEntries(
+            Map.entry(".html", "text/html; charset=utf-8"),
+            Map.entry(".css", "text/css; charset=utf-8"),
+            Map.entry(".js", "application/javascript; charset=utf-8"),
+            Map.entry(".json", "application/json; charset=utf-8"),
+            Map.entry(".wasm", "application/wasm"),
+            Map.entry(".png", "image/png"),
+            Map.entry(".jpg", "image/jpeg"),
+            Map.entry(".jpeg", "image/jpeg"),
+            Map.entry(".svg", "image/svg+xml"),
+            Map.entry(".ico", "image/x-icon")
     );
 
     private final Path normalizedStaticDir;
