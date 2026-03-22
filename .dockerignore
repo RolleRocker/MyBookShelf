@@ -9,3 +9,7 @@ docs
 .classpath
 .project
 .settings
+.idea
+.vscode
+.zed
+*.iml
