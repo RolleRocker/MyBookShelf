@@ -329,6 +329,11 @@ function escapeHtml(str) {
     .replace(/'/g, "&#039;");
 }
 
+function sanitizeColor(color) {
+  if (!color) return "";
+  return color.replace(/[^a-zA-Z0-9#(),.\s%-]/g, "");
+}
+
 // ---- Filtered Books ----
 
 function getSortedBooks(books) {
@@ -1303,7 +1308,7 @@ function renderShelfTags(book) {
   const overflow = shelves.length - maxVisible;
   let html = '<div class="shelf-tags">';
   visible.forEach((s) => {
-    html += `<button class="shelf-tag" data-shelf-id="${s.id}" type="button" title="${escapeHtml(s.name)}"><span class="shelf-tag-dot" style="background:${s.color}"></span>${escapeHtml(s.name)}</button>`;
+    html += `<button class="shelf-tag" data-shelf-id="${s.id}" type="button" title="${escapeHtml(s.name)}"><span class="shelf-tag-dot" style="background:${sanitizeColor(s.color)}"></span>${escapeHtml(s.name)}</button>`;
   });
   if (overflow > 0) {
     html += `<span class="shelf-tag-overflow" title="${shelves
@@ -1349,9 +1354,9 @@ function renderShelfCard(shelf) {
   const ids = shelf.coverBookIds || [];
   for (let i = 0; i < 4; i++) {
     if (i < ids.length) {
-      collageHtml += `<img src="/books/${ids[i]}/cover" alt="" class="collage-img" onerror="this.style.background='${shelf.color}';this.src='';">`;
+      collageHtml += `<img src="/books/${ids[i]}/cover" alt="" class="collage-img" onerror="this.style.background='${sanitizeColor(shelf.color)}';this.src='';">`;
     } else {
-      collageHtml += `<div class="collage-empty" style="background:${shelf.color}"></div>`;
+      collageHtml += `<div class="collage-empty" style="background:${sanitizeColor(shelf.color)}"></div>`;
     }
   }
 
@@ -1466,7 +1471,7 @@ function renderShelfStats(stats, notes, name, color) {
     genreBarsHtml = '<div class="stats-genres">';
     genreEntries.forEach(([genre, count]) => {
       const pct = Math.max(10, (count / maxGenreCount) * 100);
-      genreBarsHtml += `<div class="stats-genre-row"><span class="stats-genre-label">${escapeHtml(genre)}</span><div class="stats-genre-bar"><div class="stats-genre-fill" style="width:${pct}%;background:${color || "var(--gold)"}"></div></div><span class="stats-genre-count">${count}</span></div>`;
+      genreBarsHtml += `<div class="stats-genre-row"><span class="stats-genre-label">${escapeHtml(genre)}</span><div class="stats-genre-bar"><div class="stats-genre-fill" style="width:${pct}%;background:${sanitizeColor(color) || "var(--gold)"}"></div></div><span class="stats-genre-count">${count}</span></div>`;
     });
     genreBarsHtml += "</div>";
   }
@@ -1809,7 +1814,7 @@ function populateBookShelfCheckboxes(book) {
     const isOn = bookShelfIds.includes(shelf.id);
     const label = document.createElement("label");
     label.className = "shelf-cb-label";
-    label.innerHTML = `<input type="checkbox" class="shelf-cb" data-shelf-id="${shelf.id}" data-book-id="${book.id}" ${isOn ? "checked" : ""}><span class="shelf-cb-dot" style="background:${shelf.color}"></span>${escapeHtml(shelf.name)}`;
+    label.innerHTML = `<input type="checkbox" class="shelf-cb" data-shelf-id="${shelf.id}" data-book-id="${book.id}" ${isOn ? "checked" : ""}><span class="shelf-cb-dot" style="background:${sanitizeColor(shelf.color)}"></span>${escapeHtml(shelf.name)}`;
     bookShelvesCheckboxes.appendChild(label);
   });
 
