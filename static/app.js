@@ -2387,12 +2387,6 @@ document.getElementById("import-modal")?.addEventListener("click", (e) => {
 // ---- Stats Dashboard ----
 document.getElementById("stats-toggle")?.addEventListener("click", toggleStats);
 
-function escHtml(str) {
-  const el = document.createElement("span");
-  el.textContent = str;
-  return el.innerHTML;
-}
-
 async function toggleStats() {
   const panel = document.getElementById("stats-panel");
   if (!panel) return;
