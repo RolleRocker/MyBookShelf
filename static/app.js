@@ -624,7 +624,7 @@ function updateCardInPlace(book) {
 function handleStarClick(bookId, value) {
   apiPut(`/books/${bookId}`, { rating: value })
     .then((updatedBook) => {
-      updateCardInPlace(updatedBook);
+      if (updatedBook) updateCardInPlace(updatedBook);
     })
     .catch(() => showToast("Failed to update rating", "error"));
 }
@@ -1829,8 +1829,8 @@ function populateBookShelfCheckboxes(book) {
   });
   bookShelvesCheckboxes.appendChild(newLink);
 
-  // Handle checkbox changes
-  bookShelvesCheckboxes.addEventListener("change", async (e) => {
+  // Handle checkbox changes (use event replacement to avoid accumulation)
+  const handler = async (e) => {
     const cb = e.target.closest(".shelf-cb");
     if (!cb) return;
     const shelfId = cb.dataset.shelfId;
@@ -1840,7 +1840,12 @@ function populateBookShelfCheckboxes(book) {
     } else {
       await removeBookFromShelf(shelfId, bookId);
     }
-  });
+  };
+  if (bookShelvesCheckboxes._shelfChangeHandler) {
+    bookShelvesCheckboxes.removeEventListener("change", bookShelvesCheckboxes._shelfChangeHandler);
+  }
+  bookShelvesCheckboxes._shelfChangeHandler = handler;
+  bookShelvesCheckboxes.addEventListener("change", handler);
 }
 
 // ---- Drag and Drop ----
@@ -2576,7 +2581,7 @@ document.getElementById("next-page")?.addEventListener("click", () => {
   const loginBtn = document.getElementById("login-btn");
   if (!isAuthenticated()) {
     // Hide write controls for unauthenticated users
-    document.querySelectorAll(".add-book-btn, .add-shelf-btn, #add-book-btn").forEach(
+    document.querySelectorAll("#add-btn, #new-shelf-btn, #scan-btn, #bulk-scan-btn, #import-btn, #refresh-btn").forEach(
       el => el.style.display = "none"
     );
     if (loginBtn) loginBtn.style.display = "";
