@@ -92,6 +92,7 @@ public class HttpServer {
                 ResponseWriter.write(socket.getOutputStream(), response);
             } catch (IOException ignored) {}
         } catch (Exception e) {
+            logger.error("Unhandled exception processing request", e);
             response = HttpResponse.internalServerError("Internal server error");
             try {
                 ResponseWriter.write(socket.getOutputStream(), response);
