@@ -16,6 +16,8 @@ import java.util.concurrent.TimeUnit;
 
 public class BookEnrichmentService {
 
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(BookEnrichmentService.class);
+
     private final BookRepository repository;
     private final BookMetadataFetcher fetcher;
     private final ExecutorService executor;
@@ -38,7 +40,7 @@ public class BookEnrichmentService {
 
                 repository.updateFromOpenLibrary(bookId, metadata, coverData);
             } catch (Exception e) {
-                System.err.println("Enrichment failed for ISBN " + isbn + ": " + e.getMessage());
+                logger.error("Enrichment failed for ISBN {}", isbn, e);
             }
         });
     }
@@ -74,22 +76,9 @@ public class BookEnrichmentService {
                         metadata,
                         coverData
                     );
-                    System.out.println(
-                        "Re-enriched: " +
-                            book.getIsbn() +
-                            " (" +
-                            (i + 1) +
-                            "/" +
-                            sorted.size() +
-                            ")"
-                    );
+                    logger.info("Re-enriched: {} ({}/{})", book.getIsbn(), i + 1, sorted.size());
                 } catch (Exception e) {
-                    System.err.println(
-                        "Re-enrichment failed for ISBN " +
-                            book.getIsbn() +
-                            ": " +
-                            e.getMessage()
-                    );
+                    logger.error("Re-enrichment failed for ISBN {}", book.getIsbn(), e);
                 }
                 // Rate-limit: wait 3 seconds between books (except after last)
                 if (i < sorted.size() - 1) {
@@ -101,7 +90,7 @@ public class BookEnrichmentService {
                     }
                 }
             }
-            System.out.println("Re-enrichment complete.");
+            logger.info("Re-enrichment complete.");
         });
         return count;
     }

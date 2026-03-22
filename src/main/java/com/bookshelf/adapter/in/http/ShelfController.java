@@ -22,6 +22,8 @@ import java.util.UUID;
 
 public class ShelfController {
 
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(ShelfController.class);
+
     private static final String DEFAULT_COLOR = "#C4975A";
     private static final Set<String> VALID_SORT_FIELDS = Set.of("custom", "title", "author", "rating", "created");
     private static final Set<String> VALID_SORT_DIRECTIONS = Set.of("asc", "desc");
@@ -47,8 +49,7 @@ public class ShelfController {
             }
             return HttpResponse.ok(arr.toString());
         } catch (RuntimeException e) {
-            System.err.println("Error in handleGetShelves: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error in handleGetShelves", e);
             return HttpResponse.internalServerError("Internal server error");
         }
     }
@@ -113,8 +114,7 @@ public class ShelfController {
             Shelf saved = shelfRepository.save(shelf);
             return HttpResponse.created(shelfToListJson(saved).toString());
         } catch (RuntimeException e) {
-            System.err.println("Error in handleCreateShelf: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error in handleCreateShelf", e);
             return HttpResponse.internalServerError("Internal server error");
         }
     }
@@ -132,8 +132,7 @@ public class ShelfController {
                     .map(shelf -> HttpResponse.ok(shelfToDetailJson(shelf).toString()))
                     .orElse(HttpResponse.notFound("Shelf not found"));
         } catch (RuntimeException e) {
-            System.err.println("Error in handleGetShelf: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error in handleGetShelf", e);
             return HttpResponse.internalServerError("Internal server error");
         }
     }
@@ -211,8 +210,7 @@ public class ShelfController {
                     .map(s -> HttpResponse.ok(shelfToListJson(s).toString()))
                     .orElse(HttpResponse.notFound("Shelf not found"));
         } catch (RuntimeException e) {
-            System.err.println("Error in handleUpdateShelf: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error in handleUpdateShelf", e);
             return HttpResponse.internalServerError("Internal server error");
         }
     }
@@ -232,8 +230,7 @@ public class ShelfController {
             }
             return HttpResponse.notFound("Shelf not found");
         } catch (RuntimeException e) {
-            System.err.println("Error in handleDeleteShelf: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error in handleDeleteShelf", e);
             return HttpResponse.internalServerError("Internal server error");
         }
     }
@@ -292,8 +289,7 @@ public class ShelfController {
             response.addProperty("addedAt", Instant.now().toString());
             return HttpResponse.created(response.toString());
         } catch (RuntimeException e) {
-            System.err.println("Error in handleAddBook: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error in handleAddBook", e);
             return HttpResponse.internalServerError("Internal server error");
         }
     }
@@ -325,8 +321,7 @@ public class ShelfController {
             shelfRepository.removeBook(shelfId, bookId);
             return HttpResponse.noContent();
         } catch (RuntimeException e) {
-            System.err.println("Error in handleRemoveBook: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error in handleRemoveBook", e);
             return HttpResponse.internalServerError("Internal server error");
         }
     }
@@ -378,8 +373,7 @@ public class ShelfController {
             }
             return HttpResponse.ok(arr.toString());
         } catch (RuntimeException e) {
-            System.err.println("Error in handleReorderShelves: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error in handleReorderShelves", e);
             return HttpResponse.internalServerError("Internal server error");
         }
     }
@@ -450,8 +444,7 @@ public class ShelfController {
                     .map(s -> HttpResponse.ok(shelfToDetailJson(s).toString()))
                     .orElse(HttpResponse.notFound("Shelf not found"));
         } catch (RuntimeException e) {
-            System.err.println("Error in handleReorderBooks: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error in handleReorderBooks", e);
             return HttpResponse.internalServerError("Internal server error");
         }
     }

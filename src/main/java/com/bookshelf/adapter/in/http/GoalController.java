@@ -22,6 +22,8 @@ import java.util.UUID;
 
 public class GoalController {
 
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(GoalController.class);
+
     private final GoalRepository goalRepository;
     private final BookRepository bookRepository;
     private final Gson gson;
@@ -41,8 +43,7 @@ public class GoalController {
             }
             return HttpResponse.ok(arr.toString());
         } catch (RuntimeException e) {
-            System.err.println("Error in handleGetGoals: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error in handleGetGoals", e);
             return HttpResponse.internalServerError("Internal server error");
         }
     }
@@ -59,8 +60,7 @@ public class GoalController {
                 .map(goal -> HttpResponse.ok(enrichGoalJson(goal).toString()))
                 .orElse(HttpResponse.notFound("Goal not found"));
         } catch (RuntimeException e) {
-            System.err.println("Error in handleGetGoal: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error in handleGetGoal", e);
             return HttpResponse.internalServerError("Internal server error");
         }
     }
@@ -115,8 +115,7 @@ public class GoalController {
         } catch (DuplicateGoalException e) {
             return HttpResponse.conflict("Goal for year " + year + " already exists");
         } catch (RuntimeException e) {
-            System.err.println("Error in handleCreateGoal: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error in handleCreateGoal", e);
             return HttpResponse.internalServerError("Internal server error");
         }
     }
@@ -158,8 +157,7 @@ public class GoalController {
                 .map(goal -> HttpResponse.ok(enrichGoalJson(goal).toString()))
                 .orElse(HttpResponse.notFound("Goal not found"));
         } catch (RuntimeException e) {
-            System.err.println("Error in handleUpdateGoal: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error in handleUpdateGoal", e);
             return HttpResponse.internalServerError("Internal server error");
         }
     }
@@ -177,8 +175,7 @@ public class GoalController {
             }
             return HttpResponse.notFound("Goal not found");
         } catch (RuntimeException e) {
-            System.err.println("Error in handleDeleteGoal: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error in handleDeleteGoal", e);
             return HttpResponse.internalServerError("Internal server error");
         }
     }
