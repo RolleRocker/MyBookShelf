@@ -144,10 +144,10 @@ public class BookController {
                 try {
                     page = Integer.parseInt(pageParam);
                 } catch (NumberFormatException e) {
-                    return HttpResponse.badRequest("{\"error\": \"invalid page parameter\"}");
+                    return HttpResponse.badRequest("invalid page parameter");
                 }
                 if (page < 1) {
-                    return HttpResponse.badRequest("{\"error\": \"page must be >= 1\"}");
+                    return HttpResponse.badRequest("page must be >= 1");
                 }
 
                 int size = 20;
@@ -155,7 +155,7 @@ public class BookController {
                     try {
                         size = Integer.parseInt(sizeParam);
                     } catch (NumberFormatException e) {
-                        return HttpResponse.badRequest("{\"error\": \"invalid size parameter\"}");
+                        return HttpResponse.badRequest("invalid size parameter");
                     }
                 }
                 if (size < 1) size = 20;
