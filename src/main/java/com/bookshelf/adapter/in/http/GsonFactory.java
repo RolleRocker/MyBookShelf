@@ -2,6 +2,7 @@ package com.bookshelf.adapter.in.http;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import com.google.gson.JsonSerializer;
 import java.time.Instant;
@@ -17,5 +18,12 @@ public final class GsonFactory {
 
     public static Gson create() {
         return INSTANCE;
+    }
+
+    public static String getStringField(JsonObject json, String field) {
+        if (!json.has(field) || json.get(field).isJsonNull()) {
+            return null;
+        }
+        return json.get(field).getAsString();
     }
 }

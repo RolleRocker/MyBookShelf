@@ -512,10 +512,7 @@ public class ShelfController {
     }
 
     private String getStringField(JsonObject json, String field) {
-        if (!json.has(field) || json.get(field).isJsonNull()) {
-            return null;
-        }
-        return json.get(field).getAsString();
+        return GsonFactory.getStringField(json, field);
     }
 
     private String validateName(String name) {
