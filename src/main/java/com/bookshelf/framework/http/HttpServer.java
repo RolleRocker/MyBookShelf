@@ -85,17 +85,20 @@ public class HttpServer {
             response = HttpResponse.payloadTooLarge("Request body too large");
             try {
                 ResponseWriter.write(socket.getOutputStream(), response);
+                socket.shutdownOutput();
             } catch (IOException ignored) {}
         } catch (IOException e) {
             response = HttpResponse.badRequest("Bad request");
             try {
                 ResponseWriter.write(socket.getOutputStream(), response);
+                socket.shutdownOutput();
             } catch (IOException ignored) {}
         } catch (Exception e) {
             logger.error("Unhandled exception processing request", e);
             response = HttpResponse.internalServerError("Internal server error");
             try {
                 ResponseWriter.write(socket.getOutputStream(), response);
+                socket.shutdownOutput();
             } catch (IOException ignored) {}
         } finally {
             long elapsedMs = (System.nanoTime() - startTime) / 1_000_000;
