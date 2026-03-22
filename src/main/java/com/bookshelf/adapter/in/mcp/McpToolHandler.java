@@ -270,9 +270,6 @@ public class McpToolHandler {
         props.add("author", stringProp("Author name to filter by (optional)"));
         props.add("isbn", stringProp("ISBN to look up directly (optional)"));
         schema.add("properties", props);
-        JsonArray required = new JsonArray();
-        required.add("title");
-        schema.add("required", required);
         return schema;
     }
 
