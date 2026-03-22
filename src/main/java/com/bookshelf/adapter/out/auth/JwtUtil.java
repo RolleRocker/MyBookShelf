@@ -1,10 +1,14 @@
 package com.bookshelf.adapter.out.auth;
 
 import com.bookshelf.domain.port.out.TokenService;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.UUID;
@@ -16,6 +20,7 @@ public class JwtUtil implements TokenService {
 
     private static final Logger logger = LoggerFactory.getLogger(JwtUtil.class);
     private static final long EXPIRY_MS = 24 * 60 * 60 * 1000;
+    private static final Gson gson = new Gson();
     private final byte[] secret;
 
     public JwtUtil() {
@@ -39,9 +44,12 @@ public class JwtUtil implements TokenService {
         String header = base64Url("{\"alg\":\"HS256\",\"typ\":\"JWT\"}");
         long now = System.currentTimeMillis() / 1000;
         long exp = now + (EXPIRY_MS / 1000);
-        String payloadJson = String.format(
-            "{\"sub\":\"%s\",\"username\":\"%s\",\"iat\":%d,\"exp\":%d}",
-            userId.toString(), username, now, exp);
+        JsonObject payloadObj = new JsonObject();
+        payloadObj.addProperty("sub", userId.toString());
+        payloadObj.addProperty("username", username);
+        payloadObj.addProperty("iat", now);
+        payloadObj.addProperty("exp", exp);
+        String payloadJson = gson.toJson(payloadObj);
         String payload = base64Url(payloadJson);
         String signature = sign(header + "." + payload);
         return header + "." + payload + "." + signature;
@@ -54,14 +62,16 @@ public class JwtUtil implements TokenService {
             if (parts.length != 3) return null;
 
             String expectedSig = sign(parts[0] + "." + parts[1]);
-            if (!expectedSig.equals(parts[2])) return null;
+            if (!MessageDigest.isEqual(expectedSig.getBytes(StandardCharsets.UTF_8), parts[2].getBytes(StandardCharsets.UTF_8))) return null;
 
             String payloadJson = new String(Base64.getUrlDecoder().decode(parts[1]), StandardCharsets.UTF_8);
+            JsonObject payload = JsonParser.parseString(payloadJson).getAsJsonObject();
 
-            long exp = extractLong(payloadJson, "exp");
+            long exp = payload.has("exp") ? payload.get("exp").getAsLong() : 0;
             if (System.currentTimeMillis() / 1000 > exp) return null;
 
-            String sub = extractString(payloadJson, "sub");
+            String sub = payload.has("sub") && !payload.get("sub").isJsonNull()
+                ? payload.get("sub").getAsString() : null;
             if (sub == null) return null;
 
             return UUID.fromString(sub);
@@ -86,23 +96,5 @@ public class JwtUtil implements TokenService {
             .encodeToString(input.getBytes(StandardCharsets.UTF_8));
     }
 
-    private long extractLong(String json, String key) {
-        String search = "\"" + key + "\":";
-        int idx = json.indexOf(search);
-        if (idx == -1) return 0;
-        int start = idx + search.length();
-        int end = start;
-        while (end < json.length() && (Character.isDigit(json.charAt(end)) || json.charAt(end) == '-')) end++;
-        return Long.parseLong(json.substring(start, end));
-    }
 
-    private String extractString(String json, String key) {
-        String search = "\"" + key + "\":\"";
-        int idx = json.indexOf(search);
-        if (idx == -1) return null;
-        int start = idx + search.length();
-        int end = json.indexOf("\"", start);
-        if (end == -1) return null;
-        return json.substring(start, end);
-    }
 }
