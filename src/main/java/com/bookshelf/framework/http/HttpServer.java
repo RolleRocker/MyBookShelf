@@ -16,8 +16,8 @@ public class HttpServer {
     private final int port;
     private final Router router;
     private final AuthMiddleware authMiddleware;
-    private ServerSocket serverSocket;
-    private ExecutorService threadPool;
+    private volatile ServerSocket serverSocket;
+    private volatile ExecutorService threadPool;
     private volatile boolean running;
 
     public HttpServer(int port, Router router) {
