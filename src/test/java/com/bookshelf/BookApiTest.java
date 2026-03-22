@@ -1416,6 +1416,40 @@ public class BookApiTest {
         }
     }
 
+    @Test
+    void testTooManyHeadersRejected() throws Exception {
+        // Server should reject requests with >100 headers.
+        // It may respond with 400 or simply close/reset the connection.
+        try (Socket socket = new Socket("localhost", port)) {
+            socket.setSoTimeout(5000);
+            OutputStream out = socket.getOutputStream();
+            String request = "GET /books HTTP/1.1\r\nHost: localhost\r\n";
+            out.write(request.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            try {
+                for (int i = 0; i < 200; i++) {
+                    out.write(("X-Header-" + i + ": value\r\n")
+                        .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                }
+                out.write("\r\n".getBytes());
+                out.flush();
+            } catch (IOException ignored) {
+                // Server may reset connection before we finish writing — that's fine
+                return;
+            }
+            try {
+                byte[] buf = new byte[256];
+                int n = socket.getInputStream().read(buf);
+                if (n > 0) {
+                    String resp = new String(buf, 0, n, java.nio.charset.StandardCharsets.UTF_8);
+                    assertTrue(resp.contains("400"),
+                        "Expected 400 for too many headers, got: " + resp);
+                }
+            } catch (IOException ignored) {
+                // Connection reset on read is also acceptable
+            }
+        }
+    }
+
     // --- Review / Notes tests ---
 
     @Test

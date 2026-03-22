@@ -12,6 +12,7 @@ public class RequestParser {
 
     private static final int MAX_BODY_SIZE = 10 * 1024 * 1024; // 10 MB
     private static final int MAX_HEADER_LINE_SIZE = 8 * 1024;  // 8 KB per header line
+    private static final int MAX_HEADER_COUNT = 100;
 
     public static HttpRequest parse(InputStream input) throws IOException {
         String requestLine = readLine(input);
@@ -41,7 +42,11 @@ public class RequestParser {
         // Read headers
         Map<String, String> headers = new HashMap<>();
         String headerLine;
+        int headerCount = 0;
         while ((headerLine = readLine(input)) != null && !headerLine.isEmpty()) {
+            if (++headerCount > MAX_HEADER_COUNT) {
+                throw new IOException("Too many headers");
+            }
             int colonIndex = headerLine.indexOf(':');
             if (colonIndex > 0) {
                 String key = headerLine.substring(0, colonIndex).trim().toLowerCase();
