@@ -7,13 +7,10 @@ import com.bookshelf.domain.port.out.ShelfRepository;
 import com.bookshelf.framework.http.HttpRequest;
 import com.bookshelf.framework.http.HttpResponse;
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.google.gson.JsonPrimitive;
-import com.google.gson.JsonSerializer;
 import com.google.gson.JsonSyntaxException;
 
 import java.time.Instant;
@@ -38,11 +35,7 @@ public class ShelfController {
     public ShelfController(ShelfRepository shelfRepository, BookRepository bookRepository) {
         this.shelfRepository = shelfRepository;
         this.bookRepository = bookRepository;
-        this.gson = new GsonBuilder()
-                .serializeNulls()
-                .registerTypeAdapter(Instant.class,
-                        (JsonSerializer<Instant>) (src, type, ctx) -> new JsonPrimitive(src.toString()))
-                .create();
+        this.gson = GsonFactory.create();
     }
 
     public HttpResponse handleGetShelves(HttpRequest request) {
