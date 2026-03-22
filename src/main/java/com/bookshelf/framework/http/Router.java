@@ -48,12 +48,7 @@ public class Router {
 
         if (bestMatch != null) {
             request.setPathParams(bestParams);
-            long start = System.currentTimeMillis();
-            HttpResponse response = bestMatch.handler.apply(request);
-            System.out.printf("[%s] %s → %d (%dms)%n",
-                    request.getMethod(), request.getPath(),
-                    response.getStatusCode(), System.currentTimeMillis() - start);
-            return response;
+            return bestMatch.handler.apply(request);
         }
 
         if (pathMatchedButMethodDifferent) {
