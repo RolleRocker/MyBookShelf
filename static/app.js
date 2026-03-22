@@ -2395,8 +2395,7 @@ async function toggleStats() {
   panel.hidden = !isHidden;
   if (isHidden) {
     try {
-      const resp = await apiGet("/books/stats");
-      const data = await resp.json();
+      const data = await apiGet("/books/stats");
       renderStats(data);
     } catch {
       document.getElementById("stats-panel").textContent = "Failed to load statistics.";
