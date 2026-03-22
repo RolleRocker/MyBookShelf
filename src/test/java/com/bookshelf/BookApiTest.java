@@ -87,8 +87,8 @@ public class BookApiTest {
         client = HttpClient.newBuilder()
             .version(HttpClient.Version.HTTP_1_1)
             .build();
-        // Give the server a moment to start accepting
-        Thread.sleep(100);
+        // Wait for server to accept connections
+        waitForServer(port);
         // Register test user and get auth token
         String regBody = "{\"username\":\"testuser\",\"password\":\"testpassword123\"}";
         var regResp = client.send(
@@ -113,6 +113,17 @@ public class BookApiTest {
     }
 
     // --- Helper methods ---
+
+    private static void waitForServer(int port) throws InterruptedException {
+        for (int i = 0; i < 50; i++) {
+            try (Socket s = new Socket("localhost", port)) {
+                return;
+            } catch (IOException e) {
+                Thread.sleep(50);
+            }
+        }
+        throw new RuntimeException("Server did not start within 2.5s on port " + port);
+    }
 
     private String baseUrl() {
         return "http://localhost:" + port;

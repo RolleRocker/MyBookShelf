@@ -79,7 +79,7 @@ public class ShelfApiTest {
         client = HttpClient.newBuilder()
             .version(HttpClient.Version.HTTP_1_1)
             .build();
-        Thread.sleep(100);
+        waitForServer(port);
         // Register test user and get auth token
         String regBody = "{\"username\":\"testuser\",\"password\":\"testpassword123\"}";
         var regResp = client.send(
@@ -95,6 +95,17 @@ public class ShelfApiTest {
     @AfterAll
     static void stopServer() {
         if (server != null) server.stop();
+    }
+
+    private static void waitForServer(int port) throws InterruptedException {
+        for (int i = 0; i < 50; i++) {
+            try (java.net.Socket s = new java.net.Socket("localhost", port)) {
+                return;
+            } catch (java.io.IOException e) {
+                Thread.sleep(50);
+            }
+        }
+        throw new RuntimeException("Server did not start within 2.5s on port " + port);
     }
 
     @BeforeEach
