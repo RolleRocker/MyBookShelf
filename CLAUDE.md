@@ -49,7 +49,7 @@ com.bookshelf
 │   └── exception/                    # DuplicateGoalException, DuplicateUserException
 ├── adapter/                          # Adapters — depend on domain ports + framework
 │   ├── in/http/                      # Inbound HTTP adapters (BookController, ShelfController,
-│   │                                 #   GoalController, AuthController)
+│   │                                 #   GoalController, AuthController, GsonFactory)
 │   ├── in/mcp/                       # Inbound MCP adapter (McpController, McpToolHandler)
 │   └── out/
 │       ├── persistence/              # Outbound persistence (InMemory*Repository, Jdbc*Repository, DatabaseConfig)
@@ -72,11 +72,11 @@ com.bookshelf
 - **`TokenService`** — outbound port for JWT token creation/validation. Methods: `createToken(userId, username)`, `validateToken(token)`. Implemented by `JwtUtil`
 
 ### Framework Layer
-- **`HttpServer`** — `ServerSocket` listener with a fixed thread pool (10 threads via `ExecutorService`)
-- **`RequestParser`** — Reads raw socket `InputStream`, produces `HttpRequest` (method, path, queryParams, headers, body)
+- **`HttpServer`** — `ServerSocket` listener with a fixed thread pool (10 threads via `ExecutorService`). Volatile fields for thread-safe shutdown. Logs unhandled exceptions via SLF4J. Calls `socket.shutdownOutput()` in error paths for clean TCP FIN
+- **`RequestParser`** — Reads raw socket `InputStream`, produces `HttpRequest` (method, path, queryParams, headers, body). Enforces `MAX_HEADER_COUNT` (100) and `MAX_HEADER_LINE_SIZE` (8 KB). Throws on incomplete body reads
 - **`HttpRequest` / `HttpResponse`** — Simple model classes
 - **`Router`** — Maps method + path patterns (with `{param}` extraction) to handler functions. Static segments (`isbn`) take priority over parameters (`{id}`) to avoid route conflicts
-- **`ResponseWriter`** — Writes formatted HTTP response to socket `OutputStream`
+- **`ResponseWriter`** — Writes formatted HTTP response to socket `OutputStream`. Sanitizes header names/values (strips CR/LF) as defense against header injection
 - **`AuthMiddleware`** — JWT validation via `TokenService` port + public route checking
 - **`StaticFileHandler`** — Serves static frontend files from `/static` directory
 
@@ -215,6 +215,9 @@ Filter priority: `search` > `genre`/`subject` (mutually exclusive with search) >
 When `?page=` is present, the response is a wrapper object: `{"books":[...], "page":1, "size":20, "totalItems":42, "totalPages":3}`. Without `?page=`, the response is a raw JSON array (backward-compatible).
 
 ### Error Responses
+
+All error responses return JSON: `{"error":"message"}`.
+
 | Code  | When |
 |-------|------|
 | `400` | Missing required fields, malformed JSON, invalid rating (must be 0.5–5.0 in 0.5 increments when provided), invalid ISBN format, `readingProgress` out of 0–100 range, invalid date format, future dates, `finishedAt` before `startedAt` |
@@ -226,7 +229,7 @@ When `?page=` is present, the response is a wrapper object: `{"books":[...], "pa
 ## Key Design Decisions
 
 - **PUT = partial update**: only fields present in the request body are overwritten; missing fields unchanged; explicit `null` clears a field
-- **Gson** is the only external dependency in V1 (V3 adds PostgreSQL driver and HikariCP). Gson is configured with `serializeNulls()` and a custom `Instant` serializer that writes ISO-8601 strings
+- **Gson** is the only external dependency in V1 (V3 adds PostgreSQL driver and HikariCP). Gson is configured via `GsonFactory` singleton with `serializeNulls()` and a custom `Instant` serializer that writes ISO-8601 strings. All controllers share this instance
 - **ISBN validation**: accepts 10-char (last char may be 'X') or 13-digit format
 - **Duplicate ISBNs allowed** — users may own multiple copies; `findByIsbn` returns the oldest (first-created)
 - **Rating**: Half-star scale 0.5–5.0 in 0.5 increments. Stored internally as Integer 0–10 (doubled). API accepts/returns decimal (e.g., `3.5`). Default `0` (not rated). User cannot explicitly set `0`; it's only the default. Whole-number ratings serialize as integers (`4`), half-stars as decimals (`4.5`)
@@ -245,9 +248,9 @@ When `?page=` is present, the response is a wrapper object: `{"books":[...], "pa
 - **Search is client-side in the frontend** and server-side via `?search=` for API consumers. The frontend does not call `?search=` — it filters `allBooks` in memory
 - **Sorting is in-memory in `BookController`** — a `Comparator` is applied to the result list after repository fetch. No `ORDER BY` is added to SQL queries
 - **`readingProgress`** is validated as 0–100 on both create and update. Setting it to `null` via PUT clears it. Only displayed in the UI for `READING` books
-- **Authentication** — Hand-built JWT (HMAC-SHA256 via `javax.crypto.Mac`), PBKDF2WithHmacSHA256 password hashing (310k iterations, 16-byte salt). No external auth libraries. Public routes: all GET requests, `POST /auth/register`, `POST /auth/login`, `POST /auth/google`, `POST /mcp`. All other POST/PUT/DELETE require `Authorization: Bearer <token>` header. JWT secret from `JWT_SECRET` env var (random generated if not set). Tokens expire after 24 hours. Username: 3-50 chars. Password: 8-128 chars
+- **Authentication** — Hand-built JWT (HMAC-SHA256 via `javax.crypto.Mac`), PBKDF2WithHmacSHA256 password hashing (310k iterations, 16-byte salt). No external auth libraries. JWT payload built via Gson (not String.format) to prevent JSON injection. Signature comparison uses `MessageDigest.isEqual()` (constant-time) to prevent timing attacks. Password hash comparison also uses `MessageDigest.isEqual()`. Public routes: all GET requests, `POST /auth/register`, `POST /auth/login`, `POST /auth/google`, `POST /mcp`. All other POST/PUT/DELETE require `Authorization: Bearer <token>` header. JWT secret from `JWT_SECRET` env var (random generated if not set). Tokens expire after 24 hours. Username: 3-50 chars. Password: 8-128 chars
 - **Google OAuth** — Uses Google Identity Services (GIS) credential flow. Frontend loads `accounts.google.com/gsi/client`, gets an ID token from Google, POSTs it to `/auth/google`. Backend verifies the RS256-signed ID token using Google's JWKS public keys (`java.security.Signature`, no libraries). Keys are cached and refreshed on rotation. `GET /auth/config` returns the client ID so the frontend can conditionally show the Google button. Google-only users have null `passwordHash`/`salt`. Username is derived from email prefix with uniqueness suffix
-- **Request logging** — SLF4J 2.0.12 + Logback 1.5.6. `RequestLogger` routes to INFO (2xx/3xx), WARN (4xx), ERROR (5xx). Format: `METHOD /path STATUS TIMEms CLIENT_IP`. HikariCP logs suppressed to WARN level
+- **Request logging** — SLF4J 2.0.12 + Logback 1.5.16. `RequestLogger` routes to INFO (2xx/3xx), WARN (4xx), ERROR (5xx). Format: `METHOD /path STATUS TIMEms CLIENT_IP`. HikariCP logs suppressed to WARN level. All controllers use SLF4J (no System.err/out)
 - **Subject filter** — `?subject=` query param with case-insensitive substring match on the JSON array TEXT column. Mutually exclusive with `?search=` (search takes priority). Uses `LOWER(subjects) LIKE LOWER(?)` in SQL with `escapeLike()` for safe matching
 - **Pagination** — Backward-compatible: without `?page=`, returns raw JSON array. With `?page=`, returns wrapper object with `books`, `page`, `size`, `totalItems`, `totalPages`. In-memory slicing (not SQL LIMIT/OFFSET) because sorting/post-filtering already happens in Java. Default page size 20, max 100
 
@@ -280,13 +283,15 @@ The server exposes an MCP endpoint at `POST /mcp` using the Streamable HTTP tran
 Tests use JUnit 5 with `java.net.HttpClient`. The server starts on a random port (`new ServerSocket(0)`) before each test class and shuts down after. Repository is cleaned between tests for isolation. Tests run against `InMemoryBookRepository` only (no DB required for `./gradlew test`).
 
 Test classes:
-- **`BookApiTest`** (117 tests) — full HTTP integration tests covering CRUD, filtering, search, sorting, reading progress, half-star ratings, start/finish dates, reviews, partial updates, validation, cover endpoints, subject filtering, pagination, statistics, and CSV import/export
+- **`BookApiTest`** (119 tests) — full HTTP integration tests covering CRUD, filtering, search, sorting, reading progress, half-star ratings, start/finish dates, reviews, partial updates, validation, cover endpoints, subject filtering, pagination, statistics, CSV import/export, and header count limits
 - **`BookMetadataTest`** (43 tests) — unit tests for `BookMetadata.deriveGenre()`, Google Books response parsing, and `mergeMetadata()`
-- **`ShelfApiTest`** (56 tests) — shelf CRUD, book assignment, reordering, stats, validation, and edge cases
+- **`ShelfApiTest`** (58 tests) — shelf CRUD, book assignment, reordering, stats, validation, edge cases, and shelf detail field completeness
 - **`McpTest`** (21 tests) — MCP endpoint tests covering JSON-RPC protocol (initialize, tools/list, tools/call, ping, errors) and all 5 tool implementations
 - **`GoalApiTest`** (11 tests) — reading goal CRUD, progress computation, validation, duplicate handling, and edge cases
 - **`AuthApiTest`** (12 tests) — auth endpoint tests covering register, login, duplicate username, wrong password, protected endpoints (no/valid/invalid/tampered token), public GET access, and validation
 - **`GoogleAuthApiTest`** (11 tests) — Google OAuth tests using test RSA key pair: new user creation, existing user login, JWT works on protected endpoints, invalid/expired/tampered tokens, username derivation, auth config endpoint
+- **`JwtUtilTest`** (5 tests) — JWT creation/validation unit tests: roundtrip, tampered signature, special characters in username, malformed tokens
+- **`PasswordUtilTest`** (4 tests) — password hashing unit tests: roundtrip, wrong password rejection, salt uniqueness, Base64 encoding
 - **`OpenLibraryTest`** (11 tests) — live integration tests for Open Library enrichment service (excluded from default `./gradlew test` via `@Tag("integration")`; run with `./gradlew integrationTest`)
 
 ## Database Column Mapping
@@ -361,6 +366,7 @@ Migrations run on startup via `DatabaseConfig.runMigrations()`. The schema uses 
 | `ShelfController.java` | Shelf API endpoint handlers |
 | `GoalController.java` | Goal API endpoint handlers with computed progress |
 | `AuthController.java` | Register + login + Google OAuth endpoint handlers |
+| `GsonFactory.java` | Shared Gson singleton with `serializeNulls` + Instant serializer + `getStringField` helper |
 
 ### `com.bookshelf.adapter.in.mcp`
 | File | Role |
@@ -390,9 +396,9 @@ Migrations run on startup via `DatabaseConfig.runMigrations()`. The schema uses 
 ### `com.bookshelf.adapter.out.auth`
 | File | Role |
 |------|------|
-| `JwtUtil.java` | Implements `TokenService`; hand-built JWT creation/validation (HMAC-SHA256) |
-| `PasswordUtil.java` | PBKDF2 password hashing and verification |
-| `GoogleTokenVerifier.java` | Verifies Google ID tokens (RS256) using JWKS public keys |
+| `JwtUtil.java` | Implements `TokenService`; JWT creation (Gson-based payload) and validation (constant-time signature comparison via `MessageDigest.isEqual`) |
+| `PasswordUtil.java` | PBKDF2 password hashing and constant-time verification (`MessageDigest.isEqual`) |
+| `GoogleTokenVerifier.java` | Verifies Google ID tokens (RS256) using JWKS public keys; atomic key cache swap via volatile immutable Map |
 
 ### `com.bookshelf.framework.http`
 | File | Role |

@@ -312,7 +312,7 @@ body {
     font-family: inherit;
     font-size: 0.82rem;
     padding: 0.4rem 1rem;
-    border-radius: var(--radius);
+    border-radius: var(--radius-md);
     transition: all 0.2s;
 }
 
