@@ -13,8 +13,8 @@ import java.security.Signature;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.RSAPublicKeySpec;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Verifies Google ID tokens (RS256 JWTs) using Google's public JWKS keys.
@@ -26,21 +26,21 @@ public class GoogleTokenVerifier {
     private static final long KEY_REFRESH_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
 
     private final String clientId;
-    private final Map<String, RSAPublicKey> keyCache;
+    private volatile Map<String, RSAPublicKey> keyCache;
     private final boolean useFixedKeys;
     private volatile long lastKeyFetchTime = 0;
 
     /** Production constructor — fetches keys from Google's JWKS endpoint. */
     public GoogleTokenVerifier(String clientId) {
         this.clientId = clientId;
-        this.keyCache = new ConcurrentHashMap<>();
+        this.keyCache = Map.of();
         this.useFixedKeys = false;
     }
 
     /** Test constructor — uses pre-loaded keys, never fetches from Google. */
     public GoogleTokenVerifier(String clientId, Map<String, RSAPublicKey> testKeys) {
         this.clientId = clientId;
-        this.keyCache = new ConcurrentHashMap<>(testKeys);
+        this.keyCache = Map.copyOf(testKeys);
         this.useFixedKeys = true;
     }
 
@@ -166,7 +166,7 @@ public class GoogleTokenVerifier {
         JsonObject jwks = JsonParser.parseString(jwksJson).getAsJsonObject();
         if (!jwks.has("keys")) return;
 
-        Map<String, RSAPublicKey> newKeys = new ConcurrentHashMap<>();
+        Map<String, RSAPublicKey> newKeys = new HashMap<>();
         for (JsonElement keyElem : jwks.getAsJsonArray("keys")) {
             JsonObject key = keyElem.getAsJsonObject();
             String kty = key.has("kty") ? key.get("kty").getAsString() : null;
@@ -189,8 +189,7 @@ public class GoogleTokenVerifier {
         }
 
         if (!newKeys.isEmpty()) {
-            keyCache.clear();
-            keyCache.putAll(newKeys);
+            keyCache = Map.copyOf(newKeys);
         }
     }
 
