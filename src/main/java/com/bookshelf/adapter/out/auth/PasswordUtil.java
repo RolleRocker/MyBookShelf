@@ -2,8 +2,10 @@ package com.bookshelf.adapter.out.auth;
 
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
+import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.security.spec.KeySpec;
+import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
 public class PasswordUtil {
@@ -32,6 +34,8 @@ public class PasswordUtil {
 
     public static boolean verifyPassword(String password, String salt, String expectedHash) {
         String actualHash = hashPassword(password, salt);
-        return actualHash.equals(expectedHash);
+        return MessageDigest.isEqual(
+            actualHash.getBytes(StandardCharsets.UTF_8),
+            expectedHash.getBytes(StandardCharsets.UTF_8));
     }
 }
