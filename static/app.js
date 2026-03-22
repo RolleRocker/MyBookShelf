@@ -2332,7 +2332,7 @@ importFileInput?.addEventListener("change", async (e) => {
     const text = await file.text();
     const resp = await fetch(API + "/books/import", {
       method: "POST",
-      headers: { "Content-Type": "text/csv", ...authHeaders() },
+      headers: { ...authHeaders(), "Content-Type": "text/csv" },
       body: text
     });
     if (resp.status === 401) { handleAuthExpired(); return; }
