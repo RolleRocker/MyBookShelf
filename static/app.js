@@ -2119,6 +2119,13 @@ bookGrid.addEventListener("click", (e) => {
     renderFilteredBooks();
     return;
   }
+
+  const shelfTag = e.target.closest(".shelf-tag");
+  if (shelfTag) {
+    const shelfId = shelfTag.dataset.shelfId;
+    if (shelfId) selectShelf(shelfId);
+    return;
+  }
 });
 
 // Modal
@@ -2183,16 +2190,6 @@ shelfDeleteBtn.addEventListener("click", () => {
   if (id) {
     closeShelfModal();
     deleteShelf(id);
-  }
-});
-
-// Shelf tag click in book grid — navigate to that shelf
-bookGrid.addEventListener("click", (e) => {
-  const shelfTag = e.target.closest(".shelf-tag");
-  if (shelfTag) {
-    const shelfId = shelfTag.dataset.shelfId;
-    if (shelfId) selectShelf(shelfId);
-    return;
   }
 });
 
