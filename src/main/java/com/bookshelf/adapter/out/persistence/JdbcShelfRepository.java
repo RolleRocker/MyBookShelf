@@ -541,6 +541,11 @@ public class JdbcShelfRepository implements ShelfRepository {
         book.setCoverUrl(rs.getString("cover_url"));
         int readingProgress = rs.getInt("reading_progress");
         book.setReadingProgress(rs.wasNull() ? null : readingProgress);
+        book.setReview(rs.getString("review"));
+        java.sql.Date startedAt = rs.getDate("started_at");
+        book.setStartedAt(startedAt != null ? startedAt.toString() : null);
+        java.sql.Date finishedAt = rs.getDate("finished_at");
+        book.setFinishedAt(finishedAt != null ? finishedAt.toString() : null);
         Timestamp createdAt = rs.getTimestamp("created_at");
         if (createdAt != null) book.setCreatedAt(createdAt.toInstant());
         Timestamp updatedAt = rs.getTimestamp("updated_at");

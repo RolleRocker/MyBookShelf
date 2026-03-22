@@ -1270,4 +1270,36 @@ public class ShelfApiTest {
             shelves.get(0).getAsJsonObject().get("name").getAsString()
         );
     }
+
+    @Test
+    void t58_shelfDetailIncludesBookReviewAndDates() throws Exception {
+        JsonObject book = new JsonObject();
+        book.addProperty("title", "Dates Test Book");
+        book.addProperty("author", "Author");
+        book.addProperty("readStatus", "FINISHED");
+        book.addProperty("review", "Great book!");
+        book.addProperty("startedAt", "2025-01-01");
+        book.addProperty("finishedAt", "2025-02-01");
+        var createResp = post("/books", book.toString());
+        assertEquals(201, createResp.statusCode());
+        String bookId = JsonParser.parseString(createResp.body()).getAsJsonObject().get("id").getAsString();
+
+        JsonObject shelf = new JsonObject();
+        shelf.addProperty("name", "Review Test Shelf");
+        var shelfResp = post("/shelves", shelf.toString());
+        assertEquals(201, shelfResp.statusCode());
+        String shelfId = JsonParser.parseString(shelfResp.body()).getAsJsonObject().get("id").getAsString();
+
+        post("/shelves/" + shelfId + "/books", "{\"bookId\": \"" + bookId + "\"}");
+
+        var detailResp = get("/shelves/" + shelfId);
+        assertEquals(200, detailResp.statusCode());
+        JsonObject detail = JsonParser.parseString(detailResp.body()).getAsJsonObject();
+        JsonArray booksArr = detail.getAsJsonArray("books");
+        assertEquals(1, booksArr.size());
+        JsonObject b = booksArr.get(0).getAsJsonObject();
+        assertEquals("Great book!", b.get("review").getAsString());
+        assertEquals("2025-01-01", b.get("startedAt").getAsString());
+        assertEquals("2025-02-01", b.get("finishedAt").getAsString());
+    }
 }
