@@ -83,6 +83,9 @@ public class RequestParser {
                     baos.write(buffer, 0, read);
                     totalRead += read;
                 }
+                if (totalRead < contentLength) {
+                    throw new IOException("Incomplete request body: expected " + contentLength + " bytes, got " + totalRead);
+                }
                 body = baos.toString(StandardCharsets.UTF_8);
             }
         }
