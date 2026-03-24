@@ -134,6 +134,15 @@ public class App {
         AuthController authController
     ) {
         Router router = new Router();
+
+        // Health check for cloud load balancers
+        router.addRoute("GET", "/health", req ->
+            new com.bookshelf.framework.http.HttpResponse(
+                200, "OK", java.util.Map.of("Content-Type", "application/json"),
+                "{\"status\":\"ok\"}"
+            )
+        );
+
         router.addRoute("GET", "/books", controller::handleGetBooks);
         router.addRoute("POST", "/books", controller::handleCreateBook);
         router.addRoute("POST", "/books/re-enrich", controller::handleReEnrich);
