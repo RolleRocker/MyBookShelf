@@ -1004,7 +1004,7 @@ public class BookController {
         // Prevent CSV formula injection: prefix dangerous first characters
         if (!value.isEmpty()) {
             char first = value.charAt(0);
-            if (first == '=' || first == '+' || first == '-' || first == '@' || first == '\t' || first == '\r') {
+            if (first == '=' || first == '@' || first == '\t' || first == '\r') {
                 value = "'" + value;
             }
         }
