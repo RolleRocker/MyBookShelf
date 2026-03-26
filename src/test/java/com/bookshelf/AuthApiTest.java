@@ -214,9 +214,9 @@ public class AuthApiTest {
     }
 
     @Test
-    void t10_testGetEndpointsWorkWithoutAuth() throws Exception {
+    void t10_testGetBooksRequiresAuth() throws Exception {
         HttpResponse<String> resp = get("/books");
-        assertEquals(200, resp.statusCode());
+        assertEquals(401, resp.statusCode());
     }
 
     @Test
@@ -231,5 +231,61 @@ public class AuthApiTest {
         String body = "{\"username\":\"ab\",\"password\":\"password123456\"}";
         HttpResponse<String> resp = post("/auth/register", body);
         assertEquals(400, resp.statusCode());
+    }
+
+    @Test
+    void t13_registerWhitespaceOnlyUsername() throws Exception {
+        HttpResponse<String> resp = post("/auth/register",
+            "{\"username\":\"   \",\"password\":\"password123\"}");
+        assertEquals(400, resp.statusCode());
+    }
+
+    @Test
+    void t14_registerTooLongUsername() throws Exception {
+        String longName = "A".repeat(51);
+        HttpResponse<String> resp = post("/auth/register",
+            "{\"username\":\"" + longName + "\",\"password\":\"password123\"}");
+        assertEquals(400, resp.statusCode());
+    }
+
+    @Test
+    void t15_registerTooShortPassword() throws Exception {
+        HttpResponse<String> resp = post("/auth/register",
+            "{\"username\":\"shortpwuser\",\"password\":\"1234567\"}");
+        assertEquals(400, resp.statusCode());
+    }
+
+    @Test
+    void t16_registerTooLongPassword() throws Exception {
+        String longPw = "A".repeat(129);
+        HttpResponse<String> resp = post("/auth/register",
+            "{\"username\":\"longpwuser\",\"password\":\"" + longPw + "\"}");
+        assertEquals(400, resp.statusCode());
+    }
+
+    @Test
+    void t17_loginWithEmptyBody() throws Exception {
+        HttpResponse<String> resp = post("/auth/login", "");
+        assertEquals(400, resp.statusCode());
+    }
+
+    @Test
+    void t18_loginWithNullFields() throws Exception {
+        HttpResponse<String> resp = post("/auth/login",
+            "{\"username\":null,\"password\":null}");
+        assertEquals(400, resp.statusCode());
+    }
+
+    @Test
+    void t19_authHeaderBearerWithEmptyToken() throws Exception {
+        // "Bearer " followed by empty string — should be rejected
+        HttpResponse<String> resp = client.send(
+            java.net.http.HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl() + "/books"))
+                .header("Authorization", "Bearer ")
+                .GET()
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
+        assertEquals(401, resp.statusCode());
     }
 }
