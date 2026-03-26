@@ -1332,4 +1332,34 @@ public class ShelfApiTest {
         assertEquals(400, resp.statusCode());
         assertTrue(resp.body().contains("notes exceeds maximum length"));
     }
+
+    @Test
+    void t61_createShelfWhitespaceOnlyNameRejected() throws Exception {
+        HttpResponse<String> resp = post("/shelves", "{\"name\":\"   \"}");
+        assertEquals(400, resp.statusCode());
+    }
+
+    @Test
+    void t62_createShelfEmptyNameRejected() throws Exception {
+        HttpResponse<String> resp = post("/shelves", "{\"name\":\"\"}");
+        assertEquals(400, resp.statusCode());
+    }
+
+    @Test
+    void t63_updateShelfEmptyBodyAllowed() throws Exception {
+        HttpResponse<String> createResp = post("/shelves", "{\"name\":\"Edge Shelf\"}");
+        String id = JsonParser.parseString(createResp.body()).getAsJsonObject().get("id").getAsString();
+        HttpResponse<String> resp = put("/shelves/" + id, "{}");
+        assertEquals(200, resp.statusCode());
+    }
+
+    @Test
+    void t64_reorderShelvesWithDuplicateIds() throws Exception {
+        HttpResponse<String> r1 = post("/shelves", "{\"name\":\"DupReorder1\"}");
+        String id1 = JsonParser.parseString(r1.body()).getAsJsonObject().get("id").getAsString();
+        HttpResponse<String> resp = put("/shelves/reorder",
+            "{\"order\":[\"" + id1 + "\",\"" + id1 + "\"]}");
+        // Should reject or handle gracefully
+        assertTrue(resp.statusCode() == 400 || resp.statusCode() == 200);
+    }
 }
