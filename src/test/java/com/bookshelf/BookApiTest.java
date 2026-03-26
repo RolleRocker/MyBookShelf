@@ -2331,4 +2331,32 @@ public class BookApiTest {
         // The '=' should be prefixed with ' and the whole field quoted
         assertTrue(resp.body().contains("\"'=SUM(A1)\""));
     }
+
+    @Test
+    void testCreateBookWhitespaceOnlyTitleRejected() throws Exception {
+        HttpResponse<String> resp = post("/books",
+            "{\"title\":\"   \",\"author\":\"Test\",\"readStatus\":\"WANT_TO_READ\"}");
+        assertEquals(400, resp.statusCode());
+    }
+
+    @Test
+    void testCreateBookWhitespaceOnlyAuthorRejected() throws Exception {
+        HttpResponse<String> resp = post("/books",
+            "{\"title\":\"Test\",\"author\":\"   \",\"readStatus\":\"WANT_TO_READ\"}");
+        assertEquals(400, resp.statusCode());
+    }
+
+    @Test
+    void testCreateBookEmptySubjectsArrayAllowed() throws Exception {
+        HttpResponse<String> resp = post("/books",
+            "{\"title\":\"Test\",\"author\":\"Test\",\"readStatus\":\"WANT_TO_READ\",\"subjects\":[]}");
+        assertEquals(201, resp.statusCode());
+    }
+
+    @Test
+    void testCreateBookUnknownReadStatusRejected() throws Exception {
+        HttpResponse<String> resp = post("/books",
+            "{\"title\":\"Test\",\"author\":\"Test\",\"readStatus\":\"PAUSED\"}");
+        assertEquals(400, resp.statusCode());
+    }
 }

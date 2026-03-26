@@ -242,11 +242,11 @@ public class BookController {
         String isbn = getStringField(json, "isbn");
         boolean hasIsbn = isbn != null && !isbn.isEmpty();
 
-        if (!hasIsbn && (title == null || title.isEmpty())) {
+        if (!hasIsbn && (title == null || title.isBlank())) {
             return HttpResponse.badRequest("title is required");
         }
 
-        if (!hasIsbn && (author == null || author.isEmpty())) {
+        if (!hasIsbn && (author == null || author.isBlank())) {
             return HttpResponse.badRequest("author is required");
         }
 
