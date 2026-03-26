@@ -51,4 +51,41 @@ public class JwtUtilTest {
         assertNull(jwtUtil.validateToken("a.b"));
         assertNull(jwtUtil.validateToken(null));
     }
+
+    @Test
+    void testAlgNoneTokenIsRejected() {
+        UUID userId = UUID.randomUUID();
+        String token = jwtUtil.createToken(userId, "testuser");
+        // Replace the header with alg:none
+        String noneHeader = java.util.Base64.getUrlEncoder().withoutPadding()
+            .encodeToString("{\"alg\":\"none\",\"typ\":\"JWT\"}".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        String[] parts = token.split("\\.");
+        String tampered = noneHeader + "." + parts[1] + "." + parts[2];
+        assertNull(jwtUtil.validateToken(tampered), "Token with alg:none must be rejected");
+    }
+
+    @Test
+    void testWrongAlgorithmTokenIsRejected() {
+        UUID userId = UUID.randomUUID();
+        String token = jwtUtil.createToken(userId, "testuser");
+        // Replace the header with alg:HS384
+        String wrongAlgHeader = java.util.Base64.getUrlEncoder().withoutPadding()
+            .encodeToString("{\"alg\":\"HS384\",\"typ\":\"JWT\"}".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        String[] parts = token.split("\\.");
+        String tampered = wrongAlgHeader + "." + parts[1] + "." + parts[2];
+        assertNull(jwtUtil.validateToken(tampered), "Token with wrong algorithm must be rejected");
+    }
+
+    @Test
+    void testAlgNoneWithDummySignatureIsRejected() {
+        UUID userId = UUID.randomUUID();
+        String token = jwtUtil.createToken(userId, "testuser");
+        // Build alg:none header with a dummy (non-empty) signature so split produces 3 parts
+        // and the token reaches the algorithm validation check (not just the parts.length check)
+        String noneHeader = java.util.Base64.getUrlEncoder().withoutPadding()
+            .encodeToString("{\"alg\":\"none\",\"typ\":\"JWT\"}".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        String[] parts = token.split("\\.");
+        String tampered = noneHeader + "." + parts[1] + ".dummysig";
+        assertNull(jwtUtil.validateToken(tampered), "Token with alg:none must be rejected by algorithm check");
+    }
 }
