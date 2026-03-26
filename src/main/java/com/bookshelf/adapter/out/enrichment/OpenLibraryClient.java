@@ -15,8 +15,19 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class OpenLibraryClient implements BookMetadataFetcher {
+
+    private static final Logger logger = LoggerFactory.getLogger(OpenLibraryClient.class);
+    private static final int MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5 MB
+    private static final int MAX_JSON_SIZE = 1 * 1024 * 1024;  // 1 MB
+    private static final Set<String> ALLOWED_IMAGE_HOSTS = Set.of(
+        "covers.openlibrary.org", "books.google.com"
+    );
 
     private final HttpClient httpClient;
     private final String userAgent;
@@ -25,7 +36,7 @@ public class OpenLibraryClient implements BookMetadataFetcher {
     public OpenLibraryClient() {
         this.httpClient = HttpClient.newBuilder()
             .version(HttpClient.Version.HTTP_1_1)
-            .followRedirects(HttpClient.Redirect.NORMAL)
+            .followRedirects(HttpClient.Redirect.NEVER)
             .build();
         this.userAgent = "MyBookShelf/1.0 (personal project)";
         String key = System.getenv("GOOGLE_BOOKS_API_KEY");
@@ -37,7 +48,7 @@ public class OpenLibraryClient implements BookMetadataFetcher {
         try {
             BookMetadata metadata = fetchMetadata(isbn);
             if (metadata == null || metadata.getTitle() == null) {
-                System.out.println("Falling back to Google Books for ISBN " + isbn);
+                logger.info("Falling back to Google Books for ISBN {}", isbn);
                 BookMetadata googleMetadata = fetchGoogleBooksMetadata(isbn);
                 if (googleMetadata != null) {
                     metadata = mergeMetadata(metadata, googleMetadata);
@@ -45,7 +56,7 @@ public class OpenLibraryClient implements BookMetadataFetcher {
             }
             return metadata;
         } catch (Exception e) {
-            System.err.println("Metadata fetch failed for ISBN " + isbn + ": " + e.getMessage());
+            logger.warn("Metadata fetch failed for ISBN {}: {}", isbn, e.getMessage());
             return null;
         }
     }
@@ -55,7 +66,7 @@ public class OpenLibraryClient implements BookMetadataFetcher {
         try {
             return downloadCover(isbn);
         } catch (Exception e) {
-            System.err.println("Cover fetch failed for ISBN " + isbn + ": " + e.getMessage());
+            logger.warn("Cover fetch failed for ISBN {}: {}", isbn, e.getMessage());
             return null;
         }
     }
@@ -65,7 +76,7 @@ public class OpenLibraryClient implements BookMetadataFetcher {
         try {
             return downloadImageBytes(url);
         } catch (Exception e) {
-            System.err.println("Cover download failed from " + url + ": " + e.getMessage());
+            logger.warn("Cover download failed from URL: {}", e.getMessage());
             return null;
         }
     }
@@ -88,6 +99,10 @@ public class OpenLibraryClient implements BookMetadataFetcher {
             HttpResponse.BodyHandlers.ofString()
         );
         if (response.statusCode() != 200) {
+            return null;
+        }
+        if (response.body().length() > MAX_JSON_SIZE) {
+            logger.warn("Open Library response too large ({} chars) for ISBN {}", response.body().length(), isbn);
             return null;
         }
 
@@ -190,29 +205,7 @@ public class OpenLibraryClient implements BookMetadataFetcher {
 
     private byte[] downloadCover(String isbn) throws IOException, InterruptedException {
         String url = "https://covers.openlibrary.org/b/isbn/" + isbn + "-L.jpg";
-        HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(url))
-            .header("User-Agent", userAgent)
-            .timeout(Duration.ofSeconds(10))
-            .GET()
-            .build();
-
-        HttpResponse<byte[]> response = httpClient.send(
-            request,
-            HttpResponse.BodyHandlers.ofByteArray()
-        );
-        if (response.statusCode() != 200) {
-            return null;
-        }
-
-        byte[] data = response.body();
-
-        // Check for 1x1 pixel placeholder (< 1KB)
-        if (data.length < 1024) {
-            return null;
-        }
-
-        return data;
+        return downloadImageBytes(url);
     }
 
     private BookMetadata fetchGoogleBooksMetadata(String isbn)
@@ -233,12 +226,11 @@ public class OpenLibraryClient implements BookMetadataFetcher {
             HttpResponse.BodyHandlers.ofString()
         );
         if (response.statusCode() != 200) {
-            System.err.println(
-                "Google Books API returned " +
-                    response.statusCode() +
-                    " for ISBN " +
-                    isbn
-            );
+            logger.warn("Google Books API returned {} for ISBN {}", response.statusCode(), isbn);
+            return null;
+        }
+        if (response.body().length() > MAX_JSON_SIZE) {
+            logger.warn("Google Books response too large ({} chars) for ISBN {}", response.body().length(), isbn);
             return null;
         }
         return parseGoogleBooksResponse(response.body());
@@ -339,8 +331,26 @@ public class OpenLibraryClient implements BookMetadataFetcher {
         return metadata;
     }
 
+    private boolean isAllowedImageUrl(String imageUrl) {
+        try {
+            URI uri = URI.create(imageUrl);
+            String scheme = uri.getScheme();
+            String host = uri.getHost();
+            if (!"https".equals(scheme) || host == null) return false;
+            return ALLOWED_IMAGE_HOSTS.contains(host)
+                || host.endsWith(".us.archive.org");
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private byte[] downloadImageBytes(String imageUrl)
         throws IOException, InterruptedException {
+        if (!isAllowedImageUrl(imageUrl)) {
+            logger.warn("Blocked image download from untrusted URL: {}", imageUrl);
+            return null;
+        }
+
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(imageUrl))
             .header("User-Agent", userAgent)
@@ -352,12 +362,34 @@ public class OpenLibraryClient implements BookMetadataFetcher {
             request,
             HttpResponse.BodyHandlers.ofByteArray()
         );
+
+        // Follow one redirect if the Location passes the SSRF allowlist
+        if (response.statusCode() >= 300 && response.statusCode() < 400) {
+            String location = response.headers().firstValue("Location").orElse(null);
+            if (location == null || !isAllowedImageUrl(location)) {
+                logger.warn("Blocked redirect from image URL to untrusted location: {}", location);
+                return null;
+            }
+            HttpRequest redirectRequest = HttpRequest.newBuilder()
+                .uri(URI.create(location))
+                .header("User-Agent", userAgent)
+                .timeout(Duration.ofSeconds(10))
+                .GET()
+                .build();
+            response = httpClient.send(redirectRequest, HttpResponse.BodyHandlers.ofByteArray());
+        }
+
         if (response.statusCode() != 200) {
             return null;
         }
 
+        String contentType = response.headers().firstValue("content-type").orElse("");
+        if (!contentType.startsWith("image/")) {
+            return null;
+        }
+
         byte[] data = response.body();
-        if (data.length < 1024) {
+        if (data.length < 1024 || data.length > MAX_IMAGE_SIZE) {
             return null;
         }
         return data;
