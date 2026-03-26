@@ -2454,4 +2454,42 @@ public class BookApiTest {
             "title,author,readStatus\n\"Title, With Comma\",Author,WANT_TO_READ\n");
         assertEquals(200, resp.statusCode());
     }
+
+    @Test
+    void testTransferEncodingRejected() throws Exception {
+        try (Socket socket = new Socket("localhost", port)) {
+            OutputStream out = socket.getOutputStream();
+            String raw = "GET /health HTTP/1.1\r\n"
+                + "Host: localhost\r\n"
+                + "Transfer-Encoding: chunked\r\n"
+                + "\r\n";
+            out.write(raw.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            out.flush();
+            socket.shutdownOutput();
+            String response = new String(
+                socket.getInputStream().readAllBytes(),
+                java.nio.charset.StandardCharsets.UTF_8);
+            // RequestParser rejects Transfer-Encoding; server should close or return 400
+            assertTrue(response.contains("400") || response.isEmpty(),
+                "Transfer-Encoding should be rejected: " + response);
+        }
+    }
+
+    @Test
+    void testUnsupportedHttpVersionRejected() throws Exception {
+        try (Socket socket = new Socket("localhost", port)) {
+            OutputStream out = socket.getOutputStream();
+            String raw = "GET /health HTTP/2.0\r\n"
+                + "Host: localhost\r\n"
+                + "\r\n";
+            out.write(raw.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            out.flush();
+            socket.shutdownOutput();
+            String response = new String(
+                socket.getInputStream().readAllBytes(),
+                java.nio.charset.StandardCharsets.UTF_8);
+            assertTrue(response.contains("400") || response.isEmpty(),
+                "HTTP/2.0 should be rejected: " + response);
+        }
+    }
 }
