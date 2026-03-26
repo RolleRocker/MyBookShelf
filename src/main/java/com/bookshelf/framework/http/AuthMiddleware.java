@@ -25,7 +25,14 @@ public class AuthMiddleware {
 
     public static boolean isPublicRoute(String method, String path) {
         if ("GET".equalsIgnoreCase(method)) {
-            return true;
+            // Only specific GET endpoints are public; API data routes require auth
+            if ("/health".equals(path) || "/auth/config".equals(path)) {
+                return true;
+            }
+            // Static files and other non-API paths remain public
+            return !path.startsWith("/books") && !path.startsWith("/shelves")
+                && !path.startsWith("/goals") && !path.startsWith("/auth")
+                && !path.startsWith("/mcp");
         }
         if ("POST".equalsIgnoreCase(method)) {
             if ("/auth/register".equals(path) || "/auth/login".equals(path)
