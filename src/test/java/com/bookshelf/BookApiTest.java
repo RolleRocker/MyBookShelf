@@ -2409,4 +2409,28 @@ public class BookApiTest {
         // Without ?page=, response is raw JSON array (not paginated wrapper)
         assertTrue(resp.body().trim().startsWith("["));
     }
+
+    @Test
+    void testGetCoverForBookWithNoCover() throws Exception {
+        HttpResponse<String> createResp = post("/books",
+            createBookJson("No Cover Book", "Author", "WANT_TO_READ"));
+        String id = JsonParser.parseString(createResp.body()).getAsJsonObject().get("id").getAsString();
+        HttpResponse<String> resp = get("/books/" + id + "/cover");
+        assertEquals(404, resp.statusCode());
+    }
+
+    @Test
+    void testGetCoverForNonExistentBook() throws Exception {
+        HttpResponse<String> resp = get("/books/" + java.util.UUID.randomUUID() + "/cover");
+        assertEquals(404, resp.statusCode());
+    }
+
+    @Test
+    void testGetStatsReturnsValidJson() throws Exception {
+        HttpResponse<String> resp = get("/books/stats");
+        assertEquals(200, resp.statusCode());
+        // Should return valid JSON with stats fields
+        JsonObject stats = JsonParser.parseString(resp.body()).getAsJsonObject();
+        assertTrue(stats.has("totalBooks"));
+    }
 }
