@@ -2359,4 +2359,54 @@ public class BookApiTest {
             "{\"title\":\"Test\",\"author\":\"Test\",\"readStatus\":\"PAUSED\"}");
         assertEquals(400, resp.statusCode());
     }
+
+    @Test
+    void testSortWithEmptyParam() throws Exception {
+        post("/books", createBookJson("SortEmpty", "Author", "WANT_TO_READ"));
+        HttpResponse<String> resp = get("/books?sort=");
+        assertEquals(200, resp.statusCode());
+    }
+
+    @Test
+    void testSortWithInvalidField() throws Exception {
+        post("/books", createBookJson("SortInvalid", "Author", "WANT_TO_READ"));
+        HttpResponse<String> resp = get("/books?sort=invalid,asc");
+        // Invalid sort field is silently ignored (no comparator applied), returns 200
+        assertEquals(200, resp.statusCode());
+    }
+
+    @Test
+    void testSortCaseInsensitiveDirection() throws Exception {
+        post("/books", createBookJson("Beta Sort", "Author", "WANT_TO_READ"));
+        post("/books", createBookJson("Alpha Sort", "Author", "WANT_TO_READ"));
+        HttpResponse<String> resp = get("/books?sort=title,ASC");
+        assertEquals(200, resp.statusCode());
+    }
+
+    @Test
+    void testPaginationPageZero() throws Exception {
+        post("/books", createBookJson("PageZero", "Author", "WANT_TO_READ"));
+        HttpResponse<String> resp = get("/books?page=0");
+        // page=0 should either return 400 or be treated as page=1
+        assertTrue(resp.statusCode() == 200 || resp.statusCode() == 400);
+    }
+
+    @Test
+    void testPaginationNegativeSize() throws Exception {
+        post("/books", createBookJson("NegSize", "Author", "WANT_TO_READ"));
+        HttpResponse<String> resp = get("/books?page=1&size=-1");
+        assertEquals(200, resp.statusCode());
+        // Negative size should be clamped to default (20)
+        JsonObject result = JsonParser.parseString(resp.body()).getAsJsonObject();
+        assertEquals(20, result.get("size").getAsInt());
+    }
+
+    @Test
+    void testSizeWithoutPageReturnsRawArray() throws Exception {
+        post("/books", createBookJson("NoPage", "Author", "WANT_TO_READ"));
+        HttpResponse<String> resp = get("/books?size=50");
+        assertEquals(200, resp.statusCode());
+        // Without ?page=, response is raw JSON array (not paginated wrapper)
+        assertTrue(resp.body().trim().startsWith("["));
+    }
 }
