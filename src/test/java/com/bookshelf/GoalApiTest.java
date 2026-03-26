@@ -97,7 +97,8 @@ public class GoalApiTest {
 
     private HttpResponse<String> get(String path) throws IOException, InterruptedException {
         return client.send(
-            HttpRequest.newBuilder().uri(URI.create(baseUrl() + path)).GET().build(),
+            HttpRequest.newBuilder().uri(URI.create(baseUrl() + path))
+                .header("Authorization", "Bearer " + authToken).GET().build(),
             HttpResponse.BodyHandlers.ofString());
     }
 
@@ -257,5 +258,46 @@ public class GoalApiTest {
         JsonObject body = JsonParser.parseString(res.body()).getAsJsonObject();
         assertTrue(body.get("onPace").getAsBoolean());
         assertTrue(body.get("paceDelta").getAsInt() >= 0);
+    }
+
+    @Test
+    void t12_createGoalAtMinYear() throws Exception {
+        HttpResponse<String> resp = post("/goals", "{\"year\":2000,\"target\":5}");
+        assertEquals(201, resp.statusCode());
+        delete("/goals/2000");
+    }
+
+    @Test
+    void t13_createGoalAtMaxYear() throws Exception {
+        HttpResponse<String> resp = post("/goals", "{\"year\":2100,\"target\":5}");
+        assertEquals(201, resp.statusCode());
+        delete("/goals/2100");
+    }
+
+    @Test
+    void t14_createGoalBelowMinYear() throws Exception {
+        HttpResponse<String> resp = post("/goals", "{\"year\":1999,\"target\":5}");
+        assertEquals(400, resp.statusCode());
+    }
+
+    @Test
+    void t15_createGoalAboveMaxYear() throws Exception {
+        HttpResponse<String> resp = post("/goals", "{\"year\":2101,\"target\":5}");
+        assertEquals(400, resp.statusCode());
+    }
+
+    @Test
+    void t16_createGoalVeryLargeTarget() throws Exception {
+        HttpResponse<String> resp = post("/goals", "{\"year\":2099,\"target\":999999}");
+        assertEquals(201, resp.statusCode());
+        delete("/goals/2099");
+    }
+
+    @Test
+    void t17_updateGoalTargetToZero() throws Exception {
+        post("/goals", "{\"year\":2098,\"target\":5}");
+        HttpResponse<String> resp = put("/goals/2098", "{\"target\":0}");
+        assertEquals(400, resp.statusCode());
+        delete("/goals/2098");
     }
 }
