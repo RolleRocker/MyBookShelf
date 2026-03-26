@@ -134,6 +134,7 @@ public class BookApiTest {
         return client.send(
             HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl() + path))
+                .header("Authorization", "Bearer " + authToken)
                 .GET()
                 .build(),
             HttpResponse.BodyHandlers.ofString()
@@ -765,13 +766,7 @@ public class BookApiTest {
             createBookJson("Neuromancer", "William Gibson", "READING")
         );
 
-        HttpResponse<String> resp = client.send(
-            HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl() + "/books?search=dune"))
-                .GET()
-                .build(),
-            HttpResponse.BodyHandlers.ofString()
-        );
+        HttpResponse<String> resp = get("/books?search=dune");
 
         assertEquals(200, resp.statusCode());
         JsonArray books = JsonParser.parseString(resp.body()).getAsJsonArray();
@@ -790,13 +785,7 @@ public class BookApiTest {
             createBookJson("Neuromancer", "William Gibson", "READING")
         );
 
-        HttpResponse<String> resp = client.send(
-            HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl() + "/books?search=gibson"))
-                .GET()
-                .build(),
-            HttpResponse.BodyHandlers.ofString()
-        );
+        HttpResponse<String> resp = get("/books?search=gibson");
 
         assertEquals(200, resp.statusCode());
         JsonArray books = JsonParser.parseString(resp.body()).getAsJsonArray();
@@ -815,13 +804,7 @@ public class BookApiTest {
         );
         post("/books", createBookJson("Dune", "Frank Herbert", "WANT_TO_READ"));
 
-        HttpResponse<String> resp = client.send(
-            HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl() + "/books?sort=title,asc"))
-                .GET()
-                .build(),
-            HttpResponse.BodyHandlers.ofString()
-        );
+        HttpResponse<String> resp = get("/books?sort=title,asc");
 
         assertEquals(200, resp.statusCode());
         JsonArray books = JsonParser.parseString(resp.body()).getAsJsonArray();
@@ -844,13 +827,7 @@ public class BookApiTest {
         );
         post("/books", createBookJson("Dune", "Frank Herbert", "WANT_TO_READ"));
 
-        HttpResponse<String> resp = client.send(
-            HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl() + "/books?sort=title,desc"))
-                .GET()
-                .build(),
-            HttpResponse.BodyHandlers.ofString()
-        );
+        HttpResponse<String> resp = get("/books?sort=title,desc");
 
         assertEquals(200, resp.statusCode());
         JsonArray books = JsonParser.parseString(resp.body()).getAsJsonArray();
@@ -2303,5 +2280,55 @@ public class BookApiTest {
         }
         assertTrue(found1);
         assertTrue(found2);
+    }
+
+    @Test
+    void testCreateBookTitleTooLong() throws Exception {
+        String longTitle = "A".repeat(501);
+        HttpResponse<String> resp = post("/books",
+            "{\"title\":\"" + longTitle + "\",\"author\":\"Test\",\"readStatus\":\"WANT_TO_READ\"}");
+        assertEquals(400, resp.statusCode());
+        assertTrue(resp.body().contains("title exceeds maximum length"));
+    }
+
+    @Test
+    void testCreateBookReviewTooLong() throws Exception {
+        String longReview = "A".repeat(5001);
+        String body = "{\"title\":\"Test\",\"author\":\"Test\",\"readStatus\":\"WANT_TO_READ\",\"review\":\"" + longReview + "\"}";
+        HttpResponse<String> resp = post("/books", body);
+        assertEquals(400, resp.statusCode());
+        assertTrue(resp.body().contains("review exceeds maximum length"));
+    }
+
+    @Test
+    void testCreateBookTooManySubjects() throws Exception {
+        StringBuilder subjects = new StringBuilder("[");
+        for (int i = 0; i < 51; i++) {
+            if (i > 0) subjects.append(",");
+            subjects.append("\"subject").append(i).append("\"");
+        }
+        subjects.append("]");
+        String body = "{\"title\":\"Test\",\"author\":\"Test\",\"readStatus\":\"WANT_TO_READ\",\"subjects\":" + subjects + "}";
+        HttpResponse<String> resp = post("/books", body);
+        assertEquals(400, resp.statusCode());
+        assertTrue(resp.body().contains("maximum 50 subjects"));
+    }
+
+    @Test
+    void testCreateBookSubjectTooLong() throws Exception {
+        String longSubject = "A".repeat(201);
+        String body = "{\"title\":\"Test\",\"author\":\"Test\",\"readStatus\":\"WANT_TO_READ\",\"subjects\":[\"" + longSubject + "\"]}";
+        HttpResponse<String> resp = post("/books", body);
+        assertEquals(400, resp.statusCode());
+        assertTrue(resp.body().contains("each subject must be 200 characters"));
+    }
+
+    @Test
+    void testCsvExportSanitizesFormulaInjection() throws Exception {
+        post("/books", "{\"title\":\"=SUM(A1)\",\"author\":\"Test\",\"readStatus\":\"WANT_TO_READ\"}");
+        HttpResponse<String> resp = get("/books/export");
+        assertEquals(200, resp.statusCode());
+        // The '=' should be prefixed with ' and the whole field quoted
+        assertTrue(resp.body().contains("\"'=SUM(A1)\""));
     }
 }

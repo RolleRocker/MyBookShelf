@@ -125,6 +125,7 @@ public class ShelfApiTest {
         return client.send(
             HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl() + path))
+                .header("Authorization", "Bearer " + authToken)
                 .GET()
                 .build(),
             HttpResponse.BodyHandlers.ofString()
@@ -1312,5 +1313,23 @@ public class ShelfApiTest {
         assertEquals("Great book!", b.get("review").getAsString());
         assertEquals("2025-01-01", b.get("startedAt").getAsString());
         assertEquals("2025-02-01", b.get("finishedAt").getAsString());
+    }
+
+    @Test
+    void t59_createShelfDescriptionTooLong() throws Exception {
+        String longDesc = "A".repeat(2001);
+        HttpResponse<String> resp = post("/shelves",
+            "{\"name\":\"Test Shelf\",\"description\":\"" + longDesc + "\"}");
+        assertEquals(400, resp.statusCode());
+        assertTrue(resp.body().contains("description exceeds maximum length"));
+    }
+
+    @Test
+    void t60_createShelfNotesTooLong() throws Exception {
+        String longNotes = "A".repeat(5001);
+        HttpResponse<String> resp = post("/shelves",
+            "{\"name\":\"Test Shelf\",\"notes\":\"" + longNotes + "\"}");
+        assertEquals(400, resp.statusCode());
+        assertTrue(resp.body().contains("notes exceeds maximum length"));
     }
 }
