@@ -96,12 +96,19 @@ public class ShelfController {
             return HttpResponse.badRequest("Invalid sortDirection");
         }
 
+        String description = getStringField(json, "description");
+        HttpResponse descErr = validateStringLength(description, "description", 2000);
+        if (descErr != null) return descErr;
+        String notes = getStringField(json, "notes");
+        HttpResponse notesErr = validateStringLength(notes, "notes", 5000);
+        if (notesErr != null) return notesErr;
+
         try {
             Shelf shelf = new Shelf();
             shelf.setId(UUID.randomUUID());
             shelf.setName(name.trim());
-            shelf.setDescription(getStringField(json, "description"));
-            shelf.setNotes(getStringField(json, "notes"));
+            shelf.setDescription(description);
+            shelf.setNotes(notes);
             shelf.setColor(color);
             shelf.setSortField(sortField != null ? sortField : "custom");
             shelf.setSortDirection(sortDirection != null ? sortDirection : "asc");
@@ -176,10 +183,16 @@ public class ShelfController {
         }
 
         if (json.has("description")) {
-            shelf.setDescription(json.get("description").isJsonNull() ? null : json.get("description").getAsString());
+            String desc = json.get("description").isJsonNull() ? null : json.get("description").getAsString();
+            HttpResponse descErr = validateStringLength(desc, "description", 2000);
+            if (descErr != null) return descErr;
+            shelf.setDescription(desc);
         }
         if (json.has("notes")) {
-            shelf.setNotes(json.get("notes").isJsonNull() ? null : json.get("notes").getAsString());
+            String notes = json.get("notes").isJsonNull() ? null : json.get("notes").getAsString();
+            HttpResponse notesErr = validateStringLength(notes, "notes", 5000);
+            if (notesErr != null) return notesErr;
+            shelf.setNotes(notes);
         }
         if (json.has("color")) {
             String color = getStringField(json, "color");
@@ -506,6 +519,13 @@ public class ShelfController {
 
     private String getStringField(JsonObject json, String field) {
         return GsonFactory.getStringField(json, field);
+    }
+
+    private HttpResponse validateStringLength(String value, String fieldName, int maxLength) {
+        if (value != null && value.length() > maxLength) {
+            return HttpResponse.badRequest(fieldName + " exceeds maximum length of " + maxLength);
+        }
+        return null;
     }
 
     private String validateName(String name) {

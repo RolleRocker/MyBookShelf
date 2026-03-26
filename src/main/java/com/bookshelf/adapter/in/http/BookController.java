@@ -277,6 +277,10 @@ public class BookController {
             return HttpResponse.badRequest("Invalid ISBN format");
         }
 
+        // Validate string field lengths
+        HttpResponse lenErr = validateBookStringLengths(json);
+        if (lenErr != null) return lenErr;
+
         try {
             // Build the book
             Book book = new Book();
@@ -325,9 +329,17 @@ public class BookController {
                 if (!json.get("subjects").isJsonArray()) {
                     return HttpResponse.badRequest("subjects must be an array");
                 }
+                JsonArray subjectsArr = json.getAsJsonArray("subjects");
+                if (subjectsArr.size() > 50) {
+                    return HttpResponse.badRequest("maximum 50 subjects allowed");
+                }
                 List<String> subjects = new ArrayList<>();
-                for (var el : json.getAsJsonArray("subjects")) {
-                    subjects.add(el.getAsString());
+                for (var el : subjectsArr) {
+                    String s = el.getAsString();
+                    if (s.length() > 200) {
+                        return HttpResponse.badRequest("each subject must be 200 characters or fewer");
+                    }
+                    subjects.add(s);
                 }
                 book.setSubjects(subjects);
             }
@@ -438,6 +450,10 @@ public class BookController {
             }
         }
 
+        // Validate string field lengths for partial update
+        HttpResponse lenErr = validateBookStringLengths(json);
+        if (lenErr != null) return lenErr;
+
         try {
             // Save old ISBN before applying updates (book is same object as existing.get())
             String oldIsbn = book.getIsbn();
@@ -515,19 +531,26 @@ public class BookController {
                 if (json.get("subjects").isJsonNull()) {
                     book.setSubjects(null);
                 } else {
+                    JsonArray subjectsArr;
+                    try {
+                        subjectsArr = json.get("subjects").getAsJsonArray();
+                    } catch (IllegalStateException e) {
+                        return HttpResponse.badRequest("'subjects' must be an array of strings");
+                    }
+                    if (subjectsArr.size() > 50) {
+                        return HttpResponse.badRequest("maximum 50 subjects allowed");
+                    }
                     List<String> subjects = new ArrayList<>();
                     try {
-                        json
-                            .get("subjects")
-                            .getAsJsonArray()
-                            .forEach(e -> subjects.add(e.getAsString()));
-                    } catch (
-                        IllegalStateException
-                        | UnsupportedOperationException e
-                    ) {
-                        return HttpResponse.badRequest(
-                            "'subjects' must be an array of strings"
-                        );
+                        for (var el : subjectsArr) {
+                            String s = el.getAsString();
+                            if (s.length() > 200) {
+                                return HttpResponse.badRequest("each subject must be 200 characters or fewer");
+                            }
+                            subjects.add(s);
+                        }
+                    } catch (UnsupportedOperationException e) {
+                        return HttpResponse.badRequest("'subjects' must be an array of strings");
                     }
                     book.setSubjects(subjects);
                 }
@@ -718,6 +741,25 @@ public class BookController {
 
     private String getStringField(JsonObject json, String field) {
         return GsonFactory.getStringField(json, field);
+    }
+
+    private HttpResponse validateStringLength(String value, String fieldName, int maxLength) {
+        if (value != null && value.length() > maxLength) {
+            return HttpResponse.badRequest(fieldName + " exceeds maximum length of " + maxLength);
+        }
+        return null;
+    }
+
+    private HttpResponse validateBookStringLengths(JsonObject json) {
+        HttpResponse err;
+        if ((err = validateStringLength(getStringField(json, "title"), "title", 500)) != null) return err;
+        if ((err = validateStringLength(getStringField(json, "author"), "author", 500)) != null) return err;
+        if ((err = validateStringLength(getStringField(json, "genre"), "genre", 100)) != null) return err;
+        if ((err = validateStringLength(getStringField(json, "publisher"), "publisher", 500)) != null) return err;
+        if ((err = validateStringLength(getStringField(json, "publishDate"), "publishDate", 50)) != null) return err;
+        if ((err = validateStringLength(getStringField(json, "review"), "review", 5000)) != null) return err;
+        if ((err = validateStringLength(getStringField(json, "coverUrl"), "coverUrl", 2048)) != null) return err;
+        return null;
     }
 
     private Integer safeGetInt(JsonObject json, String field) {
@@ -959,7 +1001,15 @@ public class BookController {
 
     private String csvField(String value) {
         if (value == null) return "";
-        if (value.contains(",") || value.contains("\"") || value.contains("\n") || value.contains("\r")) {
+        // Prevent CSV formula injection: prefix dangerous first characters
+        if (!value.isEmpty()) {
+            char first = value.charAt(0);
+            if (first == '=' || first == '+' || first == '-' || first == '@' || first == '\t' || first == '\r') {
+                value = "'" + value;
+            }
+        }
+        if (value.contains(",") || value.contains("\"") || value.contains("\n")
+                || value.contains("\r") || value.startsWith("'")) {
             return "\"" + value.replace("\"", "\"\"") + "\"";
         }
         return value;
@@ -1215,12 +1265,8 @@ public class BookController {
         book.setFinishedAt(getCsvCol(cols, colIndex, "finishedAt"));
         book.setCoverUrl(getCsvCol(cols, colIndex, "coverUrl"));
 
-        String createdAt = getCsvCol(cols, colIndex, "createdAt");
-        if (createdAt != null && !createdAt.isEmpty()) {
-            try {
-                book.setCreatedAt(Instant.parse(createdAt.trim()));
-            } catch (DateTimeParseException ignored) {}
-        }
+        // Ignore imported createdAt — always use current time to prevent stats manipulation
+        book.setCreatedAt(Instant.now());
 
         return book;
     }
