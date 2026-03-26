@@ -2433,4 +2433,25 @@ public class BookApiTest {
         JsonObject stats = JsonParser.parseString(resp.body()).getAsJsonObject();
         assertTrue(stats.has("totalBooks"));
     }
+
+    @Test
+    void testCsvImportEmptyBody() throws Exception {
+        // Send empty body — should handle gracefully
+        HttpResponse<String> resp = postCsv("/books/import", "");
+        assertTrue(resp.statusCode() == 200 || resp.statusCode() == 400);
+    }
+
+    @Test
+    void testCsvImportHeaderOnly() throws Exception {
+        HttpResponse<String> resp = postCsv("/books/import",
+            "title,author,readStatus\n");
+        assertEquals(200, resp.statusCode());
+    }
+
+    @Test
+    void testCsvImportWithQuotedCommas() throws Exception {
+        HttpResponse<String> resp = postCsv("/books/import",
+            "title,author,readStatus\n\"Title, With Comma\",Author,WANT_TO_READ\n");
+        assertEquals(200, resp.statusCode());
+    }
 }
