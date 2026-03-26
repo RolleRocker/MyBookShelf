@@ -13,6 +13,7 @@ public class RequestParser {
     private static final int MAX_BODY_SIZE = 10 * 1024 * 1024; // 10 MB
     private static final int MAX_HEADER_LINE_SIZE = 8 * 1024;  // 8 KB per header line
     private static final int MAX_HEADER_COUNT = 100;
+    private static final int MAX_URI_LENGTH = 8192;
 
     public static HttpRequest parse(InputStream input) throws IOException {
         String requestLine = readLine(input);
@@ -21,12 +22,19 @@ public class RequestParser {
         }
 
         String[] parts = requestLine.split(" ");
-        if (parts.length < 2) {
-            throw new IOException("Malformed request line: " + requestLine);
+        if (parts.length != 3) {
+            throw new IOException("Malformed request line");
+        }
+        String httpVersion = parts[2];
+        if (!"HTTP/1.1".equals(httpVersion) && !"HTTP/1.0".equals(httpVersion)) {
+            throw new IOException("Unsupported HTTP version");
         }
 
         String method = parts[0].toUpperCase();
         String fullPath = parts[1];
+        if (fullPath.length() > MAX_URI_LENGTH) {
+            throw new IOException("Request URI too long");
+        }
 
         // Split path and query string
         String path;
@@ -52,8 +60,18 @@ public class RequestParser {
                 String key = headerLine.substring(0, colonIndex).trim().toLowerCase();
                 String value = headerLine.substring(colonIndex + 1).trim()
                         .replace("\r", "").replace("\n", "");
+                // Detect conflicting Content-Length headers
+                if ("content-length".equals(key) && headers.containsKey("content-length")
+                        && !headers.get("content-length").equals(value.trim())) {
+                    throw new IOException("Conflicting Content-Length headers");
+                }
                 headers.put(key, value);
             }
+        }
+
+        // Reject Transfer-Encoding (not supported; prevents request smuggling)
+        if (headers.containsKey("transfer-encoding")) {
+            throw new IOException("Transfer-Encoding not supported");
         }
 
         // Read body based on Content-Length
