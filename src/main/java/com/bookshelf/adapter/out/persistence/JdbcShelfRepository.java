@@ -1,10 +1,8 @@
 package com.bookshelf.adapter.out.persistence;
 
 import com.bookshelf.domain.model.Book;
-import com.bookshelf.domain.model.ReadStatus;
 import com.bookshelf.domain.model.Shelf;
 import com.bookshelf.domain.port.out.ShelfRepository;
-import com.google.gson.Gson;
 import java.sql.*;
 import java.time.Instant;
 import java.util.*;
@@ -13,7 +11,6 @@ import javax.sql.DataSource;
 public class JdbcShelfRepository implements ShelfRepository {
 
     private final DataSource dataSource;
-    private final Gson gson = new Gson();
 
     public JdbcShelfRepository(DataSource dataSource) {
         this.dataSource = dataSource;
@@ -418,7 +415,7 @@ public class JdbcShelfRepository implements ShelfRepository {
             try (ResultSet rs = stmt.executeQuery()) {
                 List<Book> books = new ArrayList<>();
                 while (rs.next()) {
-                    books.add(mapBookRow(rs));
+                    books.add(BookRowMapper.mapRow(rs));
                 }
 
                 // Apply in-memory sort for non-custom
@@ -510,47 +507,6 @@ public class JdbcShelfRepository implements ShelfRepository {
                 shelf.setStats(stats);
             }
         }
-    }
-
-    private Book mapBookRow(ResultSet rs) throws SQLException {
-        Book book = new Book();
-        book.setId(rs.getObject("id", UUID.class));
-        book.setTitle(rs.getString("title"));
-        book.setAuthor(rs.getString("author"));
-        book.setGenre(rs.getString("genre"));
-        int rating = rs.getInt("rating");
-        book.setRating(rs.wasNull() ? null : rating);
-        book.setIsbn(rs.getString("isbn"));
-        book.setPublisher(rs.getString("publisher"));
-        book.setPublishDate(rs.getString("publish_date"));
-        int pageCount = rs.getInt("page_count");
-        book.setPageCount(rs.wasNull() ? null : pageCount);
-        String subjectsJson = rs.getString("subjects");
-        if (subjectsJson != null) {
-            book.setSubjects(
-                gson.fromJson(
-                    subjectsJson,
-                    new com.google.gson.reflect.TypeToken<
-                        List<String>
-                    >() {}.getType()
-                )
-            );
-        }
-        book.setReadStatus(ReadStatus.valueOf(rs.getString("read_status")));
-        book.setCoverData(rs.getBytes("cover_data"));
-        book.setCoverUrl(rs.getString("cover_url"));
-        int readingProgress = rs.getInt("reading_progress");
-        book.setReadingProgress(rs.wasNull() ? null : readingProgress);
-        book.setReview(rs.getString("review"));
-        java.sql.Date startedAt = rs.getDate("started_at");
-        book.setStartedAt(startedAt != null ? startedAt.toString() : null);
-        java.sql.Date finishedAt = rs.getDate("finished_at");
-        book.setFinishedAt(finishedAt != null ? finishedAt.toString() : null);
-        Timestamp createdAt = rs.getTimestamp("created_at");
-        if (createdAt != null) book.setCreatedAt(createdAt.toInstant());
-        Timestamp updatedAt = rs.getTimestamp("updated_at");
-        if (updatedAt != null) book.setUpdatedAt(updatedAt.toInstant());
-        return book;
     }
 
     private void renumberBookPositions(UUID shelfId) {

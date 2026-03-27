@@ -5,7 +5,6 @@ import com.bookshelf.domain.model.BookMetadata;
 import com.bookshelf.domain.model.ReadStatus;
 import com.bookshelf.domain.port.out.BookRepository;
 import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
 
 import javax.sql.DataSource;
 import java.sql.*;
@@ -32,7 +31,7 @@ public class JdbcBookRepository implements BookRepository {
              ResultSet rs = stmt.executeQuery()) {
             List<Book> books = new ArrayList<>();
             while (rs.next()) {
-                books.add(mapRow(rs));
+                books.add(BookRowMapper.mapRow(rs));
             }
             return books;
         } catch (SQLException e) {
@@ -49,7 +48,7 @@ public class JdbcBookRepository implements BookRepository {
             try (ResultSet rs = stmt.executeQuery()) {
                 List<Book> books = new ArrayList<>();
                 while (rs.next()) {
-                    books.add(mapRow(rs));
+                    books.add(BookRowMapper.mapRow(rs));
                 }
                 return books;
             }
@@ -67,7 +66,7 @@ public class JdbcBookRepository implements BookRepository {
             try (ResultSet rs = stmt.executeQuery()) {
                 List<Book> books = new ArrayList<>();
                 while (rs.next()) {
-                    books.add(mapRow(rs));
+                    books.add(BookRowMapper.mapRow(rs));
                 }
                 return books;
             }
@@ -90,7 +89,7 @@ public class JdbcBookRepository implements BookRepository {
             stmt.setString(2, pattern);
             try (ResultSet rs = stmt.executeQuery()) {
                 List<Book> books = new ArrayList<>();
-                while (rs.next()) books.add(mapRow(rs));
+                while (rs.next()) books.add(BookRowMapper.mapRow(rs));
                 return books;
             }
         } catch (SQLException e) {
@@ -107,7 +106,7 @@ public class JdbcBookRepository implements BookRepository {
             stmt.setString(1, pattern);
             try (ResultSet rs = stmt.executeQuery()) {
                 List<Book> books = new ArrayList<>();
-                while (rs.next()) books.add(mapRow(rs));
+                while (rs.next()) books.add(BookRowMapper.mapRow(rs));
                 return books;
             }
         } catch (SQLException e) {
@@ -123,7 +122,7 @@ public class JdbcBookRepository implements BookRepository {
             stmt.setObject(1, id);
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
-                    return Optional.of(mapRow(rs));
+                    return Optional.of(BookRowMapper.mapRow(rs));
                 }
                 return Optional.empty();
             }
@@ -141,7 +140,7 @@ public class JdbcBookRepository implements BookRepository {
             stmt.setString(1, isbn);
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
-                    return Optional.of(mapRow(rs));
+                    return Optional.of(BookRowMapper.mapRow(rs));
                 }
                 return Optional.empty();
             }
@@ -289,40 +288,6 @@ public class JdbcBookRepository implements BookRepository {
         } catch (SQLException e) {
             throw new RuntimeException("Failed to clear books", e);
         }
-    }
-
-    private Book mapRow(ResultSet rs) throws SQLException {
-        Book book = new Book();
-        book.setId(rs.getObject("id", UUID.class));
-        book.setTitle(rs.getString("title"));
-        book.setAuthor(rs.getString("author"));
-        book.setGenre(rs.getString("genre"));
-        int rating = rs.getInt("rating");
-        book.setRating(rs.wasNull() ? null : rating);
-        book.setIsbn(rs.getString("isbn"));
-        book.setPublisher(rs.getString("publisher"));
-        book.setPublishDate(rs.getString("publish_date"));
-        int pageCount = rs.getInt("page_count");
-        book.setPageCount(rs.wasNull() ? null : pageCount);
-        String subjectsJson = rs.getString("subjects");
-        if (subjectsJson != null) {
-            book.setSubjects(gson.fromJson(subjectsJson, new TypeToken<List<String>>(){}.getType()));
-        }
-        book.setReadStatus(ReadStatus.valueOf(rs.getString("read_status")));
-        book.setCoverData(rs.getBytes("cover_data"));
-        book.setCoverUrl(rs.getString("cover_url"));
-        int readingProgress = rs.getInt("reading_progress");
-        book.setReadingProgress(rs.wasNull() ? null : readingProgress);
-        book.setReview(rs.getString("review"));
-        java.sql.Date startedAt = rs.getDate("started_at");
-        book.setStartedAt(startedAt != null ? startedAt.toString() : null);
-        java.sql.Date finishedAt = rs.getDate("finished_at");
-        book.setFinishedAt(finishedAt != null ? finishedAt.toString() : null);
-        Timestamp createdAt = rs.getTimestamp("created_at");
-        if (createdAt != null) book.setCreatedAt(createdAt.toInstant());
-        Timestamp updatedAt = rs.getTimestamp("updated_at");
-        if (updatedAt != null) book.setUpdatedAt(updatedAt.toInstant());
-        return book;
     }
 
     private void setNullableDate(PreparedStatement stmt, int index, String value) throws SQLException {
