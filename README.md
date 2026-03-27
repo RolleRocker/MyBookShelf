@@ -18,12 +18,13 @@ A personal bookshelf REST API built from scratch in Java 17 using only `java.net
 - **Book reviews/notes** — add personal notes or reviews to any book
 - **MCP integration** — query your bookshelf from Claude Code via natural language ("Do I have Dune?", "What am I reading?")
 - **Dockerized** — single `docker compose up` to run the app and database together
-- **Authentication** — hand-built JWT (HMAC-SHA256) + PBKDF2 password hashing; optional Google OAuth (Sign in with Google)
+- **Authentication** — hand-built JWT (HMAC-SHA256) with `iss`/`aud` claims and `alg` header validation + PBKDF2 password hashing; optional Google OAuth (Sign in with Google). All API data routes require auth; only health, auth config, and static files are public
 - **Reading statistics** — total books, by-status/by-genre breakdowns, average rating, pages read, finished-by-month, top authors
 - **CSV import/export** — export your library as CSV, import from MyBookShelf or Goodreads format
 - **Subject filtering & pagination** — `?subject=` query param, backward-compatible paginated responses
+- **Security hardening** — security headers (CSP, X-Frame-Options, nosniff), SSRF allowlist for image downloads, Transfer-Encoding rejection, CRLF sanitization, input length limits, CSV formula injection defense
 - **Hexagonal architecture** — domain layer has zero infrastructure dependencies; outbound ports for metadata fetching and token management
-- **271 automated tests** covering the full API surface, shelves, goals, MCP protocol, auth, validation, edge cases, and enrichment logic
+- **327 automated tests** covering the full API surface, shelves, goals, MCP protocol, auth, validation, edge cases, corner cases, and enrichment logic
 
 ## Tech Stack
 
@@ -72,7 +73,7 @@ This runs the server with an in-memory store (no database needed):
 ./gradlew test
 ```
 
-All 271 unit tests use an in-memory repository — no database or Docker required. 11 integration tests (Open Library) are excluded from the default run.
+All 327 unit tests use an in-memory repository — no database or Docker required. 11 integration tests (Open Library) are excluded from the default run.
 
 ## API Reference
 
@@ -234,13 +235,15 @@ src/main/java/com/bookshelf/
     └── RequestTooLargeException.java
 
 src/test/java/com/bookshelf/
-├── BookApiTest.java            # 117 tests — CRUD, filtering, search, sorting, ratings, dates, pagination, stats, CSV
+├── BookApiTest.java            # 141 tests — CRUD, filtering, search, sorting, ratings, dates, pagination, stats, CSV, field limits, HTTP parsing
 ├── BookMetadataTest.java       # 43 tests — metadata parsing, Google Books, enrichment logic
-├── ShelfApiTest.java           # 56 tests — shelf CRUD, book assignment, reordering, stats
+├── ShelfApiTest.java           # 63 tests — shelf CRUD, book assignment, reordering, stats, validation
 ├── McpTest.java                # 21 tests — MCP JSON-RPC protocol and tool implementations
-├── GoalApiTest.java            # 11 tests — reading goal CRUD, progress, validation
-├── AuthApiTest.java            # 12 tests — register, login, JWT auth, protected endpoints
+├── GoalApiTest.java            # 17 tests — reading goal CRUD, progress, validation, year boundaries
+├── AuthApiTest.java            # 19 tests — register, login, JWT auth, protected endpoints, input boundaries
 ├── GoogleAuthApiTest.java      # 11 tests — Google OAuth with test RSA key pair
+├── JwtUtilTest.java            # 8 tests — JWT roundtrip, tampered tokens, alg:none bypass
+├── PasswordUtilTest.java       # 4 tests — hash roundtrip, salt uniqueness
 └── OpenLibraryTest.java        # 11 integration tests — live Open Library API (excluded from default run)
 
 static/
@@ -277,7 +280,7 @@ static/
 ## Testing
 
 ```bash
-# Run all unit tests (271 tests)
+# Run all unit tests (327 tests)
 ./gradlew test
 
 # Run integration tests (11 tests, requires network)
@@ -303,9 +306,10 @@ Tests start the server on a random port using `new ServerSocket(0)` and use `InM
 - Custom shelves — CRUD, book assignment, reordering, stats, edge cases
 - Authentication — register, login, JWT validation, protected endpoints, Google OAuth
 - MCP JSON-RPC protocol and all 5 tool implementations
-- Input validation (missing fields, bad JSON, invalid rating/ISBN)
+- Input validation (missing fields, bad JSON, invalid rating/ISBN, field length limits, whitespace-only rejection)
 - HTTP method restrictions (405)
-- Edge cases (concurrent creates, null field clearing, ISBN-10 with trailing X)
+- HTTP parsing edge cases (Transfer-Encoding rejection, unsupported HTTP versions)
+- Edge cases (concurrent creates, null field clearing, ISBN-10 with trailing X, empty subjects, pagination boundaries, CSV formula injection)
 - Open Library enrichment (metadata, covers, re-enrichment on ISBN change)
 - Google Books fallback enrichment and response parsing
 - User-provided fields preserved during enrichment
