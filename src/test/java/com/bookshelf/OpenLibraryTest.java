@@ -3,6 +3,8 @@ package com.bookshelf;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.bookshelf.adapter.in.http.BookController;
+import com.bookshelf.adapter.in.http.BookCsvController;
+import com.bookshelf.adapter.in.http.BookStatsController;
 import com.bookshelf.adapter.in.http.GoalController;
 import com.bookshelf.adapter.in.http.ShelfController;
 import com.bookshelf.adapter.in.mcp.McpController;
@@ -59,8 +61,12 @@ public class OpenLibraryTest {
             new InMemoryGoalRepository(),
             repository
         );
+        BookStatsController statsController = new BookStatsController(repository);
+        BookCsvController csvController = new BookCsvController(repository, openLibraryService);
         Router router = App.createRouter(
             controller,
+            statsController,
+            csvController,
             shelfController,
             mcpController,
             goalController,

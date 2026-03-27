@@ -2,6 +2,8 @@ package com.bookshelf;
 
 import com.bookshelf.adapter.in.http.AuthController;
 import com.bookshelf.adapter.in.http.BookController;
+import com.bookshelf.adapter.in.http.BookCsvController;
+import com.bookshelf.adapter.in.http.BookStatsController;
 import com.bookshelf.adapter.in.http.GoalController;
 import com.bookshelf.adapter.in.http.ShelfController;
 import com.bookshelf.adapter.in.mcp.McpController;
@@ -53,6 +55,8 @@ public class App {
             openLibraryService,
             shelfRepository
         );
+        BookStatsController statsController = new BookStatsController(repository);
+        BookCsvController csvController = new BookCsvController(repository, openLibraryService);
         ShelfController shelfController = new ShelfController(
             shelfRepository,
             repository
@@ -86,6 +90,8 @@ public class App {
         );
         Router router = createRouter(
             controller,
+            statsController,
+            csvController,
             shelfController,
             mcpController,
             goalController,
@@ -134,6 +140,8 @@ public class App {
 
     public static Router createRouter(
         BookController controller,
+        BookStatsController statsController,
+        BookCsvController csvController,
         ShelfController shelfController,
         McpController mcpController,
         GoalController goalController,
@@ -152,9 +160,9 @@ public class App {
         router.addRoute("GET", "/books", controller::handleGetBooks);
         router.addRoute("POST", "/books", controller::handleCreateBook);
         router.addRoute("POST", "/books/re-enrich", controller::handleReEnrich);
-        router.addRoute("GET", "/books/stats", controller::handleGetStats);
-        router.addRoute("GET", "/books/export", controller::handleExportBooks);
-        router.addRoute("POST", "/books/import", controller::handleImportBooks);
+        router.addRoute("GET", "/books/stats", statsController::handleGetStats);
+        router.addRoute("GET", "/books/export", csvController::handleExportBooks);
+        router.addRoute("POST", "/books/import", csvController::handleImportBooks);
         router.addRoute("GET", "/books/{id}", controller::handleGetBook);
         router.addRoute("PUT", "/books/{id}", controller::handleUpdateBook);
         router.addRoute("DELETE", "/books/{id}", controller::handleDeleteBook);

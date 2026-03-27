@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.bookshelf.adapter.in.http.AuthController;
 import com.bookshelf.adapter.in.http.BookController;
+import com.bookshelf.adapter.in.http.BookCsvController;
+import com.bookshelf.adapter.in.http.BookStatsController;
 import com.bookshelf.adapter.in.http.GoalController;
 import com.bookshelf.adapter.in.http.ShelfController;
 import com.bookshelf.adapter.in.mcp.McpController;
@@ -79,8 +81,12 @@ public class BookApiTest {
             java.util.Set.of("/auth/register", "/auth/login", "/auth/google", "/mcp"),
             java.util.Set.of("/books", "/shelves", "/goals", "/auth", "/mcp")
         );
+        BookStatsController statsController = new BookStatsController(repository);
+        BookCsvController csvController = new BookCsvController(repository, null);
         Router router = App.createRouter(
             controller,
+            statsController,
+            csvController,
             shelfController,
             mcpController,
             goalController,
