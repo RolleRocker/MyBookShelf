@@ -15,6 +15,7 @@ import java.security.spec.RSAPublicKeySpec;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Verifies Google ID tokens (RS256 JWTs) using Google's public JWKS keys.
@@ -26,21 +27,21 @@ public class GoogleTokenVerifier {
     private static final long KEY_REFRESH_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
 
     private final String clientId;
-    private volatile Map<String, RSAPublicKey> keyCache;
+    private final AtomicReference<Map<String, RSAPublicKey>> cachedKeys;
     private final boolean useFixedKeys;
     private volatile long lastKeyFetchTime = 0;
 
     /** Production constructor — fetches keys from Google's JWKS endpoint. */
     public GoogleTokenVerifier(String clientId) {
         this.clientId = clientId;
-        this.keyCache = Map.of();
+        this.cachedKeys = new AtomicReference<>(Map.of());
         this.useFixedKeys = false;
     }
 
     /** Test constructor — uses pre-loaded keys, never fetches from Google. */
     public GoogleTokenVerifier(String clientId, Map<String, RSAPublicKey> testKeys) {
         this.clientId = clientId;
-        this.keyCache = Map.copyOf(testKeys);
+        this.cachedKeys = new AtomicReference<>(Map.copyOf(testKeys));
         this.useFixedKeys = true;
     }
 
@@ -131,10 +132,10 @@ public class GoogleTokenVerifier {
     }
 
     private RSAPublicKey getKey(String kid) {
-        if (keyCache.isEmpty() && !useFixedKeys) {
+        if (cachedKeys.get().isEmpty() && !useFixedKeys) {
             refreshKeys();
         }
-        return keyCache.get(kid);
+        return cachedKeys.get().get(kid);
     }
 
     private synchronized void refreshKeys() {
@@ -189,7 +190,7 @@ public class GoogleTokenVerifier {
         }
 
         if (!newKeys.isEmpty()) {
-            keyCache = Map.copyOf(newKeys);
+            cachedKeys.set(Map.copyOf(newKeys));
         }
     }
 
