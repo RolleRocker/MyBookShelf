@@ -23,6 +23,7 @@ import com.bookshelf.framework.http.HttpServer;
 import com.bookshelf.framework.http.Router;
 import com.bookshelf.framework.http.StaticFileHandler;
 import java.nio.file.Files;
+import java.util.Set;
 import java.nio.file.Path;
 
 public class App {
@@ -77,7 +78,12 @@ public class App {
         }
         AuthController authController = new AuthController(
             userRepository, jwtUtil, googleTokenVerifier, googleClientId);
-        AuthMiddleware authMiddleware = new AuthMiddleware(jwtUtil);
+        AuthMiddleware authMiddleware = new AuthMiddleware(
+            jwtUtil,
+            Set.of("/health", "/auth/config"),
+            Set.of("/auth/register", "/auth/login", "/auth/google", "/mcp"),
+            Set.of("/books", "/shelves", "/goals", "/auth", "/mcp")
+        );
         Router router = createRouter(
             controller,
             shelfController,

@@ -66,7 +66,7 @@ public class HttpServer {
 
             // Auth check
             if (authMiddleware != null) {
-                boolean isPublic = AuthMiddleware.isPublicRoute(request.getMethod(), request.getPath());
+                boolean isPublic = authMiddleware.isPublicRoute(request.getMethod(), request.getPath());
                 if (!isPublic) {
                     java.util.Optional<java.util.UUID> userId = authMiddleware.authenticate(request);
                     if (userId.isEmpty()) {

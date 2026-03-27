@@ -50,7 +50,12 @@ public class GoalApiTest {
         JwtUtil jwtUtil = new JwtUtil("test-secret");
         InMemoryUserRepository userRepository = new InMemoryUserRepository();
         AuthController authController = new AuthController(userRepository, jwtUtil);
-        AuthMiddleware authMiddleware = new AuthMiddleware(jwtUtil);
+        AuthMiddleware authMiddleware = new AuthMiddleware(
+            jwtUtil,
+            java.util.Set.of("/health", "/auth/config"),
+            java.util.Set.of("/auth/register", "/auth/login", "/auth/google", "/mcp"),
+            java.util.Set.of("/books", "/shelves", "/goals", "/auth", "/mcp")
+        );
         Router router = App.createRouter(bookController, shelfController, mcpController, goalController, authController);
         server = new HttpServer(0, router, authMiddleware);
         server.start();

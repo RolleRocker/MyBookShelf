@@ -3,14 +3,24 @@ package com.bookshelf.framework.http;
 import com.bookshelf.domain.port.out.TokenService;
 
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public class AuthMiddleware {
 
     private final TokenService tokenService;
+    private final Set<String> publicGetPaths;
+    private final Set<String> publicPostPaths;
+    private final Set<String> protectedGetPrefixes;
 
-    public AuthMiddleware(TokenService tokenService) {
+    public AuthMiddleware(TokenService tokenService,
+                          Set<String> publicGetPaths,
+                          Set<String> publicPostPaths,
+                          Set<String> protectedGetPrefixes) {
         this.tokenService = tokenService;
+        this.publicGetPaths = publicGetPaths;
+        this.publicPostPaths = publicPostPaths;
+        this.protectedGetPrefixes = protectedGetPrefixes;
     }
 
     public Optional<UUID> authenticate(HttpRequest request) {
@@ -23,22 +33,16 @@ public class AuthMiddleware {
         return Optional.ofNullable(userId);
     }
 
-    public static boolean isPublicRoute(String method, String path) {
+    public boolean isPublicRoute(String method, String path) {
         if ("GET".equalsIgnoreCase(method)) {
-            // Only specific GET endpoints are public; API data routes require auth
-            if ("/health".equals(path) || "/auth/config".equals(path)) {
-                return true;
+            if (publicGetPaths.contains(path)) return true;
+            for (String prefix : protectedGetPrefixes) {
+                if (path.startsWith(prefix)) return false;
             }
-            // Static files and other non-API paths remain public
-            return !path.startsWith("/books") && !path.startsWith("/shelves")
-                && !path.startsWith("/goals") && !path.startsWith("/auth")
-                && !path.startsWith("/mcp");
+            return true;
         }
         if ("POST".equalsIgnoreCase(method)) {
-            if ("/auth/register".equals(path) || "/auth/login".equals(path)
-                    || "/auth/google".equals(path) || "/mcp".equals(path)) {
-                return true;
-            }
+            return publicPostPaths.contains(path);
         }
         return false;
     }
