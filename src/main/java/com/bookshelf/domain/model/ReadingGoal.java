@@ -1,6 +1,7 @@
 package com.bookshelf.domain.model;
 
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 
 public class ReadingGoal {
@@ -26,4 +27,22 @@ public class ReadingGoal {
 
     public Instant getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        ReadingGoal that = (ReadingGoal) o;
+        return Objects.equals(id, that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id);
+    }
+
+    @Override
+    public String toString() {
+        return "ReadingGoal{id=" + id + ", year=" + year + ", target=" + target + "}";
+    }
 }

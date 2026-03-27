@@ -2,20 +2,30 @@ package com.bookshelf.domain.model;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 public class Book {
+    // Identity
     private UUID id;
+    // User-provided content
     private String title;
     private String author;
     private String genre;
     private Integer rating;
     private String isbn;
+    private String review;
+    private Integer readingProgress;
+    private String startedAt;
+    private String finishedAt;
+    // Enrichment data
     private String publisher;
     private String publishDate;
     private Integer pageCount;
     private List<String> subjects;
+    // Read tracking
     private ReadStatus readStatus;
+    // Covers & metadata
     private transient byte[] coverData;
     private String coverUrl;
     private Instant createdAt;
@@ -62,11 +72,6 @@ public class Book {
     public String getCoverUrl() { return coverUrl; }
     public void setCoverUrl(String coverUrl) { this.coverUrl = coverUrl; }
 
-    private String review;
-    private Integer readingProgress;
-    private String startedAt;
-    private String finishedAt;
-
     public String getReview() { return review; }
     public void setReview(String review) { this.review = review; }
 
@@ -84,4 +89,22 @@ public class Book {
 
     public Instant getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Book book = (Book) o;
+        return Objects.equals(id, book.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id);
+    }
+
+    @Override
+    public String toString() {
+        return "Book{id=" + id + ", title='" + title + "', author='" + author + "', isbn='" + isbn + "'}";
+    }
 }

@@ -2,6 +2,7 @@ package com.bookshelf.domain.model;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 
 public class BookMetadata {
     private String title;
@@ -38,6 +39,31 @@ public class BookMetadata {
 
     public String getGenre() { return genre; }
     public void setGenre(String genre) { this.genre = genre; }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        BookMetadata that = (BookMetadata) o;
+        return Objects.equals(title, that.title)
+            && Objects.equals(author, that.author)
+            && Objects.equals(publisher, that.publisher)
+            && Objects.equals(publishDate, that.publishDate)
+            && Objects.equals(pageCount, that.pageCount)
+            && Objects.equals(subjects, that.subjects)
+            && Objects.equals(coverUrl, that.coverUrl)
+            && Objects.equals(genre, that.genre);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(title, author, publisher, publishDate, pageCount, subjects, coverUrl, genre);
+    }
+
+    @Override
+    public String toString() {
+        return "BookMetadata{title='" + title + "', author='" + author + "'}";
+    }
 
     public static String deriveGenre(List<String> subjects) {
         if (subjects == null || subjects.isEmpty()) return null;
