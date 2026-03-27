@@ -13,7 +13,7 @@ import java.util.UUID;
 
 final class BookRowMapper {
 
-    private static final Gson gson = new Gson();
+    private static final Gson gson = com.bookshelf.adapter.in.http.GsonFactory.create();
 
     private BookRowMapper() {}
 

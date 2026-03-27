@@ -17,7 +17,7 @@ import java.util.UUID;
 public class JdbcBookRepository implements BookRepository {
 
     private final DataSource dataSource;
-    private final Gson gson = new Gson();
+    private final Gson gson = com.bookshelf.adapter.in.http.GsonFactory.create();
 
     public JdbcBookRepository(DataSource dataSource) {
         this.dataSource = dataSource;
