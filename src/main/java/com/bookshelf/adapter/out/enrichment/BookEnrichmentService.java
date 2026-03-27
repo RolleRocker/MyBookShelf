@@ -18,6 +18,8 @@ public class BookEnrichmentService {
 
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(BookEnrichmentService.class);
 
+    private static final long RE_ENRICH_DELAY_MS = 3000;
+
     private final BookRepository repository;
     private final BookMetadataFetcher fetcher;
     private final ExecutorService executor;
@@ -83,7 +85,7 @@ public class BookEnrichmentService {
                 // Rate-limit: wait 3 seconds between books (except after last)
                 if (i < sorted.size() - 1) {
                     try {
-                        Thread.sleep(3000);
+                        Thread.sleep(RE_ENRICH_DELAY_MS);
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                         break;

@@ -24,6 +24,9 @@ public class ShelfController {
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(ShelfController.class);
 
     private static final String DEFAULT_COLOR = "#C4975A";
+    private static final int MAX_NAME_LENGTH = 100;
+    private static final int MAX_DESCRIPTION_LENGTH = 2000;
+    private static final int MAX_NOTES_LENGTH = 5000;
     private static final Set<String> VALID_SORT_FIELDS = Set.of("custom", "title", "author", "rating", "created");
     private static final Set<String> VALID_SORT_DIRECTIONS = Set.of("asc", "desc");
     private static final java.util.regex.Pattern HEX_COLOR_PATTERN =
@@ -88,10 +91,10 @@ public class ShelfController {
         }
 
         String description = getStringField(json, "description");
-        HttpResponse descErr = validateStringLength(description, "description", 2000);
+        HttpResponse descErr = validateStringLength(description, "description", MAX_DESCRIPTION_LENGTH);
         if (descErr != null) return descErr;
         String notes = getStringField(json, "notes");
-        HttpResponse notesErr = validateStringLength(notes, "notes", 5000);
+        HttpResponse notesErr = validateStringLength(notes, "notes", MAX_NOTES_LENGTH);
         if (notesErr != null) return notesErr;
 
         try {
@@ -159,13 +162,13 @@ public class ShelfController {
 
         if (json.has("description")) {
             String desc = json.get("description").isJsonNull() ? null : json.get("description").getAsString();
-            HttpResponse descErr = validateStringLength(desc, "description", 2000);
+            HttpResponse descErr = validateStringLength(desc, "description", MAX_DESCRIPTION_LENGTH);
             if (descErr != null) return descErr;
             shelf.setDescription(desc);
         }
         if (json.has("notes")) {
             String notes = json.get("notes").isJsonNull() ? null : json.get("notes").getAsString();
-            HttpResponse notesErr = validateStringLength(notes, "notes", 5000);
+            HttpResponse notesErr = validateStringLength(notes, "notes", MAX_NOTES_LENGTH);
             if (notesErr != null) return notesErr;
             shelf.setNotes(notes);
         }
@@ -460,7 +463,7 @@ public class ShelfController {
         if (name == null || name.isBlank()) {
             return "name is required";
         }
-        if (name.trim().length() > 100) {
+        if (name.trim().length() > MAX_NAME_LENGTH) {
             return "name must be 100 characters or fewer";
         }
         return null;

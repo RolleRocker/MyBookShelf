@@ -32,6 +32,18 @@ public class BookController {
 
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(BookController.class);
 
+    private static final int MAX_TITLE_LENGTH = 500;
+    private static final int MAX_AUTHOR_LENGTH = 500;
+    private static final int MAX_GENRE_LENGTH = 100;
+    private static final int MAX_PUBLISHER_LENGTH = 500;
+    private static final int MAX_PUBLISH_DATE_LENGTH = 50;
+    private static final int MAX_REVIEW_LENGTH = 5000;
+    private static final int MAX_COVER_URL_LENGTH = 2048;
+    private static final int MAX_SUBJECTS_COUNT = 50;
+    private static final int MAX_SUBJECT_LENGTH = 200;
+    private static final int DEFAULT_PAGE_SIZE = 20;
+    private static final int MAX_PAGE_SIZE = 100;
+
     private final BookRepository repository;
     private final BookEnrichmentService openLibraryService;
     private final ShelfRepository shelfRepository;
@@ -149,7 +161,7 @@ public class BookController {
                     return HttpResponse.badRequest("page must be >= 1");
                 }
 
-                int size = 20;
+                int size = DEFAULT_PAGE_SIZE;
                 if (sizeParam != null) {
                     try {
                         size = Integer.parseInt(sizeParam);
@@ -157,8 +169,8 @@ public class BookController {
                         return HttpResponse.badRequest("invalid size parameter");
                     }
                 }
-                if (size < 1) size = 20;
-                if (size > 100) size = 100;
+                if (size < 1) size = DEFAULT_PAGE_SIZE;
+                if (size > MAX_PAGE_SIZE) size = MAX_PAGE_SIZE;
 
                 int totalItems = books.size();
                 int totalPages = (int) Math.ceil((double) totalItems / size);
@@ -317,13 +329,13 @@ public class BookController {
                     return HttpResponse.badRequest("subjects must be an array");
                 }
                 JsonArray subjectsArr = json.getAsJsonArray("subjects");
-                if (subjectsArr.size() > 50) {
+                if (subjectsArr.size() > MAX_SUBJECTS_COUNT) {
                     return HttpResponse.badRequest("maximum 50 subjects allowed");
                 }
                 List<String> subjects = new ArrayList<>();
                 for (var el : subjectsArr) {
                     String s = el.getAsString();
-                    if (s.length() > 200) {
+                    if (s.length() > MAX_SUBJECT_LENGTH) {
                         return HttpResponse.badRequest("each subject must be 200 characters or fewer");
                     }
                     subjects.add(s);
@@ -512,14 +524,14 @@ public class BookController {
                     } catch (IllegalStateException e) {
                         return HttpResponse.badRequest("'subjects' must be an array of strings");
                     }
-                    if (subjectsArr.size() > 50) {
+                    if (subjectsArr.size() > MAX_SUBJECTS_COUNT) {
                         return HttpResponse.badRequest("maximum 50 subjects allowed");
                     }
                     List<String> subjects = new ArrayList<>();
                     try {
                         for (var el : subjectsArr) {
                             String s = el.getAsString();
-                            if (s.length() > 200) {
+                            if (s.length() > MAX_SUBJECT_LENGTH) {
                                 return HttpResponse.badRequest("each subject must be 200 characters or fewer");
                             }
                             subjects.add(s);
@@ -716,13 +728,13 @@ public class BookController {
 
     private HttpResponse validateBookStringLengths(JsonObject json) {
         HttpResponse err;
-        if ((err = validateStringLength(getStringField(json, "title"), "title", 500)) != null) return err;
-        if ((err = validateStringLength(getStringField(json, "author"), "author", 500)) != null) return err;
-        if ((err = validateStringLength(getStringField(json, "genre"), "genre", 100)) != null) return err;
-        if ((err = validateStringLength(getStringField(json, "publisher"), "publisher", 500)) != null) return err;
-        if ((err = validateStringLength(getStringField(json, "publishDate"), "publishDate", 50)) != null) return err;
-        if ((err = validateStringLength(getStringField(json, "review"), "review", 5000)) != null) return err;
-        if ((err = validateStringLength(getStringField(json, "coverUrl"), "coverUrl", 2048)) != null) return err;
+        if ((err = validateStringLength(getStringField(json, "title"), "title", MAX_TITLE_LENGTH)) != null) return err;
+        if ((err = validateStringLength(getStringField(json, "author"), "author", MAX_AUTHOR_LENGTH)) != null) return err;
+        if ((err = validateStringLength(getStringField(json, "genre"), "genre", MAX_GENRE_LENGTH)) != null) return err;
+        if ((err = validateStringLength(getStringField(json, "publisher"), "publisher", MAX_PUBLISHER_LENGTH)) != null) return err;
+        if ((err = validateStringLength(getStringField(json, "publishDate"), "publishDate", MAX_PUBLISH_DATE_LENGTH)) != null) return err;
+        if ((err = validateStringLength(getStringField(json, "review"), "review", MAX_REVIEW_LENGTH)) != null) return err;
+        if ((err = validateStringLength(getStringField(json, "coverUrl"), "coverUrl", MAX_COVER_URL_LENGTH)) != null) return err;
         return null;
     }
 

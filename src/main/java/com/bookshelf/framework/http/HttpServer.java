@@ -32,7 +32,7 @@ public class HttpServer {
 
     public void start() throws IOException {
         serverSocket = new ServerSocket(port);
-        threadPool = Executors.newFixedThreadPool(10);
+        threadPool = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
         running = true;
 
         Thread acceptThread = new Thread(() -> {
@@ -51,6 +51,7 @@ public class HttpServer {
         acceptThread.start();
     }
 
+    private static final int THREAD_POOL_SIZE = 10;
     private static final int READ_TIMEOUT_MS = 30_000;
 
     private void handleConnection(Socket socket) {

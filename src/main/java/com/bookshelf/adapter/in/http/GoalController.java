@@ -22,6 +22,9 @@ public class GoalController {
 
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(GoalController.class);
 
+    private static final int MIN_GOAL_YEAR = 2000;
+    private static final int MAX_GOAL_YEAR = 2100;
+
     private final GoalRepository goalRepository;
     private final BookRepository bookRepository;
     private final Gson gson;
@@ -86,8 +89,8 @@ public class GoalController {
             return HttpResponse.badRequest("target must be a valid integer");
         }
 
-        if (year < 2000 || year > 2100) {
-            return HttpResponse.badRequest("year must be between 2000 and 2100");
+        if (year < MIN_GOAL_YEAR || year > MAX_GOAL_YEAR) {
+            return HttpResponse.badRequest("year must be between " + MIN_GOAL_YEAR + " and " + MAX_GOAL_YEAR);
         }
         if (target < 1) {
             return HttpResponse.badRequest("target must be at least 1");
