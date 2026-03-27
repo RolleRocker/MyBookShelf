@@ -14,7 +14,6 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.google.gson.JsonSyntaxException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -194,12 +193,8 @@ public class BookController {
 
     public HttpResponse handleGetBook(HttpRequest request) {
         try {
-            UUID id;
-            try {
-                id = UUID.fromString(request.getPathParams().get("id"));
-            } catch (IllegalArgumentException e) {
-                return HttpResponse.notFound("Book not found");
-            }
+            UUID id = ControllerUtils.parseUuid(request.getPathParams().get("id"));
+            if (id == null) return HttpResponse.notFound("Book not found");
 
             return repository
                 .findById(id)
@@ -225,16 +220,8 @@ public class BookController {
     }
 
     public HttpResponse handleCreateBook(HttpRequest request) {
-        JsonObject json;
-        try {
-            JsonElement parsed = JsonParser.parseString(request.getBody());
-            if (!parsed.isJsonObject()) {
-                return HttpResponse.badRequest("Invalid JSON");
-            }
-            json = parsed.getAsJsonObject();
-        } catch (JsonSyntaxException | NullPointerException e) {
-            return HttpResponse.badRequest("Invalid JSON");
-        }
+        JsonObject json = ControllerUtils.parseJsonBody(request.getBody());
+        if (json == null) return HttpResponse.badRequest("Invalid JSON");
 
         // Validate required fields
         String title = getStringField(json, "title");
@@ -399,12 +386,8 @@ public class BookController {
     }
 
     public HttpResponse handleUpdateBook(HttpRequest request) {
-        UUID id;
-        try {
-            id = UUID.fromString(request.getPathParams().get("id"));
-        } catch (IllegalArgumentException e) {
-            return HttpResponse.notFound("Book not found");
-        }
+        UUID id = ControllerUtils.parseUuid(request.getPathParams().get("id"));
+        if (id == null) return HttpResponse.notFound("Book not found");
 
         var existing = repository.findById(id);
         if (existing.isEmpty()) {
@@ -413,16 +396,8 @@ public class BookController {
 
         Book book = existing.get();
 
-        JsonObject json;
-        try {
-            JsonElement parsed = JsonParser.parseString(request.getBody());
-            if (!parsed.isJsonObject()) {
-                return HttpResponse.badRequest("Invalid JSON");
-            }
-            json = parsed.getAsJsonObject();
-        } catch (JsonSyntaxException | NullPointerException e) {
-            return HttpResponse.badRequest("Invalid JSON");
-        }
+        JsonObject json = ControllerUtils.parseJsonBody(request.getBody());
+        if (json == null) return HttpResponse.badRequest("Invalid JSON");
 
         // Validate rating if provided
         if (json.has("rating") && !json.get("rating").isJsonNull()) {
@@ -669,12 +644,8 @@ public class BookController {
 
     public HttpResponse handleDeleteBook(HttpRequest request) {
         try {
-            UUID id;
-            try {
-                id = UUID.fromString(request.getPathParams().get("id"));
-            } catch (IllegalArgumentException e) {
-                return HttpResponse.notFound("Book not found");
-            }
+            UUID id = ControllerUtils.parseUuid(request.getPathParams().get("id"));
+            if (id == null) return HttpResponse.notFound("Book not found");
 
             if (repository.delete(id)) {
                 if (shelfRepository != null) {
@@ -717,12 +688,8 @@ public class BookController {
 
     public HttpResponse handleGetCover(HttpRequest request) {
         try {
-            UUID id;
-            try {
-                id = UUID.fromString(request.getPathParams().get("id"));
-            } catch (IllegalArgumentException e) {
-                return HttpResponse.notFound("Book not found");
-            }
+            UUID id = ControllerUtils.parseUuid(request.getPathParams().get("id"));
+            if (id == null) return HttpResponse.notFound("Book not found");
 
             var bookOpt = repository.findById(id);
             if (bookOpt.isEmpty() || bookOpt.get().getCoverData() == null) {
@@ -744,10 +711,7 @@ public class BookController {
     }
 
     private HttpResponse validateStringLength(String value, String fieldName, int maxLength) {
-        if (value != null && value.length() > maxLength) {
-            return HttpResponse.badRequest(fieldName + " exceeds maximum length of " + maxLength);
-        }
-        return null;
+        return ControllerUtils.validateStringLength(value, fieldName, maxLength);
     }
 
     private HttpResponse validateBookStringLengths(JsonObject json) {

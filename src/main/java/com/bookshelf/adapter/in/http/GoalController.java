@@ -10,10 +10,8 @@ import com.bookshelf.framework.http.HttpRequest;
 import com.bookshelf.framework.http.HttpResponse;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.google.gson.JsonSyntaxException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.Year;
@@ -66,14 +64,8 @@ public class GoalController {
     }
 
     public HttpResponse handleCreateGoal(HttpRequest request) {
-        JsonObject json;
-        try {
-            JsonElement parsed = JsonParser.parseString(request.getBody());
-            if (!parsed.isJsonObject()) return HttpResponse.badRequest("Invalid JSON");
-            json = parsed.getAsJsonObject();
-        } catch (JsonSyntaxException | NullPointerException e) {
-            return HttpResponse.badRequest("Invalid JSON");
-        }
+        JsonObject json = ControllerUtils.parseJsonBody(request.getBody());
+        if (json == null) return HttpResponse.badRequest("Invalid JSON");
 
         if (!json.has("year") || json.get("year").isJsonNull()) {
             return HttpResponse.badRequest("year is required");
@@ -128,14 +120,8 @@ public class GoalController {
             return HttpResponse.notFound("Goal not found");
         }
 
-        JsonObject json;
-        try {
-            JsonElement parsed = JsonParser.parseString(request.getBody());
-            if (!parsed.isJsonObject()) return HttpResponse.badRequest("Invalid JSON");
-            json = parsed.getAsJsonObject();
-        } catch (JsonSyntaxException | NullPointerException e) {
-            return HttpResponse.badRequest("Invalid JSON");
-        }
+        JsonObject json = ControllerUtils.parseJsonBody(request.getBody());
+        if (json == null) return HttpResponse.badRequest("Invalid JSON");
 
         if (!json.has("target") || json.get("target").isJsonNull()) {
             return HttpResponse.badRequest("target is required");

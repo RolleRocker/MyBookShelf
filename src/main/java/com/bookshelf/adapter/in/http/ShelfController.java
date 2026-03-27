@@ -11,7 +11,6 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.google.gson.JsonSyntaxException;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -55,16 +54,8 @@ public class ShelfController {
     }
 
     public HttpResponse handleCreateShelf(HttpRequest request) {
-        JsonObject json;
-        try {
-            JsonElement parsed = JsonParser.parseString(request.getBody());
-            if (!parsed.isJsonObject()) {
-                return HttpResponse.badRequest("Invalid JSON");
-            }
-            json = parsed.getAsJsonObject();
-        } catch (JsonSyntaxException | NullPointerException e) {
-            return HttpResponse.badRequest("Invalid JSON");
-        }
+        JsonObject json = ControllerUtils.parseJsonBody(request.getBody());
+        if (json == null) return HttpResponse.badRequest("Invalid JSON");
 
         // Validate name
         String name = getStringField(json, "name");
@@ -128,12 +119,8 @@ public class ShelfController {
 
     public HttpResponse handleGetShelf(HttpRequest request) {
         try {
-            UUID id;
-            try {
-                id = UUID.fromString(request.getPathParams().get("id"));
-            } catch (IllegalArgumentException e) {
-                return HttpResponse.notFound("Shelf not found");
-            }
+            UUID id = ControllerUtils.parseUuid(request.getPathParams().get("id"));
+            if (id == null) return HttpResponse.notFound("Shelf not found");
 
             return shelfRepository.findById(id)
                     .map(shelf -> HttpResponse.ok(shelfToDetailJson(shelf).toString()))
@@ -145,12 +132,8 @@ public class ShelfController {
     }
 
     public HttpResponse handleUpdateShelf(HttpRequest request) {
-        UUID id;
-        try {
-            id = UUID.fromString(request.getPathParams().get("id"));
-        } catch (IllegalArgumentException e) {
-            return HttpResponse.notFound("Shelf not found");
-        }
+        UUID id = ControllerUtils.parseUuid(request.getPathParams().get("id"));
+        if (id == null) return HttpResponse.notFound("Shelf not found");
 
         var existing = shelfRepository.findById(id);
         if (existing.isEmpty()) {
@@ -159,16 +142,8 @@ public class ShelfController {
 
         Shelf shelf = existing.get();
 
-        JsonObject json;
-        try {
-            JsonElement parsed = JsonParser.parseString(request.getBody());
-            if (!parsed.isJsonObject()) {
-                return HttpResponse.badRequest("Invalid JSON");
-            }
-            json = parsed.getAsJsonObject();
-        } catch (JsonSyntaxException | NullPointerException e) {
-            return HttpResponse.badRequest("Invalid JSON");
-        }
+        JsonObject json = ControllerUtils.parseJsonBody(request.getBody());
+        if (json == null) return HttpResponse.badRequest("Invalid JSON");
 
         // Validate name if provided
         if (json.has("name")) {
@@ -230,12 +205,8 @@ public class ShelfController {
 
     public HttpResponse handleDeleteShelf(HttpRequest request) {
         try {
-            UUID id;
-            try {
-                id = UUID.fromString(request.getPathParams().get("id"));
-            } catch (IllegalArgumentException e) {
-                return HttpResponse.notFound("Shelf not found");
-            }
+            UUID id = ControllerUtils.parseUuid(request.getPathParams().get("id"));
+            if (id == null) return HttpResponse.notFound("Shelf not found");
 
             if (shelfRepository.delete(id)) {
                 shelfRepository.renumberShelfPositions();
@@ -249,27 +220,15 @@ public class ShelfController {
     }
 
     public HttpResponse handleAddBook(HttpRequest request) {
-        UUID shelfId;
-        try {
-            shelfId = UUID.fromString(request.getPathParams().get("id"));
-        } catch (IllegalArgumentException e) {
-            return HttpResponse.notFound("Shelf not found");
-        }
+        UUID shelfId = ControllerUtils.parseUuid(request.getPathParams().get("id"));
+        if (shelfId == null) return HttpResponse.notFound("Shelf not found");
 
         if (shelfRepository.findById(shelfId).isEmpty()) {
             return HttpResponse.notFound("Shelf not found");
         }
 
-        JsonObject json;
-        try {
-            JsonElement parsed = JsonParser.parseString(request.getBody());
-            if (!parsed.isJsonObject()) {
-                return HttpResponse.badRequest("Invalid JSON");
-            }
-            json = parsed.getAsJsonObject();
-        } catch (JsonSyntaxException | NullPointerException e) {
-            return HttpResponse.badRequest("Invalid JSON");
-        }
+        JsonObject json = ControllerUtils.parseJsonBody(request.getBody());
+        if (json == null) return HttpResponse.badRequest("Invalid JSON");
 
         String bookIdStr = getStringField(json, "bookId");
         if (bookIdStr == null || bookIdStr.isBlank()) {
@@ -309,19 +268,11 @@ public class ShelfController {
 
     public HttpResponse handleRemoveBook(HttpRequest request) {
         try {
-            UUID shelfId;
-            try {
-                shelfId = UUID.fromString(request.getPathParams().get("id"));
-            } catch (IllegalArgumentException e) {
-                return HttpResponse.notFound("Shelf not found");
-            }
+            UUID shelfId = ControllerUtils.parseUuid(request.getPathParams().get("id"));
+            if (shelfId == null) return HttpResponse.notFound("Shelf not found");
 
-            UUID bookId;
-            try {
-                bookId = UUID.fromString(request.getPathParams().get("bookId"));
-            } catch (IllegalArgumentException e) {
-                return HttpResponse.notFound("Book not found");
-            }
+            UUID bookId = ControllerUtils.parseUuid(request.getPathParams().get("bookId"));
+            if (bookId == null) return HttpResponse.notFound("Book not found");
 
             if (shelfRepository.findById(shelfId).isEmpty()) {
                 return HttpResponse.notFound("Shelf not found");
@@ -340,16 +291,8 @@ public class ShelfController {
     }
 
     public HttpResponse handleReorderShelves(HttpRequest request) {
-        JsonObject json;
-        try {
-            JsonElement parsed = JsonParser.parseString(request.getBody());
-            if (!parsed.isJsonObject()) {
-                return HttpResponse.badRequest("Invalid JSON");
-            }
-            json = parsed.getAsJsonObject();
-        } catch (JsonSyntaxException | NullPointerException e) {
-            return HttpResponse.badRequest("Invalid JSON");
-        }
+        JsonObject json = ControllerUtils.parseJsonBody(request.getBody());
+        if (json == null) return HttpResponse.badRequest("Invalid JSON");
 
         if (!json.has("order") || !json.get("order").isJsonArray()) {
             return HttpResponse.badRequest("order array is required");
@@ -392,28 +335,16 @@ public class ShelfController {
     }
 
     public HttpResponse handleReorderBooks(HttpRequest request) {
-        UUID shelfId;
-        try {
-            shelfId = UUID.fromString(request.getPathParams().get("id"));
-        } catch (IllegalArgumentException e) {
-            return HttpResponse.notFound("Shelf not found");
-        }
+        UUID shelfId = ControllerUtils.parseUuid(request.getPathParams().get("id"));
+        if (shelfId == null) return HttpResponse.notFound("Shelf not found");
 
         var shelfOpt = shelfRepository.findById(shelfId);
         if (shelfOpt.isEmpty()) {
             return HttpResponse.notFound("Shelf not found");
         }
 
-        JsonObject json;
-        try {
-            JsonElement parsed = JsonParser.parseString(request.getBody());
-            if (!parsed.isJsonObject()) {
-                return HttpResponse.badRequest("Invalid JSON");
-            }
-            json = parsed.getAsJsonObject();
-        } catch (JsonSyntaxException | NullPointerException e) {
-            return HttpResponse.badRequest("Invalid JSON");
-        }
+        JsonObject json = ControllerUtils.parseJsonBody(request.getBody());
+        if (json == null) return HttpResponse.badRequest("Invalid JSON");
 
         if (!json.has("order") || !json.get("order").isJsonArray()) {
             return HttpResponse.badRequest("order array is required");
@@ -522,10 +453,7 @@ public class ShelfController {
     }
 
     private HttpResponse validateStringLength(String value, String fieldName, int maxLength) {
-        if (value != null && value.length() > maxLength) {
-            return HttpResponse.badRequest(fieldName + " exceeds maximum length of " + maxLength);
-        }
-        return null;
+        return ControllerUtils.validateStringLength(value, fieldName, maxLength);
     }
 
     private String validateName(String name) {
