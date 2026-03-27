@@ -18,6 +18,7 @@ public class McpController {
     private static final String PROTOCOL_VERSION = "2025-03-26";
     private static final String SERVER_NAME = "bookshelf-mcp";
     private static final String SERVER_VERSION = "1.0.0";
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(McpController.class);
 
     private final McpToolHandler toolHandler;
 
@@ -115,8 +116,7 @@ public class McpController {
         } catch (Exception e) {
             text = "Tool error: " + e.getMessage();
             isError = true;
-            System.err.println("MCP tool '" + toolName + "' failed: " + e.getMessage());
-            e.printStackTrace(System.err);
+            logger.error("MCP tool '{}' failed: {}", toolName, e.getMessage(), e);
         }
 
         JsonObject result = new JsonObject();
