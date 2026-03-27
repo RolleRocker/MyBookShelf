@@ -3,6 +3,7 @@ package com.bookshelf.adapter.out.persistence;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import javax.sql.DataSource;
@@ -128,16 +129,16 @@ public class DatabaseConfig {
         }
 
         // Half-star ratings migration: double existing ratings from 1-5 to 2-10 scale
+        // Guarded by column type check so it's idempotent (only runs once)
         try (Connection conn = dataSource.getConnection();
              Statement stmt = conn.createStatement()) {
-            var rs = stmt.executeQuery(
-                "SELECT COALESCE(MAX(rating), 0) FROM books WHERE rating > 0"
-            );
-            rs.next();
-            int maxRating = rs.getInt(1);
-            // Only migrate if there are rated books still on old scale (max <= 5)
-            if (maxRating >= 1 && maxRating <= 5) {
-                stmt.execute("UPDATE books SET rating = rating * 2 WHERE rating > 0");
+            try (ResultSet rs = stmt.executeQuery(
+                    "SELECT data_type FROM information_schema.columns " +
+                    "WHERE table_name = 'books' AND column_name = 'rating'")) {
+                if (rs.next() && "smallint".equals(rs.getString("data_type"))) {
+                    stmt.executeUpdate("ALTER TABLE books ALTER COLUMN rating TYPE INTEGER");
+                    stmt.executeUpdate("UPDATE books SET rating = rating * 2 WHERE rating BETWEEN 1 AND 5");
+                }
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to run half-star rating migration", e);
