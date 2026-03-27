@@ -10,6 +10,7 @@ import com.bookshelf.framework.http.HttpRequest;
 import com.bookshelf.framework.http.HttpResponse;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+
 import java.time.Instant;
 import java.util.UUID;
 
@@ -34,15 +35,8 @@ public class AuthController {
     }
 
     public HttpResponse handleRegister(HttpRequest request) {
-        JsonObject body;
-        try {
-            body = gson.fromJson(request.getBody(), JsonObject.class);
-        } catch (Exception e) {
-            return HttpResponse.badRequest("invalid JSON");
-        }
-        if (body == null) {
-            return HttpResponse.badRequest("request body is required");
-        }
+        JsonObject body = ControllerUtils.parseJsonBody(request.getBody());
+        if (body == null) return HttpResponse.badRequest("Invalid JSON");
 
         String username = body.has("username") && !body.get("username").isJsonNull()
             ? body.get("username").getAsString().trim() : null;
@@ -90,15 +84,8 @@ public class AuthController {
     }
 
     public HttpResponse handleLogin(HttpRequest request) {
-        JsonObject body;
-        try {
-            body = gson.fromJson(request.getBody(), JsonObject.class);
-        } catch (Exception e) {
-            return HttpResponse.badRequest("invalid JSON");
-        }
-        if (body == null) {
-            return HttpResponse.badRequest("request body is required");
-        }
+        JsonObject body = ControllerUtils.parseJsonBody(request.getBody());
+        if (body == null) return HttpResponse.badRequest("Invalid JSON");
 
         String username = body.has("username") && !body.get("username").isJsonNull()
             ? body.get("username").getAsString().trim() : null;
@@ -128,15 +115,8 @@ public class AuthController {
             return HttpResponse.badRequest("Google login is not configured");
         }
 
-        JsonObject body;
-        try {
-            body = gson.fromJson(request.getBody(), JsonObject.class);
-        } catch (Exception e) {
-            return HttpResponse.badRequest("invalid JSON");
-        }
-        if (body == null) {
-            return HttpResponse.badRequest("request body is required");
-        }
+        JsonObject body = ControllerUtils.parseJsonBody(request.getBody());
+        if (body == null) return HttpResponse.badRequest("Invalid JSON");
 
         String credential = body.has("credential") && !body.get("credential").isJsonNull()
             ? body.get("credential").getAsString() : null;
