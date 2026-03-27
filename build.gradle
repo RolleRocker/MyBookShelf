@@ -26,10 +26,10 @@ repositories {
 
 dependencies {
     implementation 'com.google.code.gson:gson:2.11.0'
-    implementation 'org.postgresql:postgresql:42.7.3'
+    implementation 'org.postgresql:postgresql:42.7.7'
     implementation 'com.zaxxer:HikariCP:5.1.0'
-    implementation 'org.slf4j:slf4j-api:2.0.12'
-    implementation 'ch.qos.logback:logback-classic:1.5.16'
+    implementation 'org.slf4j:slf4j-api:2.0.17'
+    implementation 'ch.qos.logback:logback-classic:1.5.32'
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
 }
 

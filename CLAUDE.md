@@ -147,9 +147,11 @@ All errors return JSON: `{"error":"message"}`. Codes: `400` (validation), `401` 
 - **Duplicate ISBNs allowed** — `findByIsbn` returns the oldest
 - **Cover images** — stored as BYTEA in DB, not filesystem. Open Library returns 1x1 pixel placeholder for missing covers; detected via size < 1KB
 - **Sorting/pagination** — in-memory in `BookController` (no SQL ORDER BY/LIMIT). Pagination uses in-memory slicing since sorting/post-filtering already happens in Java
-- **Authentication** — hand-built JWT (HMAC-SHA256), PBKDF2 passwords (310k iterations, 16-byte salt). Constant-time comparison via `MessageDigest.isEqual()` for both signatures and password hashes. JWT payload built via Gson to prevent JSON injection. Public routes: all GETs, `POST /auth/*`, `POST /mcp`. Tokens expire after 24h. Password: 8-128 chars
+- **Authentication** — hand-built JWT (HMAC-SHA256) with `iss`/`aud` claims and `alg` header validation (prevents `alg:none` bypass). PBKDF2 passwords (310k iterations, 16-byte salt). Constant-time comparison via `MessageDigest.isEqual()` for both signatures and password hashes. JWT payload built via Gson to prevent JSON injection. Public routes: `GET /health`, `GET /auth/config`, static files; all API data GETs require auth. `POST /auth/*`, `POST /mcp` are public. Tokens expire after 24h. Password: 8-128 chars
 - **Google OAuth** — GIS credential flow. Backend verifies RS256 ID tokens using Google JWKS public keys (cached, volatile immutable Map for atomic refresh). Google-only users have null password/salt
-- **Logging** — SLF4J 2.0.12 + Logback 1.5.16. `RequestLogger`: INFO (2xx/3xx), WARN (4xx), ERROR (5xx). All controllers use SLF4J
+- **Input validation** — string field length limits enforced (title/author/publisher 500, genre 100, publishDate 50, review 5000, coverUrl 2048, shelf description 2000, shelf notes 5000). Subjects: max 50, each max 200 chars. Whitespace-only title/author/shelf-name rejected via `isBlank()`. CSV export defends against formula injection (`=`, `@` prefixed with `'`)
+- **HTTP hardening** — security headers (X-Content-Type-Options, X-Frame-Options, CSP, Referrer-Policy). Request parser rejects Transfer-Encoding (prevents smuggling), conflicting Content-Length, unsupported HTTP versions, URIs > 8KB. CRLF sanitization on status text and headers. SSRF allowlist for image downloads (covers.openlibrary.org, books.google.com, *.us.archive.org)
+- **Logging** — SLF4J 2.0.17 + Logback 1.5.32. `RequestLogger`: INFO (2xx/3xx), WARN (4xx), ERROR (5xx). All controllers use SLF4J
 - **DB schema** — `NULL` allowed for `title`/`author` to support ISBN-only creation. Migrations use `IF NOT EXISTS` / `ADD COLUMN IF NOT EXISTS` (safe to re-run). DB uses `snake_case`, Java uses `camelCase`
 
 ## MCP Integration
@@ -172,15 +174,15 @@ All errors return JSON: `{"error":"message"}`. Codes: `400` (validation), `401` 
 
 ## Testing
 
-Tests use JUnit 5 with `java.net.HttpClient`. Server starts on random port (`new ServerSocket(0)`) per test class. In-memory repositories (no DB required). 282 tests total:
+Tests use JUnit 5 with `java.net.HttpClient`. Server starts on random port (`new ServerSocket(0)`) per test class. In-memory repositories (no DB required). 327 tests total:
 
-- **`BookApiTest`** (119) — CRUD, filtering, search, sorting, ratings, dates, reviews, validation, covers, pagination, stats, CSV, header limits
+- **`BookApiTest`** (141) — CRUD, filtering, search, sorting, ratings, dates, reviews, validation, covers, pagination, stats, CSV, header limits, field length limits, formula injection, HTTP parsing edge cases
 - **`BookMetadataTest`** (43) — `deriveGenre()`, Google Books parsing, `mergeMetadata()`
-- **`ShelfApiTest`** (58) — shelf CRUD, book assignment, reordering, stats, validation
+- **`ShelfApiTest`** (63) — shelf CRUD, book assignment, reordering, stats, validation, field length limits
 - **`McpTest`** (21) — JSON-RPC protocol + all 5 tools
-- **`GoalApiTest`** (11) — goal CRUD, progress, validation
-- **`AuthApiTest`** (12) — register, login, token validation, protected endpoints
+- **`GoalApiTest`** (17) — goal CRUD, progress, validation, year boundary tests
+- **`AuthApiTest`** (19) — register, login, token validation, protected endpoints, input boundary tests
 - **`GoogleAuthApiTest`** (11) — Google OAuth with test RSA keys
-- **`JwtUtilTest`** (5) — JWT roundtrip, tampered tokens, special chars
+- **`JwtUtilTest`** (8) — JWT roundtrip, tampered tokens, special chars, alg:none bypass
 - **`PasswordUtilTest`** (4) — hash roundtrip, salt uniqueness
 - **`OpenLibraryTest`** (11) — live integration (excluded from default run; `./gradlew integrationTest`)

@@ -47,6 +47,8 @@ public class JwtUtil implements TokenService {
         JsonObject payloadObj = new JsonObject();
         payloadObj.addProperty("sub", userId.toString());
         payloadObj.addProperty("username", username);
+        payloadObj.addProperty("iss", "mybookshelf");
+        payloadObj.addProperty("aud", "mybookshelf");
         payloadObj.addProperty("iat", now);
         payloadObj.addProperty("exp", exp);
         String payloadJson = gson.toJson(payloadObj);
@@ -61,6 +63,12 @@ public class JwtUtil implements TokenService {
             String[] parts = token.split("\\.");
             if (parts.length != 3) return null;
 
+            // Validate algorithm to prevent alg:none bypass
+            String headerJson = new String(Base64.getUrlDecoder().decode(parts[0]), StandardCharsets.UTF_8);
+            JsonObject header = JsonParser.parseString(headerJson).getAsJsonObject();
+            String alg = header.has("alg") ? header.get("alg").getAsString() : null;
+            if (!"HS256".equals(alg)) return null;
+
             String expectedSig = sign(parts[0] + "." + parts[1]);
             if (!MessageDigest.isEqual(expectedSig.getBytes(StandardCharsets.UTF_8), parts[2].getBytes(StandardCharsets.UTF_8))) return null;
 
@@ -69,6 +77,10 @@ public class JwtUtil implements TokenService {
 
             long exp = payload.has("exp") ? payload.get("exp").getAsLong() : 0;
             if (System.currentTimeMillis() / 1000 > exp) return null;
+
+            // Validate issuer/audience if present (soft migration for existing tokens)
+            if (payload.has("iss") && !"mybookshelf".equals(payload.get("iss").getAsString())) return null;
+            if (payload.has("aud") && !"mybookshelf".equals(payload.get("aud").getAsString())) return null;
 
             String sub = payload.has("sub") && !payload.get("sub").isJsonNull()
                 ? payload.get("sub").getAsString() : null;

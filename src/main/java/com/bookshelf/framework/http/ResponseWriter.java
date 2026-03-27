@@ -9,9 +9,10 @@ public class ResponseWriter {
     public static void write(OutputStream output, HttpResponse response) throws IOException {
         StringBuilder sb = new StringBuilder();
 
-        // Status line
+        // Status line (sanitize status text against CRLF injection)
+        String statusText = response.getStatusText().replaceAll("[\\r\\n]", "");
         sb.append("HTTP/1.1 ").append(response.getStatusCode())
-          .append(" ").append(response.getStatusText()).append("\r\n");
+          .append(" ").append(statusText).append("\r\n");
 
         // Body bytes — prefer rawBody (binary) over body (string)
         byte[] bodyBytes = null;
@@ -31,6 +32,15 @@ public class ResponseWriter {
             response.getHeaders().put("Content-Length", "0");
         }
         response.getHeaders().put("Connection", "close");
+
+        // Security headers (putIfAbsent so controllers can override)
+        response.getHeaders().putIfAbsent("X-Content-Type-Options", "nosniff");
+        response.getHeaders().putIfAbsent("X-Frame-Options", "DENY");
+        response.getHeaders().putIfAbsent("Referrer-Policy", "strict-origin-when-cross-origin");
+        response.getHeaders().putIfAbsent("Content-Security-Policy",
+            "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            + "font-src https://fonts.gstatic.com; script-src 'self' https://accounts.google.com; "
+            + "img-src 'self' data: blob:; connect-src 'self'");
 
         // Write headers (strip CR/LF as defense against header injection)
         for (var entry : response.getHeaders().entrySet()) {
