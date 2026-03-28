@@ -2,6 +2,7 @@ package com.bookshelf.framework.http;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 public class RequestLogger {
 
@@ -22,12 +23,22 @@ public class RequestLogger {
         int status = response != null ? response.getStatusCode() : 0;
         String message = String.format("%s %s%s %d %dms %s", method, path, queryString, status, elapsedMs, clientIp);
 
-        if (status >= 500) {
-            logger.error(message);
-        } else if (status >= 400) {
-            logger.warn(message);
-        } else {
-            logger.info(message);
+        try {
+            MDC.put("method", method);
+            MDC.put("path", path);
+            MDC.put("status", String.valueOf(status));
+            MDC.put("duration_ms", String.valueOf(elapsedMs));
+            MDC.put("client_ip", clientIp != null ? clientIp : "-");
+
+            if (status >= 500) {
+                logger.error(message);
+            } else if (status >= 400) {
+                logger.warn(message);
+            } else {
+                logger.info(message);
+            }
+        } finally {
+            MDC.clear();
         }
     }
 }
