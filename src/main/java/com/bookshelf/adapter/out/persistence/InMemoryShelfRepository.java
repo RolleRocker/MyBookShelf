@@ -103,25 +103,20 @@ public class InMemoryShelfRepository implements ShelfRepository {
 
     @Override
     public List<Shelf> findShelvesForBook(UUID bookId) {
-        List<Shelf> result = new ArrayList<>();
-        for (var entry : shelfBooks.entrySet()) {
-            boolean contains = entry
-                .getValue()
-                .stream()
-                .anyMatch(e -> e.bookId().equals(bookId));
-            if (contains) {
-                Shelf shelf = shelves.get(entry.getKey());
-                if (shelf != null) {
-                    // Return minimal shelf info for book enrichment
-                    Shelf mini = new Shelf();
-                    mini.setId(shelf.getId());
-                    mini.setName(shelf.getName());
-                    mini.setColor(shelf.getColor());
-                    result.add(mini);
-                }
-            }
-        }
-        return result;
+        return shelfBooks.entrySet().stream()
+            .filter(entry -> entry.getValue().stream()
+                .anyMatch(e -> e.bookId().equals(bookId)))
+            .map(entry -> shelves.get(entry.getKey()))
+            .filter(shelf -> shelf != null)
+            .map(shelf -> {
+                // Return minimal shelf info for book enrichment
+                Shelf mini = new Shelf();
+                mini.setId(shelf.getId());
+                mini.setName(shelf.getName());
+                mini.setColor(shelf.getColor());
+                return mini;
+            })
+            .toList();
     }
 
     @Override
@@ -238,13 +233,13 @@ public class InMemoryShelfRepository implements ShelfRepository {
         );
 
         // Get books sorted appropriately
-        List<Book> books = new ArrayList<>();
         List<ShelfBookEntry> sorted = new ArrayList<>(entries);
         sorted.sort(Comparator.comparingInt(ShelfBookEntry::position));
 
-        for (ShelfBookEntry entry : sorted) {
-            bookRepository.findById(entry.bookId()).ifPresent(books::add);
-        }
+        List<Book> books = sorted.stream()
+            .map(entry -> bookRepository.findById(entry.bookId()))
+            .flatMap(Optional::stream)
+            .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
 
         // Apply sort if not custom
         String sortField =
@@ -339,13 +334,11 @@ public class InMemoryShelfRepository implements ShelfRepository {
         stats.put("totalPages", totalPages);
 
         // Genre breakdown
-        java.util.Map<String, Integer> genreBreakdown =
-            new java.util.LinkedHashMap<>();
-        for (Book book : books) {
-            if (book.getGenre() != null && !book.getGenre().isBlank()) {
-                genreBreakdown.merge(book.getGenre(), 1, Integer::sum);
-            }
-        }
+        java.util.Map<String, Integer> genreBreakdown = books.stream()
+            .map(Book::getGenre)
+            .filter(g -> g != null && !g.isBlank())
+            .collect(java.util.stream.Collectors.toMap(
+                g -> g, g -> 1, Integer::sum, java.util.LinkedHashMap::new));
         stats.put("genreBreakdown", genreBreakdown);
 
         return stats;
