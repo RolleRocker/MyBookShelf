@@ -34,11 +34,13 @@ com.bookshelf
 │   │                                 #   GoalRepository, UserRepository, BookMetadataFetcher, TokenService)
 │   └── exception/                    # DuplicateGoalException, DuplicateUserException
 ├── adapter/                          # Adapters — depend on domain ports + framework
-│   ├── in/http/                      # Inbound HTTP (BookController, ShelfController,
-│   │                                 #   GoalController, AuthController, GsonFactory)
+│   ├── in/http/                      # Inbound HTTP (BookController, BookStatsController,
+│   │                                 #   BookCsvController, ShelfController, GoalController,
+│   │                                 #   AuthController, ControllerUtils, GsonFactory)
 │   ├── in/mcp/                       # Inbound MCP (McpController, McpToolHandler)
 │   └── out/
-│       ├── persistence/              # InMemory*Repository (tests), Jdbc*Repository (prod), DatabaseConfig
+│       ├── persistence/              # InMemory*Repository (tests), Jdbc*Repository (prod),
+│       │                             #   DatabaseConfig, BookRowMapper
 │       ├── enrichment/               # BookEnrichmentService, OpenLibraryClient
 │       └── auth/                     # JwtUtil, PasswordUtil, GoogleTokenVerifier
 └── framework/http/                   # HttpServer, HttpRequest, HttpResponse, RequestParser,

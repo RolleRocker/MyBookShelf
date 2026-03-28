@@ -212,13 +212,15 @@ src/main/java/com/bookshelf/
 │       └── DuplicateUserException.java
 ├── adapter/
 │   ├── in/http/                          # Inbound HTTP adapters
-│   │   ├── BookController.java, ShelfController.java
-│   │   ├── GoalController.java, AuthController.java
+│   │   ├── BookController.java, BookStatsController.java, BookCsvController.java
+│   │   ├── ShelfController.java, GoalController.java, AuthController.java
+│   │   ├── ControllerUtils.java, GsonFactory.java
 │   ├── in/mcp/                           # Inbound MCP adapter
 │   │   ├── McpController.java, McpToolHandler.java
 │   ├── out/persistence/                  # Repository implementations
 │   │   ├── InMemory*Repository.java      # In-memory (tests)
 │   │   ├── Jdbc*Repository.java          # PostgreSQL (production)
+│   │   ├── BookRowMapper.java            # Shared ResultSet → Book mapping
 │   │   └── DatabaseConfig.java           # HikariCP + migrations
 │   ├── out/enrichment/                   # Book metadata fetching
 │   │   ├── OpenLibraryClient.java        # Implements BookMetadataFetcher
@@ -242,8 +244,8 @@ src/test/java/com/bookshelf/
 ├── GoalApiTest.java            # 17 tests — reading goal CRUD, progress, validation, year boundaries
 ├── AuthApiTest.java            # 19 tests — register, login, JWT auth, protected endpoints, input boundaries
 ├── GoogleAuthApiTest.java      # 11 tests — Google OAuth with test RSA key pair
-├── JwtUtilTest.java            # 8 tests — JWT roundtrip, tampered tokens, alg:none bypass
-├── PasswordUtilTest.java       # 4 tests — hash roundtrip, salt uniqueness
+├── JwtUtilTest.java            #  8 tests — JWT roundtrip, tampered tokens, alg:none bypass
+├── PasswordUtilTest.java       #  4 tests — hash roundtrip, salt uniqueness
 └── OpenLibraryTest.java        # 11 integration tests — live Open Library API (excluded from default run)
 
 static/
