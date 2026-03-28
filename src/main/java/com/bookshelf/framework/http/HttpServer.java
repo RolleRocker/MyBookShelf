@@ -66,16 +66,12 @@ public class HttpServer {
 
             // Auth check
             if (authMiddleware != null) {
-                boolean isPublic = authMiddleware.isPublicRoute(request.getMethod(), request.getPath());
-                if (!isPublic) {
-                    java.util.Optional<java.util.UUID> userId = authMiddleware.authenticate(request);
-                    if (userId.isEmpty()) {
-                        response = HttpResponse.unauthorized("authentication required");
-                        ResponseWriter.write(socket.getOutputStream(), response);
-                        socket.shutdownOutput();
-                        return;
-                    }
-                    request.setUserId(userId.get());
+                HttpResponse authError = authMiddleware.enforceAuth(request);
+                if (authError != null) {
+                    response = authError;
+                    ResponseWriter.write(socket.getOutputStream(), response);
+                    socket.shutdownOutput();
+                    return;
                 }
             }
 

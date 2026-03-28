@@ -33,6 +33,22 @@ public class AuthMiddleware {
         return Optional.ofNullable(userId);
     }
 
+    /**
+     * Returns null if the request is authorized (public route or valid token).
+     * Returns an error HttpResponse if auth fails.
+     */
+    public HttpResponse enforceAuth(HttpRequest request) {
+        if (isPublicRoute(request.getMethod(), request.getPath())) {
+            return null;
+        }
+        Optional<UUID> userId = authenticate(request);
+        if (userId.isEmpty()) {
+            return HttpResponse.unauthorized("authentication required");
+        }
+        request.setUserId(userId.get());
+        return null;
+    }
+
     public boolean isPublicRoute(String method, String path) {
         if ("GET".equalsIgnoreCase(method)) {
             if (publicGetPaths.contains(path)) return true;
