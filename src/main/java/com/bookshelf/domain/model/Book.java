@@ -107,4 +107,32 @@ public class Book {
     public String toString() {
         return "Book{id=" + id + ", title='" + title + "', author='" + author + "', isbn='" + isbn + "'}";
     }
+
+    public static class Builder {
+        private final Book book = new Book();
+
+        public Builder id(UUID id) { book.setId(id); return this; }
+        public Builder title(String title) { book.setTitle(title); return this; }
+        public Builder author(String author) { book.setAuthor(author); return this; }
+        public Builder genre(String genre) { book.setGenre(genre); return this; }
+        public Builder rating(Integer rating) { book.setRating(rating); return this; }
+        public Builder isbn(String isbn) { book.setIsbn(isbn); return this; }
+        public Builder publisher(String publisher) { book.setPublisher(publisher); return this; }
+        public Builder publishDate(String publishDate) { book.setPublishDate(publishDate); return this; }
+        public Builder pageCount(Integer pageCount) { book.setPageCount(pageCount); return this; }
+        public Builder subjects(List<String> subjects) { book.setSubjects(subjects); return this; }
+        public Builder readStatus(ReadStatus readStatus) { book.setReadStatus(readStatus); return this; }
+        public Builder coverData(byte[] coverData) { book.setCoverData(coverData); return this; }
+        public Builder coverUrl(String coverUrl) { book.setCoverUrl(coverUrl); return this; }
+        public Builder review(String review) { book.setReview(review); return this; }
+        public Builder readingProgress(Integer readingProgress) { book.setReadingProgress(readingProgress); return this; }
+        public Builder startedAt(String startedAt) { book.setStartedAt(startedAt); return this; }
+        public Builder finishedAt(String finishedAt) { book.setFinishedAt(finishedAt); return this; }
+        public Builder createdAt(Instant createdAt) { book.setCreatedAt(createdAt); return this; }
+        public Builder updatedAt(Instant updatedAt) { book.setUpdatedAt(updatedAt); return this; }
+
+        public Book build() { return book; }
+    }
+
+    public static Builder builder() { return new Builder(); }
 }
